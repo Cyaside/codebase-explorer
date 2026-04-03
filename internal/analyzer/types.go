@@ -7,6 +7,7 @@ import (
 )
 
 type Result struct {
+	SchemaVersion        string            `json:"schema_version"`
 	Version              string            `json:"version"`
 	GeneratedAt          time.Time         `json:"generated_at"`
 	ProjectName          string            `json:"project_name"`

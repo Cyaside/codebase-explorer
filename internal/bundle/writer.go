@@ -82,6 +82,17 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	if err := writeJSON(filepath.Join(bundlePath, "data", "modules.json"), request.Analysis.Modules); err != nil {
 		return WriteResult{}, err
 	}
+	contractMeta := map[string]any{
+		"bundle_schema_version":   request.Analysis.SchemaVersion,
+		"analysis_schema_version": request.Analysis.SchemaVersion,
+		"metrics_schema_version":  request.Analysis.SchemaVersion,
+		"files_schema_version":    request.Analysis.SchemaVersion,
+		"modules_schema_version":  request.Analysis.SchemaVersion,
+		"tool_version":            w.version,
+	}
+	if err := writeJSON(filepath.Join(bundlePath, "data", "contract.json"), contractMeta); err != nil {
+		return WriteResult{}, err
+	}
 	cacheMeta := map[string]any{
 		"version":            w.version,
 		"cache_enabled":      false,

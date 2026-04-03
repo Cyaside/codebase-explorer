@@ -121,5 +121,5 @@ func ChangesREADME() string {
 }
 
 func DataREADME() string {
-	return "# Data\n\nThis folder contains machine-readable baseline outputs for the deterministic analysis bundle.\n"
+	return "# Data\n\nThis folder contains machine-readable baseline outputs for the deterministic analysis bundle, including `contract.json` to pin the phase 1 schema version.\n"
 }

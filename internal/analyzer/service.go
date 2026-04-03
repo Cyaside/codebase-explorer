@@ -15,6 +15,8 @@ type Service struct {
 	version string
 }
 
+const schemaVersion = "phase1.v1"
+
 func NewService(version string) Service {
 	return Service{version: version}
 }
@@ -40,6 +42,7 @@ func (s Service) Analyze(scanResult repo.ScanResult, deterministicOnly bool) Res
 	}
 
 	return Result{
+		SchemaVersion:        schemaVersion,
 		Version:              s.version,
 		GeneratedAt:          generatedAt,
 		ProjectName:          scanResult.ProjectName,
