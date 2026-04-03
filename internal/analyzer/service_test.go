@@ -31,3 +31,56 @@ func TestAnalyzeDetectsLanguagesAndHotspots(t *testing.T) {
 		t.Fatalf("expected hotspot candidates")
 	}
 }
+
+func TestBuildModulesGroupsRootFilesIntoRootBucket(t *testing.T) {
+	t.Parallel()
+
+	modules := buildModules([]repo.FileInfo{
+		{Path: "README.md", LineCount: 10, Extension: ".md"},
+		{Path: "go.mod", LineCount: 5, Extension: ".mod"},
+		{Path: "internal/app/service.go", LineCount: 30, Extension: ".go"},
+		{Path: "cmd/codearch/main.go", LineCount: 20, Extension: ".go", IsEntryPoint: true},
+	})
+
+	if len(modules) < 3 {
+		t.Fatalf("expected root, internal, and cmd modules, got %#v", modules)
+	}
+
+	if modules[0].Path != "internal" {
+		t.Fatalf("expected internal to stay as the dominant module, got %#v", modules[0])
+	}
+
+	var rootModule *ModuleInfo
+	for index := range modules {
+		if modules[index].Path == "." {
+			rootModule = &modules[index]
+			break
+		}
+	}
+	if rootModule == nil {
+		t.Fatalf("expected root files to be grouped into the root bucket, got %#v", modules)
+	}
+	if rootModule.FileCount != 2 {
+		t.Fatalf("expected root bucket to contain two files, got %#v", rootModule)
+	}
+}
+
+func TestBuildImportantDirectoriesSkipsRootBucket(t *testing.T) {
+	t.Parallel()
+
+	modules := []ModuleInfo{
+		{Path: "internal", TotalLines: 200},
+		{Path: ".", TotalLines: 100},
+		{Path: "cmd", TotalLines: 50},
+	}
+
+	importantDirectories := buildImportantDirectories(modules)
+	if len(importantDirectories) != 2 {
+		t.Fatalf("expected only directory-like modules, got %#v", importantDirectories)
+	}
+	for _, directory := range importantDirectories {
+		if directory == "." {
+			t.Fatalf("did not expect the root bucket to appear in important directories: %#v", importantDirectories)
+		}
+	}
+}

@@ -196,19 +196,29 @@ func buildEntryPoints(files []repo.FileInfo) []string {
 }
 
 func buildImportantDirectories(modules []ModuleInfo) []string {
-	limit := min(len(modules), 5)
-	results := make([]string, 0, limit)
-	for _, module := range modules[:limit] {
+	var results []string
+	for _, module := range modules {
+		if module.Path == "." {
+			continue
+		}
 		results = append(results, module.Path)
+		if len(results) == 5 {
+			break
+		}
 	}
 	return results
 }
 
 func buildCoreModules(modules []ModuleInfo) []string {
-	limit := min(len(modules), 4)
-	results := make([]string, 0, limit)
-	for _, module := range modules[:limit] {
+	var results []string
+	for _, module := range modules {
+		if module.Path == "." {
+			continue
+		}
 		results = append(results, module.Path)
+		if len(results) == 4 {
+			break
+		}
 	}
 	return results
 }
@@ -296,6 +306,9 @@ func buildSummary(projectName, projectType string, metrics Metrics, languages []
 func topLevelPath(filePath string) string {
 	normalized := filepathToSlash(filePath)
 	if normalized == "." || normalized == "" {
+		return "."
+	}
+	if !strings.Contains(normalized, "/") {
 		return "."
 	}
 	segments := strings.Split(normalized, "/")
