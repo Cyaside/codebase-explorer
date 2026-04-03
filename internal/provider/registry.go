@@ -83,6 +83,20 @@ func (r Registry) Describe(name string) (Descriptor, bool) {
 	return descriptor, found
 }
 
+func (r Registry) ClientFor(config Config) (Client, error) {
+	if err := r.Validate(config); err != nil {
+		return nil, err
+	}
+
+	switch normalizeName(config.Name) {
+	case "openai", "openai-compatible":
+		client := NewOpenAICompatibleClient(nil)
+		return client, nil
+	default:
+		return nil, fmt.Errorf("unsupported provider %q; supported providers: %s", config.Name, strings.Join(r.Names(), ", "))
+	}
+}
+
 func normalizeName(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
