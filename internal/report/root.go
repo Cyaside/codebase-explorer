@@ -31,6 +31,10 @@ func RootREADME(_ repo.ScanResult, analysis analyzer.Result, aiResult provider.R
 	builder.WriteString("\n")
 	builder.WriteString("## Summary\n\n")
 	builder.WriteString(analysis.Summary)
+	if summary := strings.TrimSpace(aiResult.ProjectSummary); summary != "" {
+		builder.WriteString("\n\n## AI Snapshot\n\n")
+		builder.WriteString(summary)
+	}
 	builder.WriteString("\n\n## Reports\n\n")
 	builder.WriteString("- [Overview](overview/README.md)\n")
 	builder.WriteString("- [Architecture](architecture/README.md)\n")

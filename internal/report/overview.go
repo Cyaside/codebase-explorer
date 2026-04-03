@@ -5,9 +5,10 @@ import (
 	"strings"
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
+	"github.com/Cyaside/codebase-explorer/internal/provider"
 )
 
-func OverviewREADME(analysis analyzer.Result) string {
+func OverviewREADME(analysis analyzer.Result, aiResult provider.Result) string {
 	var builder strings.Builder
 	builder.WriteString("# Overview\n\n")
 	builder.WriteString(fmt.Sprintf("Project type: `%s`\n\n", analysis.ProjectType))
@@ -30,5 +31,10 @@ func OverviewREADME(analysis analyzer.Result) string {
 	builder.WriteString("\n## Deterministic Summary\n\n")
 	builder.WriteString(analysis.Summary)
 	builder.WriteString("\n")
+	if summary := strings.TrimSpace(aiResult.ProjectSummary); summary != "" {
+		builder.WriteString("\n## AI Project Summary\n\n")
+		builder.WriteString(summary)
+		builder.WriteString("\n")
+	}
 	return builder.String()
 }

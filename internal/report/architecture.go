@@ -5,11 +5,17 @@ import (
 	"strings"
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
+	"github.com/Cyaside/codebase-explorer/internal/provider"
 )
 
-func ArchitectureREADME(analysis analyzer.Result) string {
+func ArchitectureREADME(analysis analyzer.Result, aiResult provider.Result) string {
 	var builder strings.Builder
 	builder.WriteString("# Architecture\n\n")
+	if narrative := strings.TrimSpace(aiResult.ArchitectureNarrative); narrative != "" {
+		builder.WriteString("## AI Architecture Narrative\n\n")
+		builder.WriteString(narrative)
+		builder.WriteString("\n\n")
+	}
 	builder.WriteString("## Core Modules\n\n")
 	for _, module := range analysis.Modules {
 		builder.WriteString(fmt.Sprintf("- `%s`: %d files, %d lines, %d entry point(s)\n", module.Path, module.FileCount, module.TotalLines, module.EntryPointCount))

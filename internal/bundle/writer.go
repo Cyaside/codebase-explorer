@@ -58,11 +58,11 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 
 	files := map[string]string{
 		filepath.Join(bundlePath, "README.md"):                 report.RootREADME(request.ScanResult, request.Analysis, request.AIResult, bundleName),
-		filepath.Join(bundlePath, "overview", "README.md"):     report.OverviewREADME(request.Analysis),
-		filepath.Join(bundlePath, "architecture", "README.md"): report.ArchitectureREADME(request.Analysis),
-		filepath.Join(bundlePath, "hotspots", "README.md"):     report.HotspotsREADME(request.Analysis),
+		filepath.Join(bundlePath, "overview", "README.md"):     report.OverviewREADME(request.Analysis, request.AIResult),
+		filepath.Join(bundlePath, "architecture", "README.md"): report.ArchitectureREADME(request.Analysis, request.AIResult),
+		filepath.Join(bundlePath, "hotspots", "README.md"):     report.HotspotsREADME(request.Analysis, request.AIResult),
 		filepath.Join(bundlePath, "dependencies", "README.md"): report.DependenciesREADME(request.Analysis),
-		filepath.Join(bundlePath, "reading-path", "README.md"): report.ReadingPathREADME(request.Analysis),
+		filepath.Join(bundlePath, "reading-path", "README.md"): report.ReadingPathREADME(request.Analysis, request.AIResult),
 		filepath.Join(bundlePath, "changes", "README.md"):      report.ChangesREADME(),
 		filepath.Join(bundlePath, "data", "README.md"):         report.DataREADME(),
 	}
