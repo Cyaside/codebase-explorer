@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Cyaside/codebase-explorer/internal/repo"
@@ -81,6 +82,34 @@ func TestBuildImportantDirectoriesSkipsRootBucket(t *testing.T) {
 	for _, directory := range importantDirectories {
 		if directory == "." {
 			t.Fatalf("did not expect the root bucket to appear in important directories: %#v", importantDirectories)
+		}
+	}
+}
+
+func TestAnalyzeKeepsFixturePathsOutOfOrientationSignals(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join("..", "..")
+	scanResult, err := repo.NewScanner().Scan(t.Context(), repo.ScanOptions{RootPath: root})
+	if err != nil {
+		t.Fatalf("scan repository root: %v", err)
+	}
+
+	result := NewService("test").Analyze(scanResult, true)
+
+	for _, entryPoint := range result.EntryPoints {
+		if strings.Contains(entryPoint, "testdata/") {
+			t.Fatalf("did not expect fixture entry point in orientation output: %#v", result.EntryPoints)
+		}
+	}
+	for _, module := range result.CoreModules {
+		if module == "testdata" {
+			t.Fatalf("did not expect fixture module in core modules: %#v", result.CoreModules)
+		}
+	}
+	for _, item := range result.ReadingPath {
+		if strings.Contains(item.Path, "testdata/") || item.Path == "testdata" {
+			t.Fatalf("did not expect fixture path in reading path: %#v", result.ReadingPath)
 		}
 	}
 }
