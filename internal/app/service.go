@@ -53,7 +53,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 
 	analysis := s.analyzer.Analyze(scanResult, request.DeterministicOnly)
 	aiContext := buildCondensedContext(analysis)
-	aiResult := s.buildAIResult(analysis, request.DeterministicOnly)
+	aiResult := s.buildAIResult(ctx, analysis, request.DeterministicOnly, aiContext)
 
 	writeResult, err := s.writer.Write(bundle.WriteRequest{
 		OutputRoot:        outputRoot,
