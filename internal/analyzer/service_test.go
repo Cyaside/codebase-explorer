@@ -113,3 +113,32 @@ func TestAnalyzeKeepsFixturePathsOutOfOrientationSignals(t *testing.T) {
 		}
 	}
 }
+
+func TestComputeHotspotsRanksHighSignalFilesFirst(t *testing.T) {
+	t.Parallel()
+
+	hotspots := computeHotspots([]repo.FileInfo{
+		{
+			Path:         "internal/core/service.go",
+			LineCount:    200,
+			ImportCount:  5,
+			TodoCount:    1,
+			FixmeCount:   1,
+			IsEntryPoint: true,
+		},
+		{
+			Path:      "internal/core/helpers.go",
+			LineCount: 40,
+		},
+	})
+
+	if len(hotspots) != 2 {
+		t.Fatalf("expected both files to be scored, got %#v", hotspots)
+	}
+	if hotspots[0].Path != "internal/core/service.go" {
+		t.Fatalf("expected high-signal file to rank first, got %#v", hotspots)
+	}
+	if hotspots[0].Score <= hotspots[1].Score {
+		t.Fatalf("expected first hotspot to outrank second, got %#v", hotspots)
+	}
+}
