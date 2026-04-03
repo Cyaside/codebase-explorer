@@ -52,12 +52,14 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	}
 
 	analysis := s.analyzer.Analyze(scanResult, request.DeterministicOnly)
+	aiContext := buildCondensedContext(analysis)
 
 	writeResult, err := s.writer.Write(bundle.WriteRequest{
 		OutputRoot:        outputRoot,
 		DeterministicOnly: request.DeterministicOnly,
 		ScanResult:        scanResult,
 		Analysis:          analysis,
+		AIContext:         aiContext,
 	})
 	if err != nil {
 		return AnalyzeResult{}, fmt.Errorf("write bundle: %w", err)

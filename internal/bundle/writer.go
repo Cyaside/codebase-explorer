@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
+	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 	"github.com/Cyaside/codebase-explorer/internal/report"
 )
@@ -19,6 +20,7 @@ type WriteRequest struct {
 	DeterministicOnly bool
 	ScanResult        repo.ScanResult
 	Analysis          analyzer.Result
+	AIContext         provider.CondensedContext
 }
 
 type WriteResult struct {
@@ -82,13 +84,17 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	if err := writeJSON(filepath.Join(bundlePath, "data", "modules.json"), request.Analysis.Modules); err != nil {
 		return WriteResult{}, err
 	}
+	if err := writeJSON(filepath.Join(bundlePath, "data", "ai-context.json"), request.AIContext); err != nil {
+		return WriteResult{}, err
+	}
 	contractMeta := map[string]any{
-		"bundle_schema_version":   request.Analysis.SchemaVersion,
-		"analysis_schema_version": request.Analysis.SchemaVersion,
-		"metrics_schema_version":  request.Analysis.SchemaVersion,
-		"files_schema_version":    request.Analysis.SchemaVersion,
-		"modules_schema_version":  request.Analysis.SchemaVersion,
-		"tool_version":            w.version,
+		"bundle_schema_version":     request.Analysis.SchemaVersion,
+		"analysis_schema_version":   request.Analysis.SchemaVersion,
+		"metrics_schema_version":    request.Analysis.SchemaVersion,
+		"files_schema_version":      request.Analysis.SchemaVersion,
+		"modules_schema_version":    request.Analysis.SchemaVersion,
+		"ai_context_schema_version": request.AIContext.SchemaVersion,
+		"tool_version":              w.version,
 	}
 	if err := writeJSON(filepath.Join(bundlePath, "data", "contract.json"), contractMeta); err != nil {
 		return WriteResult{}, err
