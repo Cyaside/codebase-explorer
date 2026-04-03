@@ -53,7 +53,8 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 
 	analysis := s.analyzer.Analyze(scanResult, request.DeterministicOnly)
 	aiContext := buildCondensedContext(analysis)
-	aiResult := s.buildAIResult(ctx, analysis, request.DeterministicOnly, aiContext)
+	emitAnalyzeProgress(request, "ai-context", "ready", summarizeAIContext(aiContext))
+	aiResult := s.buildAIResult(ctx, request, analysis, request.DeterministicOnly, aiContext)
 
 	writeResult, err := s.writer.Write(bundle.WriteRequest{
 		OutputRoot:        outputRoot,
@@ -80,6 +81,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 		TotalLines:      analysis.Metrics.TotalLines,
 		EntryPoints:     analysis.EntryPoints,
 		PrimaryLanguage: primaryLanguage,
+		AI:              buildAISummary(aiContext, aiResult),
 	}, nil
 }
 

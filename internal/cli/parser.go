@@ -28,6 +28,7 @@ func Run(ctx context.Context, args []string, service Service, stdout, stderr io.
 
 	switch command.name {
 	case "analyze":
+		command.analyzeRequest.Progress = composeAnalyzeProgress(command.analyzeRequest.Progress, stderr)
 		result, runErr := service.Analyze(ctx, command.analyzeRequest)
 		if runErr != nil {
 			return 1, runErr

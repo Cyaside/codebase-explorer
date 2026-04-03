@@ -6,6 +6,7 @@ type AnalyzeRequest struct {
 	DeterministicOnly    bool
 	ExtraIgnorePatterns  []string
 	OptionalSupportFiles []string
+	Progress             AnalyzeProgressReporter
 }
 
 type AnalyzeResult struct {
@@ -16,6 +17,25 @@ type AnalyzeResult struct {
 	TotalLines      int
 	EntryPoints     []string
 	PrimaryLanguage string
+	AI              AnalyzeAISummary
+}
+
+type AnalyzeProgressEvent struct {
+	Stage  string
+	Status string
+	Detail string
+}
+
+type AnalyzeProgressReporter func(AnalyzeProgressEvent)
+
+type AnalyzeAISummary struct {
+	Status           string
+	Provider         string
+	Model            string
+	Used             bool
+	Note             string
+	ContextSummary   string
+	ContextTruncated bool
 }
 
 type DoctorRequest struct{}

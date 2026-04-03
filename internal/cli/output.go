@@ -26,7 +26,51 @@ func printAnalyzeResult(output io.Writer, result app.AnalyzeResult) {
 	if len(result.EntryPoints) > 0 {
 		fmt.Fprintf(output, "Entry points: %s\n", strings.Join(result.EntryPoints, ", "))
 	}
+	if result.AI.Status != "" {
+		fmt.Fprintf(output, "AI synthesis: %s\n", result.AI.Status)
+	}
+	if result.AI.Provider != "" {
+		if result.AI.Model != "" {
+			fmt.Fprintf(output, "AI provider: %s (%s)\n", result.AI.Provider, result.AI.Model)
+		} else {
+			fmt.Fprintf(output, "AI provider: %s\n", result.AI.Provider)
+		}
+	}
+	if result.AI.ContextSummary != "" {
+		fmt.Fprintf(output, "AI context: %s\n", result.AI.ContextSummary)
+	}
+	if result.AI.Note != "" {
+		fmt.Fprintf(output, "AI note: %s\n", result.AI.Note)
+	}
 	fmt.Fprintf(output, "Bundle: %s\n", result.OutputPath)
+}
+
+func composeAnalyzeProgress(existing app.AnalyzeProgressReporter, output io.Writer) app.AnalyzeProgressReporter {
+	return func(event app.AnalyzeProgressEvent) {
+		if existing != nil {
+			existing(event)
+		}
+		printAnalyzeProgress(output, event)
+	}
+}
+
+func printAnalyzeProgress(output io.Writer, event app.AnalyzeProgressEvent) {
+	if output == nil {
+		return
+	}
+
+	stage := strings.TrimSpace(event.Stage)
+	status := strings.TrimSpace(event.Status)
+	detail := strings.TrimSpace(event.Detail)
+	if stage == "" && status == "" && detail == "" {
+		return
+	}
+
+	if detail == "" {
+		fmt.Fprintf(output, "AI progress [%s/%s]\n", stage, status)
+		return
+	}
+	fmt.Fprintf(output, "AI progress [%s/%s]: %s\n", stage, status, detail)
 }
 
 func printDoctorResult(output io.Writer, result app.DoctorResult) {
