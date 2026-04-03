@@ -10,22 +10,25 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/bundle"
 	"github.com/Cyaside/codebase-explorer/internal/config"
+	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 )
 
 type Service struct {
-	settings config.Settings
-	scanner  repo.Scanner
-	analyzer analyzer.Service
-	writer   bundle.Writer
+	settings  config.Settings
+	scanner   repo.Scanner
+	analyzer  analyzer.Service
+	providers provider.Registry
+	writer    bundle.Writer
 }
 
 func New(settings config.Settings) Service {
 	return Service{
-		settings: settings,
-		scanner:  repo.NewScanner(),
-		analyzer: analyzer.NewService(settings.AppVersion),
-		writer:   bundle.NewWriter(settings.AppVersion),
+		settings:  settings,
+		scanner:   repo.NewScanner(),
+		analyzer:  analyzer.NewService(settings.AppVersion),
+		providers: provider.NewRegistry(),
+		writer:    bundle.NewWriter(settings.AppVersion),
 	}
 }
 
@@ -104,17 +107,48 @@ func (s Service) Doctor(_ context.Context, _ DoctorRequest) (DoctorResult, error
 		})
 	}
 
-	checks = append(checks, DoctorCheck{
-		Name:   "provider",
-		Status: "pass",
-		Detail: "phase 1 baseline uses deterministic-only analysis",
-	})
+	checks = append(checks, s.providerDoctorCheck())
 
 	return DoctorResult{
 		ConfigSource: s.settings.ConfigSource,
 		OutputRoot:   outputRoot,
 		Checks:       checks,
 	}, nil
+}
+
+func (s Service) providerDoctorCheck() DoctorCheck {
+	providerConfig := provider.Config{
+		Name:    s.settings.Provider.Name,
+		Model:   s.settings.Provider.Model,
+		APIKey:  s.settings.Provider.APIKey,
+		BaseURL: s.settings.Provider.BaseURL,
+	}
+	if !providerConfig.Enabled() {
+		return DoctorCheck{
+			Name:   "provider",
+			Status: "pass",
+			Detail: "no provider configured; deterministic analysis remains available",
+		}
+	}
+
+	if err := s.providers.Validate(providerConfig); err != nil {
+		return DoctorCheck{
+			Name:   "provider",
+			Status: "fail",
+			Detail: err.Error(),
+		}
+	}
+
+	detail := fmt.Sprintf("provider %s is configured with model %s", providerConfig.Name, providerConfig.Model)
+	if strings.TrimSpace(providerConfig.BaseURL) != "" {
+		detail += fmt.Sprintf(" via %s", providerConfig.BaseURL)
+	}
+
+	return DoctorCheck{
+		Name:   "provider",
+		Status: "pass",
+		Detail: detail,
+	}
 }
 
 func resolveRepoPath(repoPath string) (string, error) {

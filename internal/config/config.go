@@ -16,14 +16,20 @@ type Settings struct {
 	DefaultOutputRoot string
 	AppVersion        string
 	ConfigSource      string
+	Provider          ProviderSettings
 }
 
 func Load() (Settings, error) {
-	outputRoot := strings.TrimSpace(os.Getenv("CODEARCH_OUTPUT_ROOT"))
+	outputRoot := strings.TrimSpace(getEnv("CODEARCH_OUTPUT_ROOT"))
 	source := "defaults"
 	if outputRoot == "" {
 		outputRoot = defaultOutputRoot
 	} else {
+		source = "environment"
+	}
+
+	providerSettings, providerFromEnv := loadProviderSettings()
+	if providerFromEnv {
 		source = "environment"
 	}
 
@@ -36,5 +42,10 @@ func Load() (Settings, error) {
 		DefaultOutputRoot: cleanRoot,
 		AppVersion:        defaultAppVersion,
 		ConfigSource:      source,
+		Provider:          providerSettings,
 	}, nil
+}
+
+func getEnv(key string) string {
+	return os.Getenv(key)
 }
