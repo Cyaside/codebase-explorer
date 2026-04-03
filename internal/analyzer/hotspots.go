@@ -3,6 +3,7 @@ package analyzer
 import (
 	"fmt"
 	"math"
+	"sort"
 
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 )
@@ -76,4 +77,13 @@ func computeHotspots(files []repo.FileInfo) []Hotspot {
 
 func markerTotal(file repo.FileInfo) int {
 	return file.TodoCount + file.FixmeCount + file.HackCount
+}
+
+func sortHotspots(hotspots []Hotspot) {
+	sort.Slice(hotspots, func(i, j int) bool {
+		if hotspots[i].Score == hotspots[j].Score {
+			return hotspots[i].Path < hotspots[j].Path
+		}
+		return hotspots[i].Score > hotspots[j].Score
+	})
 }
