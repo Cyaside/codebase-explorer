@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -178,8 +179,18 @@ func isProbablyText(reader *bufio.Reader) (bool, error) {
 	return true, nil
 }
 
+var markerPatterns = map[string]*regexp.Regexp{
+	"TODO":  regexp.MustCompile(`(?i)\bTODO\b`),
+	"FIXME": regexp.MustCompile(`(?i)\bFIXME\b`),
+	"HACK":  regexp.MustCompile(`(?i)\bHACK\b`),
+}
+
 func markerCount(line, marker string) int {
-	return strings.Count(strings.ToUpper(line), marker)
+	pattern, found := markerPatterns[strings.ToUpper(marker)]
+	if !found {
+		return 0
+	}
+	return len(pattern.FindAllStringIndex(line, -1))
 }
 
 func importLikeCount(line string) int {
