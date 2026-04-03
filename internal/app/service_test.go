@@ -67,6 +67,26 @@ func TestAnalyzeWritesDeterministicBundle(t *testing.T) {
 	if aiContext.SchemaVersion != condensedContextSchemaVersion {
 		t.Fatalf("expected AI context schema version %q, got %q", condensedContextSchemaVersion, aiContext.SchemaVersion)
 	}
+
+	aiResultContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "ai-result.json"))
+	if err != nil {
+		t.Fatalf("read ai result contract: %v", err)
+	}
+
+	var aiResult struct {
+		SchemaVersion  string `json:"schema_version"`
+		Status         string `json:"status"`
+		FallbackReason string `json:"fallback_reason"`
+	}
+	if err := json.Unmarshal(aiResultContents, &aiResult); err != nil {
+		t.Fatalf("unmarshal ai result contract: %v", err)
+	}
+	if aiResult.SchemaVersion != "ai-result.v1" {
+		t.Fatalf("expected AI result schema version ai-result.v1, got %q", aiResult.SchemaVersion)
+	}
+	if aiResult.Status != "skipped" {
+		t.Fatalf("expected deterministic-only analyze to skip AI synthesis, got %#v", aiResult)
+	}
 }
 
 func TestDoctorFailsWhenProviderConfigIsInvalid(t *testing.T) {
@@ -169,6 +189,46 @@ func TestBuildCondensedContextTrimsLargeSections(t *testing.T) {
 	}
 	if !context.Metadata.Truncated {
 		t.Fatalf("expected truncation metadata to be set")
+	}
+}
+
+func TestAnalyzeFallsBackWhenProviderConfigIsInvalid(t *testing.T) {
+	t.Parallel()
+
+	service := New(config.Settings{
+		DefaultOutputRoot: t.TempDir(),
+		AppVersion:        "test",
+		ConfigSource:      "test",
+		Provider: config.ProviderSettings{
+			Name: "openai",
+		},
+	})
+
+	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
+	result, err := service.Analyze(t.Context(), AnalyzeRequest{
+		RepoPath: repoPath,
+	})
+	if err != nil {
+		t.Fatalf("analyze sample repo with invalid provider config: %v", err)
+	}
+
+	aiResultContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "ai-result.json"))
+	if err != nil {
+		t.Fatalf("read ai result contract: %v", err)
+	}
+
+	var aiResult struct {
+		Status         string `json:"status"`
+		FallbackReason string `json:"fallback_reason"`
+	}
+	if err := json.Unmarshal(aiResultContents, &aiResult); err != nil {
+		t.Fatalf("unmarshal ai result contract: %v", err)
+	}
+	if aiResult.Status != "fallback" {
+		t.Fatalf("expected invalid provider config to fall back, got %#v", aiResult)
+	}
+	if aiResult.FallbackReason == "" {
+		t.Fatalf("expected fallback reason to be present")
 	}
 }
 

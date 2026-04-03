@@ -53,6 +53,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 
 	analysis := s.analyzer.Analyze(scanResult, request.DeterministicOnly)
 	aiContext := buildCondensedContext(analysis)
+	aiResult := s.buildAIResult(analysis, request.DeterministicOnly)
 
 	writeResult, err := s.writer.Write(bundle.WriteRequest{
 		OutputRoot:        outputRoot,
@@ -60,6 +61,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 		ScanResult:        scanResult,
 		Analysis:          analysis,
 		AIContext:         aiContext,
+		AIResult:          aiResult,
 	})
 	if err != nil {
 		return AnalyzeResult{}, fmt.Errorf("write bundle: %w", err)
@@ -119,12 +121,7 @@ func (s Service) Doctor(_ context.Context, _ DoctorRequest) (DoctorResult, error
 }
 
 func (s Service) providerDoctorCheck() DoctorCheck {
-	providerConfig := provider.Config{
-		Name:    s.settings.Provider.Name,
-		Model:   s.settings.Provider.Model,
-		APIKey:  s.settings.Provider.APIKey,
-		BaseURL: s.settings.Provider.BaseURL,
-	}
+	providerConfig := s.providerConfig()
 	if !providerConfig.Enabled() {
 		return DoctorCheck{
 			Name:   "provider",

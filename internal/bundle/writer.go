@@ -21,6 +21,7 @@ type WriteRequest struct {
 	ScanResult        repo.ScanResult
 	Analysis          analyzer.Result
 	AIContext         provider.CondensedContext
+	AIResult          provider.Result
 }
 
 type WriteResult struct {
@@ -56,7 +57,7 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	}
 
 	files := map[string]string{
-		filepath.Join(bundlePath, "README.md"):                 report.RootREADME(request.ScanResult, request.Analysis, bundleName),
+		filepath.Join(bundlePath, "README.md"):                 report.RootREADME(request.ScanResult, request.Analysis, request.AIResult, bundleName),
 		filepath.Join(bundlePath, "overview", "README.md"):     report.OverviewREADME(request.Analysis),
 		filepath.Join(bundlePath, "architecture", "README.md"): report.ArchitectureREADME(request.Analysis),
 		filepath.Join(bundlePath, "hotspots", "README.md"):     report.HotspotsREADME(request.Analysis),
@@ -87,6 +88,9 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	if err := writeJSON(filepath.Join(bundlePath, "data", "ai-context.json"), request.AIContext); err != nil {
 		return WriteResult{}, err
 	}
+	if err := writeJSON(filepath.Join(bundlePath, "data", "ai-result.json"), request.AIResult); err != nil {
+		return WriteResult{}, err
+	}
 	contractMeta := map[string]any{
 		"bundle_schema_version":     request.Analysis.SchemaVersion,
 		"analysis_schema_version":   request.Analysis.SchemaVersion,
@@ -94,6 +98,7 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		"files_schema_version":      request.Analysis.SchemaVersion,
 		"modules_schema_version":    request.Analysis.SchemaVersion,
 		"ai_context_schema_version": request.AIContext.SchemaVersion,
+		"ai_result_schema_version":  request.AIResult.SchemaVersion,
 		"tool_version":              w.version,
 	}
 	if err := writeJSON(filepath.Join(bundlePath, "data", "contract.json"), contractMeta); err != nil {
