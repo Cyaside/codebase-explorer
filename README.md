@@ -1,19 +1,28 @@
 # Codebase Explorer
 
-Codebase Explorer adalah local-first repository orientation tool untuk membantu memahami codebase asing dengan cepat melalui structured analysis bundle.
+Codebase Explorer adalah CLI local-first untuk membantu memahami codebase asing dengan cepat lewat structured analysis bundle.
 
-Target produk ini:
-- personal use
-- local execution
-- deterministic-first
-- optional AI synthesis
-- reusable report output
+Saat ini tool ini fokus pada deterministic repository orientation:
+- scan repo lokal dengan ignore handling
+- deteksi bahasa utama, entry point, dan module penting
+- ranking hotspot dan dependency risk ringan
+- reading path awal untuk onboarding
+- output bundle reusable dalam format Markdown dan JSON
 
-Planned direction utamanya:
-- Go untuk core analyzer dan CLI
-- Markdown, JSON, dan Mermaid untuk output
-- static local viewer untuk membaca hasil
+## Menjalankan
 
-Catatan:
-- planning dan rulebook project disimpan secara lokal di folder `guide/`
-- folder `guide/` sengaja tidak ikut version control
+```bash
+go run ./cmd/codearch doctor
+go run ./cmd/codearch analyze <repo-path> --deterministic-only
+```
+
+## Output Bundle
+
+Hasil analisis ditulis ke folder `out/` dan berisi:
+- `README.md` sebagai pintu masuk hasil
+- `overview/`, `architecture/`, `hotspots/`, `dependencies/`, dan `reading-path/`
+- `data/analysis.json`, `data/metrics.json`, `data/files.json`, `data/modules.json`, dan `data/contract.json`
+
+## Fokus Saat Ini
+
+Phase 1 membangun fondasi analyzer yang tetap berguna tanpa AI, sehingga hasil scan, heuristik deterministic, dan bundle output sudah bisa dipakai sendiri untuk orientasi awal repository.
