@@ -6,6 +6,19 @@
 2. Jalankan `go run ./cmd/codearch analyze <repo-path> --deterministic-only`
 3. Buka hasil dengan `go run ./cmd/codearch open --no-browser`
 
+## Local Workbench
+
+1. Jalankan `go run ./cmd/codearch serve`
+2. Masukkan local repo path di form workbench
+3. Pilih connection profile:
+   `Deterministic only`, `OpenAI`, `OpenRouter`, `Mistral`, atau custom compatible profile
+4. Jalankan analisis dari UI dan pilih bundle hasilnya dari sidebar
+
+Catatan:
+- connection profile disimpan lokal di browser
+- API key tidak ikut ditulis ke bundle
+- GitHub URL belum di-clone otomatis; gunakan local checkout path
+
 ## Dengan Support Files
 
 1. Siapkan repo lokal
@@ -30,6 +43,8 @@ export CODEARCH_API_KEY=...
 
 2. Jalankan `go run ./cmd/codearch doctor`
 3. Jalankan `go run ./cmd/codearch analyze <repo-path>`
+
+Alternatifnya, gunakan `go run ./cmd/codearch serve` lalu simpan beberapa connection profile di workbench bila kamu ingin berganti API key atau vendor per analisis.
 
 ## Export Bundle
 

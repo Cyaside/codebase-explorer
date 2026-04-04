@@ -15,6 +15,7 @@ Saat ini tool ini fokus pada deterministic repository orientation:
 ```bash
 go run ./cmd/codearch doctor
 go run ./cmd/codearch analyze <repo-path> --deterministic-only
+go run ./cmd/codearch serve --no-browser
 go run ./cmd/codearch analyze <repo-path> --support ./issues.json --changelog ./CHANGELOG.md
 go run ./cmd/codearch open --no-browser
 go run ./cmd/codearch export --output ./out/latest-bundle.zip
@@ -29,6 +30,8 @@ Panduan langkah cepat yang lebih lengkap ada di [docs/quickstart.md](docs/quicks
   Validasi config, output root, cache root, dan provider setup.
 - `codearch analyze <repo-path>`
   Menjalankan scan, deterministic analysis, support-file correlation opsional, dan AI synthesis opsional.
+- `codearch serve [--addr <host:port>] [--no-browser]`
+  Menjalankan local web workbench untuk membuka project, memilih koneksi provider, dan membaca bundle dengan UI dark mode.
 - `codearch open [bundle-path] [--no-browser]`
   Membuka viewer bundle terbaru atau bundle yang dipilih.
 - `codearch export [bundle-path] [--output <zip-path>]`
@@ -57,6 +60,8 @@ Variabel environment yang didukung:
 - `CODEARCH_BASE_URL`
   Base URL untuk provider `openai-compatible`
 
+Environment tetap cocok untuk satu default provider. Kalau butuh beberapa API key sekaligus, gunakan `codearch serve` lalu simpan connection profile lokal di browser untuk OpenAI, OpenRouter, Mistral, atau endpoint compatible lain. Profile itu hanya dipakai per run dan tidak ikut ditulis ke bundle output.
+
 ## Output Bundle
 
 Hasil analisis ditulis ke folder `out/` dan berisi:
@@ -71,6 +76,15 @@ Hasil analisis ditulis ke folder `out/` dan berisi:
 `out/` juga sekarang dipruning otomatis agar hanya menyimpan bundle terbaru dalam jumlah terbatas.
 
 Support files tetap opsional. Kalau file issue/changelog tidak diberikan atau tidak valid, hasil utama deterministic tetap jadi dan bundle tetap ditulis.
+
+## Workbench
+
+Workbench adalah local webapp ringan yang tetap jalan dari binary Go yang sama, tanpa Electron atau backend berat tambahan. Workbench ini cocok untuk:
+- membuka project path lokal
+- menyimpan beberapa connection profile secara lokal di browser
+- menjalankan analisis dan langsung membaca summary, architecture, flowchart, issue tracking, dan recommendations
+
+Untuk sekarang jalur local-first tetap diprioritaskan, jadi input repository GitHub URL belum di-clone otomatis. Gunakan local checkout path saat menjalankan analisis dari workbench.
 
 ## Build
 

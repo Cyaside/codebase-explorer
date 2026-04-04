@@ -11,6 +11,11 @@ Solusi:
 - cek environment variable yang aktif
 - jalankan `go run ./cmd/codearch doctor` lagi setelah diperbaiki
 
+Kalau kamu memakai workbench:
+- cek profile yang sedang dipilih
+- pastikan `model`, `api_key`, dan `base_url` profile terisi sesuai provider
+- simpan profile lagi lalu ulangi analisis
+
 ## AI Status `fallback`
 
 Artinya deterministic analysis tetap sukses, tetapi synthesis AI gagal atau tidak valid.
@@ -18,7 +23,16 @@ Artinya deterministic analysis tetap sukses, tetapi synthesis AI gagal atau tida
 Langkah cek:
 - pastikan API key dan model benar
 - cek apakah provider mengembalikan response yang valid
+- untuk OpenRouter atau Mistral lewat mode compatible, pastikan base URL profile benar
 - ulangi dengan `--deterministic-only` bila ingin memastikan jalur baseline tetap sehat
+
+## Workbench Tidak Bisa Menganalisis GitHub URL
+
+Itu memang perilaku saat ini.
+
+Workbench sengaja tetap local-first dan lightweight, jadi URL remote belum di-clone otomatis. Solusinya:
+- clone repo lebih dulu ke lokal
+- jalankan analisis dengan local path hasil clone
 
 ## Changes Report Kosong
 
