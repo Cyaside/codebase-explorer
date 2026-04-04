@@ -72,6 +72,10 @@
     @apply text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground;
   }
 
+  .field-description {
+    @apply text-sm text-muted-foreground;
+  }
+
   .field-input {
     @apply w-full rounded-2xl border border-border bg-background/70 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/50 focus:ring-2 focus:ring-primary/30;
   }
@@ -102,6 +106,14 @@
 
   .status-pill-active {
     @apply border-primary/35 bg-primary/15 text-primary-foreground;
+  }
+
+  .kbd-chip {
+    @apply inline-flex min-w-8 items-center justify-center rounded-lg border border-border bg-card px-2 py-1 font-mono text-[11px] font-semibold text-foreground shadow-sm;
+  }
+
+  .surface-fact {
+    @apply rounded-2xl border border-border bg-background/55 px-3 py-3;
   }
 
   .code-block {

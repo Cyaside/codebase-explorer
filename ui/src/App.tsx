@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CircleAlert, FolderOpenDot } from "lucide-react";
 
 import { AnalyzeForm } from "@/components/AnalyzeForm";
@@ -9,6 +9,7 @@ import { TabPanels } from "@/components/TabPanels";
 import { WorkbenchAlerts } from "@/components/WorkbenchAlerts";
 import { WorkbenchRail } from "@/components/WorkbenchRail";
 import { buildProviderPayload, cancelAnalyzeRun, fetchAnalyzeRun, fetchBundle, fetchStatus, mergeBundleSummary, startAnalyzeRun } from "@/lib/api";
+import { useWorkbenchShortcuts } from "@/hooks/useWorkbenchShortcuts";
 import { defaultProfiles, loadProfiles, loadUIState, persistProfiles, persistUIState } from "@/lib/storage";
 import { openAnalyzeRunStream } from "@/lib/stream";
 import type { AnalyzeFormState, AnalyzeRun, ConnectionProfile, TabKey, WorkbenchBundle, WorkbenchStatusResponse } from "@/lib/types";
@@ -17,6 +18,7 @@ import { validateProfile } from "@/lib/validation";
 
 const initialUIState = loadUIState();
 const initialProfiles = loadProfiles();
+const workbenchTabs: TabKey[] = ["summary", "architecture", "flowchart", "issues", "recommendations"];
 
 export function App() {
   const [status, setStatus] = useState<WorkbenchStatusResponse | null>(null);
@@ -43,6 +45,7 @@ export function App() {
   const apiKey = profileSecrets[profile.id] || "";
   const validationErrors = validateProfile(profile, apiKey, providerOptions);
   const busy = !!activeRun && ["queued", "running", "canceling"].includes(activeRun.status);
+  const repoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     void refreshStatus();
@@ -125,6 +128,26 @@ export function App() {
       }
     };
   }, [activeRun?.id, activeRun?.status]);
+
+  useWorkbenchShortcuts({
+    activeTab,
+    busy,
+    onAnalyze: () => {
+      void handleAnalyze();
+    },
+    onCancel: () => {
+      void handleCancelAnalyze();
+    },
+    onFocusAnalyze: () => {
+      repoInputRef.current?.focus();
+      repoInputRef.current?.select();
+    },
+    onRefresh: () => {
+      void refreshStatus();
+    },
+    onSelectTab: setActiveTab,
+    tabs: workbenchTabs,
+  });
 
   async function refreshStatus(preferredBundleName?: string) {
     try {
@@ -354,12 +377,14 @@ export function App() {
 
               <section className="grid gap-4 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
                 <AnalyzeForm
+                  activeProfileLabel={profile.label}
                   busy={busy}
                   busyDetail={busyDetail}
                   form={form}
                   onCancel={handleCancelAnalyze}
                   onChange={setForm}
                   onSubmit={handleAnalyze}
+                  repoInputRef={repoInputRef}
                   run={activeRun}
                 />
                 <ConnectionPanel
