@@ -7,13 +7,14 @@ Saat ini tool ini fokus pada deterministic repository orientation:
 - deteksi bahasa utama, entry point, dan module penting
 - ranking hotspot dan dependency risk ringan
 - reading path awal untuk onboarding
-- output bundle reusable dalam format Markdown dan JSON
+- output bundle reusable dalam format Markdown, JSON, Mermaid, dan viewer lokal statis
 
 ## Menjalankan
 
 ```bash
 go run ./cmd/codearch doctor
 go run ./cmd/codearch analyze <repo-path> --deterministic-only
+go run ./cmd/codearch open --no-browser
 ```
 
 ## Output Bundle
@@ -21,8 +22,12 @@ go run ./cmd/codearch analyze <repo-path> --deterministic-only
 Hasil analisis ditulis ke folder `out/` dan berisi:
 - `README.md` sebagai pintu masuk hasil
 - `overview/`, `architecture/`, `hotspots/`, `dependencies/`, dan `reading-path/`
+- `architecture/module-graph.mmd` dan `dependencies/dependency-graph.mmd`
+- `ui/index.html` untuk viewer lokal
 - `data/analysis.json`, `data/metrics.json`, `data/files.json`, `data/modules.json`, dan `data/contract.json`
+
+`out/` juga sekarang dipruning otomatis agar hanya menyimpan bundle terbaru dalam jumlah terbatas.
 
 ## Fokus Saat Ini
 
-Phase 1 membangun fondasi analyzer yang tetap berguna tanpa AI, sehingga hasil scan, heuristik deterministic, dan bundle output sudah bisa dipakai sendiri untuk orientasi awal repository.
+Fase fondasi analyzer, synthesis AI opsional, dan visual report inti sudah aktif. Fokus berikutnya adalah memperkaya kualitas konsumsi hasil tanpa mengorbankan local-first workflow dan efisiensi runtime.

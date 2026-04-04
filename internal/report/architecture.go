@@ -16,6 +16,10 @@ func ArchitectureREADME(analysis analyzer.Result, aiResult provider.Result) stri
 		builder.WriteString(narrative)
 		builder.WriteString("\n\n")
 	}
+	builder.WriteString("## Related Views\n\n")
+	builder.WriteString("- [Open the local viewer](../ui/index.html)\n")
+	builder.WriteString("- [Review the root report](../README.md)\n")
+	builder.WriteString("- [Open the architecture Mermaid graph](module-graph.mmd)\n\n")
 	builder.WriteString("## Orientation Graph\n\n")
 	builder.WriteString("- [module-graph.mmd](module-graph.mmd)\n\n")
 	builder.WriteString("## Core Modules\n\n")

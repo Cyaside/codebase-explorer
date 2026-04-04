@@ -11,6 +11,10 @@ import (
 func ReadingPathREADME(analysis analyzer.Result, aiResult provider.Result) string {
 	var builder strings.Builder
 	builder.WriteString("# Reading Path\n\n")
+	builder.WriteString("## Related Views\n\n")
+	builder.WriteString("- [Open the local viewer](../ui/index.html)\n")
+	builder.WriteString("- [Review the root report](../README.md)\n")
+	builder.WriteString("- [Compare with architecture notes](../architecture/README.md)\n\n")
 	if len(analysis.ReadingPath) == 0 {
 		builder.WriteString("No reading path candidates were generated.\n")
 		return builder.String()

@@ -36,5 +36,9 @@ func OverviewREADME(analysis analyzer.Result, aiResult provider.Result) string {
 		builder.WriteString(summary)
 		builder.WriteString("\n")
 	}
+	builder.WriteString("\n## Next Stops\n\n")
+	builder.WriteString("- [Open the local viewer](../ui/index.html)\n")
+	builder.WriteString("- [Inspect architecture details](../architecture/README.md)\n")
+	builder.WriteString("- [Follow the reading path](../reading-path/README.md)\n")
 	return builder.String()
 }
