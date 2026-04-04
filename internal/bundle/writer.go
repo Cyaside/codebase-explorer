@@ -13,6 +13,7 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 	"github.com/Cyaside/codebase-explorer/internal/report"
+	"github.com/Cyaside/codebase-explorer/internal/viewer"
 )
 
 type WriteRequest struct {
@@ -55,6 +56,7 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		filepath.Join(bundlePath, "reading-path"),
 		filepath.Join(bundlePath, "changes"),
 		filepath.Join(bundlePath, "data"),
+		filepath.Join(bundlePath, "ui"),
 	}
 	for _, directory := range directories {
 		if err := os.MkdirAll(directory, 0o755); err != nil {
@@ -78,6 +80,17 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	for pathOnDisk, contents := range files {
 		if err := os.WriteFile(pathOnDisk, []byte(contents), 0o644); err != nil {
 			return WriteResult{}, fmt.Errorf("write report file %q: %w", pathOnDisk, err)
+		}
+	}
+
+	viewerFiles, err := viewer.Files(buildViewerData(request, bundleName))
+	if err != nil {
+		return WriteResult{}, fmt.Errorf("prepare viewer files: %w", err)
+	}
+	for relativePath, contents := range viewerFiles {
+		pathOnDisk := filepath.Join(bundlePath, "ui", relativePath)
+		if err := os.WriteFile(pathOnDisk, contents, 0o644); err != nil {
+			return WriteResult{}, fmt.Errorf("write viewer file %q: %w", pathOnDisk, err)
 		}
 	}
 
@@ -169,4 +182,43 @@ func sanitizeName(name string) string {
 		return "repository"
 	}
 	return strings.ToLower(cleaned)
+}
+
+func buildViewerData(request WriteRequest, bundleName string) viewer.BundleData {
+	return viewer.BundleData{
+		BundleName:  bundleName,
+		GeneratedAt: request.Analysis.GeneratedAt,
+		Project: viewer.ProjectData{
+			Name:         request.Analysis.ProjectName,
+			Type:         request.Analysis.ProjectType,
+			AnalyzedPath: request.Analysis.AnalyzedPath,
+			Summary:      request.Analysis.Summary,
+			ProviderMode: request.Analysis.Provider,
+		},
+		Metrics:              request.Analysis.Metrics,
+		Languages:            request.Analysis.Languages,
+		ImportantDirectories: request.Analysis.ImportantDirectories,
+		EntryPoints:          request.Analysis.EntryPoints,
+		CoreModules:          request.Analysis.CoreModules,
+		Modules:              request.Analysis.Modules,
+		Hotspots:             request.Analysis.Hotspots,
+		Dependencies:         request.Analysis.DependencyRisks,
+		ReadingPath:          request.Analysis.ReadingPath,
+		AI:                   request.AIResult,
+		Mermaid: viewer.MermaidData{
+			Architecture: report.ArchitectureMermaid(request.Analysis),
+			Dependencies: report.DependenciesMermaid(request.Analysis),
+		},
+		Links: viewer.LinkData{
+			Root:                "README.md",
+			Overview:            "overview/README.md",
+			Architecture:        "architecture/README.md",
+			Dependencies:        "dependencies/README.md",
+			Hotspots:            "hotspots/README.md",
+			ReadingPath:         "reading-path/README.md",
+			Changes:             "changes/README.md",
+			ArchitectureDiagram: "architecture/module-graph.mmd",
+			DependencyDiagram:   "dependencies/dependency-graph.mmd",
+		},
+	}
 }

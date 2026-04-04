@@ -59,6 +59,12 @@ func TestAnalyzeWritesDeterministicBundle(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(result.OutputPath, "dependencies", "dependency-graph.mmd")); err != nil {
 		t.Fatalf("expected dependency mermaid graph to be written: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(result.OutputPath, "ui", "index.html")); err != nil {
+		t.Fatalf("expected viewer index to be written: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(result.OutputPath, "ui", "viewer-data.js")); err != nil {
+		t.Fatalf("expected viewer data payload to be written: %v", err)
+	}
 
 	aiContextContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "ai-context.json"))
 	if err != nil {

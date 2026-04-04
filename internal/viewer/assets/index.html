@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codebase Explorer Viewer</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <p class="eyebrow">Local Viewer</p>
+          <h1 id="bundle-title">Codebase Explorer</h1>
+          <p id="bundle-subtitle" class="muted">Bundle summary</p>
+        </div>
+        <nav class="nav">
+          <a href="#overview">Overview</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#hotspots">Hotspots</a>
+          <a href="#dependencies">Dependencies</a>
+          <a href="#reading-path">Reading Path</a>
+          <a href="#changes">Changes</a>
+          <a href="#diagrams">Diagrams</a>
+        </nav>
+        <section class="sidebar-block">
+          <h2>Bundle Links</h2>
+          <ul id="bundle-links" class="link-list"></ul>
+        </section>
+      </aside>
+      <main class="content">
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">Repository Orientation</p>
+            <h2 id="project-name">Loading bundle...</h2>
+            <p id="project-summary" class="hero-summary"></p>
+          </div>
+          <div class="hero-cards" id="summary-cards"></div>
+        </section>
+
+        <section id="overview" class="panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Overview</p>
+            <h3>Project Snapshot</h3>
+          </div>
+          <div id="overview-body" class="panel-body"></div>
+        </section>
+
+        <section id="architecture" class="panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Architecture</p>
+            <h3>Structure and Modules</h3>
+          </div>
+          <div id="architecture-body" class="panel-body"></div>
+        </section>
+
+        <section id="hotspots" class="panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Hotspots</p>
+            <h3>Files Worth Reviewing Carefully</h3>
+          </div>
+          <div id="hotspots-body" class="panel-body"></div>
+        </section>
+
+        <section id="dependencies" class="panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Dependencies</p>
+            <h3>Concentration Map</h3>
+          </div>
+          <div id="dependencies-body" class="panel-body"></div>
+        </section>
+
+        <section id="reading-path" class="panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Reading Path</p>
+            <h3>Suggested Walkthrough</h3>
+          </div>
+          <div id="reading-path-body" class="panel-body"></div>
+        </section>
+
+        <section id="changes" class="panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Changes</p>
+            <h3>Current Status</h3>
+          </div>
+          <div id="changes-body" class="panel-body"></div>
+        </section>
+
+        <section id="diagrams" class="panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Diagrams</p>
+            <h3>Mermaid Source</h3>
+          </div>
+          <div id="diagrams-body" class="panel-body"></div>
+        </section>
+      </main>
+    </div>
+    <script src="./viewer-data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+  </html>
