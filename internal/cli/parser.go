@@ -17,6 +17,7 @@ type Service interface {
 	Analyze(context.Context, app.AnalyzeRequest) (app.AnalyzeResult, error)
 	Doctor(context.Context, app.DoctorRequest) (app.DoctorResult, error)
 	Open(context.Context, app.OpenRequest) (app.OpenResult, error)
+	ClearCache(context.Context, app.CacheClearRequest) (app.CacheClearResult, error)
 }
 
 func Run(ctx context.Context, args []string, service Service, stdout, stderr io.Writer) (int, error) {
@@ -45,6 +46,13 @@ func Run(ctx context.Context, args []string, service Service, stdout, stderr io.
 			return 1, runErr
 		}
 		printDoctorResult(stdout, result)
+		return 0, nil
+	case "cache-clear":
+		result, runErr := service.ClearCache(ctx, app.CacheClearRequest{})
+		if runErr != nil {
+			return 1, runErr
+		}
+		printCacheClearResult(stdout, result)
 		return 0, nil
 	case "open":
 		result, runErr := service.Open(ctx, command.openRequest)
@@ -79,6 +87,11 @@ func parse(args []string) (parsedCommand, error) {
 	switch args[0] {
 	case "-h", "--help", "help":
 		return parsedCommand{}, errUsage
+	case "cache":
+		if len(args) == 2 && args[1] == "clear" {
+			return parsedCommand{name: "cache-clear"}, nil
+		}
+		return parsedCommand{}, fmt.Errorf("unknown cache command")
 	case "doctor":
 		if len(args) > 1 {
 			return parsedCommand{}, fmt.Errorf("doctor does not accept additional arguments")

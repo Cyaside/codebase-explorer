@@ -23,6 +23,7 @@ type WriteRequest struct {
 	ScanResult        repo.ScanResult
 	Analysis          analyzer.Result
 	Changes           changes.Result
+	Cache             CacheMeta
 	AIContext         provider.CondensedContext
 	AIResult          provider.Result
 }
@@ -36,6 +37,13 @@ type WriteResult struct {
 type Writer struct {
 	version    string
 	keepLatest int
+}
+
+type CacheMeta struct {
+	Enabled             bool
+	Root                string
+	DeterministicStatus string
+	ProviderStatus      string
 }
 
 func NewWriter(version string, keepLatest int) Writer {
@@ -132,11 +140,14 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		return WriteResult{}, err
 	}
 	cacheMeta := map[string]any{
-		"version":            w.version,
-		"cache_enabled":      false,
-		"deterministic_only": request.DeterministicOnly,
-		"generated_at":       request.Analysis.GeneratedAt,
-		"note":               "phase 1 baseline writes cache metadata but does not reuse cache yet",
+		"version":                w.version,
+		"cache_enabled":          request.Cache.Enabled,
+		"cache_root":             request.Cache.Root,
+		"deterministic_status":   request.Cache.DeterministicStatus,
+		"provider_status":        request.Cache.ProviderStatus,
+		"deterministic_only":     request.DeterministicOnly,
+		"generated_at":           request.Analysis.GeneratedAt,
+		"output_retention_limit": w.keepLatest,
 	}
 	if err := writeJSON(filepath.Join(bundlePath, "data", "cache-meta.json"), cacheMeta); err != nil {
 		return WriteResult{}, err

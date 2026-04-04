@@ -19,6 +19,11 @@ func TestPrintAnalyzeResultIncludesAISummary(t *testing.T) {
 		EntryPoints:     []string{"cmd/codearch/main.go"},
 		PrimaryLanguage: "Go",
 		OutputPath:      "/tmp/out",
+		Cache: app.AnalyzeCacheSummary{
+			Enabled:             true,
+			DeterministicStatus: "hit",
+			ProviderStatus:      "miss",
+		},
 		Changes: app.AnalyzeChangesSummary{
 			SupportFileCount: 2,
 			ParsedItemCount:  5,
@@ -59,6 +64,9 @@ func TestPrintAnalyzeResultIncludesAISummary(t *testing.T) {
 	}
 	if !strings.Contains(output, "Change note: supporting files were parsed successfully") {
 		t.Fatalf("expected change note in analyze output, got %q", output)
+	}
+	if !strings.Contains(output, "Cache: deterministic hit, provider miss") {
+		t.Fatalf("expected cache summary in analyze output, got %q", output)
 	}
 	if !strings.Contains(output, "Output retention: keep latest 10 bundle(s)") {
 		t.Fatalf("expected output retention line in analyze output, got %q", output)
@@ -103,5 +111,20 @@ func TestPrintOpenResultIncludesResolvedViewerPath(t *testing.T) {
 	}
 	if !strings.Contains(output, "Browser launch: skipped by flag") {
 		t.Fatalf("expected browser skip note, got %q", output)
+	}
+}
+
+func TestPrintCacheClearResult(t *testing.T) {
+	t.Parallel()
+
+	var builder strings.Builder
+	printCacheClearResult(&builder, app.CacheClearResult{
+		CacheRoot:      "/tmp/cache",
+		RemovedEntries: 3,
+	})
+
+	output := builder.String()
+	if !strings.Contains(output, "Cache cleared.") || !strings.Contains(output, "Removed entries: 3") {
+		t.Fatalf("expected cache clear output, got %q", output)
 	}
 }

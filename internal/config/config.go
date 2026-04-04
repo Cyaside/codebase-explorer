@@ -15,6 +15,8 @@ const (
 
 type Settings struct {
 	DefaultOutputRoot string
+	CacheRoot         string
+	CacheEnabled      bool
 	AppVersion        string
 	ConfigSource      string
 	OutputKeepLatest  int
@@ -27,6 +29,11 @@ func Load() (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
+	cacheRoot, cacheRootFromEnv := loadCacheRoot()
+	cacheEnabled, cacheEnabledFromEnv, err := loadCacheEnabled()
+	if err != nil {
+		return Settings{}, err
+	}
 	source := "defaults"
 	if outputRoot == "" {
 		outputRoot = defaultOutputRoot
@@ -34,6 +41,9 @@ func Load() (Settings, error) {
 		source = "environment"
 	}
 	if outputKeepLatestFromEnv {
+		source = "environment"
+	}
+	if cacheRootFromEnv || cacheEnabledFromEnv {
 		source = "environment"
 	}
 
@@ -49,6 +59,8 @@ func Load() (Settings, error) {
 
 	return Settings{
 		DefaultOutputRoot: cleanRoot,
+		CacheRoot:         cacheRoot,
+		CacheEnabled:      cacheEnabled,
 		AppVersion:        defaultAppVersion,
 		ConfigSource:      source,
 		OutputKeepLatest:  outputKeepLatest,

@@ -17,6 +17,7 @@ type AnalyzeResult struct {
 	TotalLines      int
 	EntryPoints     []string
 	PrimaryLanguage string
+	Cache           AnalyzeCacheSummary
 	Changes         AnalyzeChangesSummary
 	AI              AnalyzeAISummary
 	Output          AnalyzeOutputSummary
@@ -45,6 +46,13 @@ type AnalyzeOutputSummary struct {
 	PrunedBundles  int
 }
 
+type AnalyzeCacheSummary struct {
+	Enabled             bool
+	Root                string
+	DeterministicStatus string
+	ProviderStatus      string
+}
+
 type AnalyzeChangesSummary struct {
 	Available        bool
 	SupportFileCount int
@@ -62,6 +70,24 @@ type OpenResult struct {
 	BundlePath     string
 	ViewerPath     string
 	ResolvedLatest bool
+}
+
+type ExportRequest struct {
+	BundlePath  string
+	OutputPath  string
+	IncludeName bool
+}
+
+type ExportResult struct {
+	BundlePath  string
+	ArchivePath string
+}
+
+type CacheClearRequest struct{}
+
+type CacheClearResult struct {
+	CacheRoot      string
+	RemovedEntries int
 }
 
 type DoctorRequest struct{}

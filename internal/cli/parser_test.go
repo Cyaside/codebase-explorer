@@ -29,3 +29,15 @@ func TestParseAnalyzeRejectsMissingSupportValue(t *testing.T) {
 		t.Fatalf("expected parse error for missing support value")
 	}
 }
+
+func TestParseCacheClearCommand(t *testing.T) {
+	t.Parallel()
+
+	command, err := parse([]string{"cache", "clear"})
+	if err != nil {
+		t.Fatalf("parse cache clear command: %v", err)
+	}
+	if command.name != "cache-clear" {
+		t.Fatalf("expected cache-clear command, got %#v", command)
+	}
+}

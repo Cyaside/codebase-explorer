@@ -9,7 +9,7 @@ import (
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/bundle"
-	"github.com/Cyaside/codebase-explorer/internal/changes"
+	"github.com/Cyaside/codebase-explorer/internal/cache"
 	"github.com/Cyaside/codebase-explorer/internal/config"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
@@ -19,15 +19,30 @@ type Service struct {
 	settings  config.Settings
 	scanner   repo.Scanner
 	analyzer  analyzer.Service
+	cache     cache.Store
 	providers provider.Registry
 	writer    bundle.Writer
 }
 
 func New(settings config.Settings) Service {
+	cacheRoot := strings.TrimSpace(settings.CacheRoot)
+	cacheEnabled := settings.CacheEnabled
+	if cacheRoot == "" {
+		if strings.TrimSpace(settings.DefaultOutputRoot) != "" {
+			cacheRoot = filepath.Join(settings.DefaultOutputRoot, ".codearch-cache")
+		} else {
+			cacheRoot = ".codearch-cache"
+		}
+		if !settings.CacheEnabled {
+			cacheEnabled = true
+		}
+	}
+
 	return Service{
 		settings:  settings,
 		scanner:   repo.NewScanner(),
 		analyzer:  analyzer.NewService(settings.AppVersion),
+		cache:     cache.NewStore(cacheRoot, cacheEnabled),
 		providers: provider.NewRegistry(),
 		writer:    bundle.NewWriter(settings.AppVersion, settings.OutputKeepLatest),
 	}
@@ -44,20 +59,18 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 		return AnalyzeResult{}, err
 	}
 
-	scanResult, err := s.scanner.Scan(ctx, repo.ScanOptions{
-		RootPath:            repoPath,
-		ExtraIgnorePatterns: request.ExtraIgnorePatterns,
-	})
+	supportFiles := resolveSupportFiles(repoPath, request.OptionalSupportFiles)
+	state, err := s.loadDeterministicState(ctx, request, repoPath, supportFiles)
 	if err != nil {
 		return AnalyzeResult{}, fmt.Errorf("scan repository: %w", err)
 	}
 
-	analysis := s.analyzer.Analyze(scanResult, request.DeterministicOnly)
-	supportFiles := resolveSupportFiles(repoPath, request.OptionalSupportFiles)
-	changeResult := changes.Analyze(analysis.GeneratedAt, analysis, supportFiles)
+	scanResult := state.ScanResult
+	analysis := state.Analysis
+	changeResult := state.Changes
 	aiContext := buildCondensedContext(analysis)
 	emitAnalyzeProgress(request, "ai-context", "ready", summarizeAIContext(aiContext))
-	aiResult := s.buildAIResult(ctx, request, analysis, request.DeterministicOnly, aiContext)
+	aiResult, providerCacheStatus := s.buildAIResult(ctx, request, analysis, request.DeterministicOnly, aiContext)
 
 	writeResult, err := s.writer.Write(bundle.WriteRequest{
 		OutputRoot:        outputRoot,
@@ -65,8 +78,14 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 		ScanResult:        scanResult,
 		Analysis:          analysis,
 		Changes:           changeResult,
-		AIContext:         aiContext,
-		AIResult:          aiResult,
+		Cache: bundle.CacheMeta{
+			Enabled:             s.cache.Enabled(),
+			Root:                s.cache.Root(),
+			DeterministicStatus: state.Status,
+			ProviderStatus:      providerCacheStatus,
+		},
+		AIContext: aiContext,
+		AIResult:  aiResult,
 	})
 	if err != nil {
 		return AnalyzeResult{}, fmt.Errorf("write bundle: %w", err)
@@ -86,6 +105,12 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 		TotalLines:      analysis.Metrics.TotalLines,
 		EntryPoints:     analysis.EntryPoints,
 		PrimaryLanguage: primaryLanguage,
+		Cache: AnalyzeCacheSummary{
+			Enabled:             s.cache.Enabled(),
+			Root:                s.cache.Root(),
+			DeterministicStatus: state.Status,
+			ProviderStatus:      providerCacheStatus,
+		},
 		Changes: AnalyzeChangesSummary{
 			Available:        changeResult.Available,
 			SupportFileCount: changeResult.SupportFileCount,
@@ -126,6 +151,24 @@ func (s Service) Doctor(_ context.Context, _ DoctorRequest) (DoctorResult, error
 			Name:   "output-root",
 			Status: "pass",
 			Detail: fmt.Sprintf("output root is ready at %s; keeping latest %d bundle(s)", outputRoot, s.settings.OutputKeepLatest),
+		})
+	}
+
+	if err := s.cache.Ensure(); err != nil {
+		checks = append(checks, DoctorCheck{
+			Name:   "cache",
+			Status: "fail",
+			Detail: fmt.Sprintf("cannot prepare cache root %q: %v", s.cache.Root(), err),
+		})
+	} else {
+		status := "enabled"
+		if !s.cache.Enabled() {
+			status = "disabled"
+		}
+		checks = append(checks, DoctorCheck{
+			Name:   "cache",
+			Status: "pass",
+			Detail: fmt.Sprintf("cache %s at %s", status, s.cache.Root()),
 		})
 	}
 

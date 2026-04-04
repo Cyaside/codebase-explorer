@@ -13,6 +13,7 @@ func printUsage(output io.Writer) {
 	fmt.Fprintln(output, "  codearch analyze <repo-path> [support-file ...] [--support <file>] [--issues <file>] [--changelog <file>] [--output <dir>] [--deterministic-only] [--ignore <pattern>]")
 	fmt.Fprintln(output, "  codearch open [bundle-path] [--no-browser]")
 	fmt.Fprintln(output, "  codearch doctor")
+	fmt.Fprintln(output, "  codearch cache clear")
 }
 
 func printAnalyzeResult(output io.Writer, result app.AnalyzeResult) {
@@ -51,6 +52,9 @@ func printAnalyzeResult(output io.Writer, result app.AnalyzeResult) {
 		if result.Changes.Note != "" {
 			fmt.Fprintf(output, "Change note: %s\n", result.Changes.Note)
 		}
+	}
+	if result.Cache.Enabled {
+		fmt.Fprintf(output, "Cache: deterministic %s, provider %s\n", result.Cache.DeterministicStatus, result.Cache.ProviderStatus)
 	}
 	if result.Output.RetentionLimit > 0 {
 		fmt.Fprintf(output, "Output retention: keep latest %d bundle(s)\n", result.Output.RetentionLimit)
@@ -95,6 +99,12 @@ func printDoctorResult(output io.Writer, result app.DoctorResult) {
 	for _, check := range result.Checks {
 		fmt.Fprintf(output, "- [%s] %s: %s\n", strings.ToUpper(check.Status), check.Name, check.Detail)
 	}
+}
+
+func printCacheClearResult(output io.Writer, result app.CacheClearResult) {
+	fmt.Fprintf(output, "Cache cleared.\n")
+	fmt.Fprintf(output, "Cache root: %s\n", result.CacheRoot)
+	fmt.Fprintf(output, "Removed entries: %d\n", result.RemovedEntries)
 }
 
 func printOpenResult(output io.Writer, result app.OpenResult, openErr error, noBrowser bool) {

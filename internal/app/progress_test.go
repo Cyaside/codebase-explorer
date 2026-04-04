@@ -33,11 +33,11 @@ func TestAnalyzeEmitsProgressForDeterministicOnly(t *testing.T) {
 	if len(events) < 2 {
 		t.Fatalf("expected AI progress events to be emitted, got %#v", events)
 	}
-	if events[0].Stage != "ai-context" || events[0].Status != "ready" {
-		t.Fatalf("expected first progress event to describe AI context, got %#v", events)
+	if !hasProgressEvent(events, "ai-context", "ready") {
+		t.Fatalf("expected AI context progress event, got %#v", events)
 	}
-	if events[1].Stage != "ai-synthesis" || events[1].Status != "skipped" {
-		t.Fatalf("expected second progress event to describe skipped synthesis, got %#v", events)
+	if !hasProgressEvent(events, "ai-synthesis", "skipped") {
+		t.Fatalf("expected skipped synthesis event, got %#v", events)
 	}
 }
 
@@ -87,10 +87,19 @@ func TestAnalyzeEmitsProgressForSuccessfulSynthesis(t *testing.T) {
 	if len(events) < 3 {
 		t.Fatalf("expected progress events for AI context and synthesis, got %#v", events)
 	}
-	if events[1].Status != "running" {
+	if !hasProgressEvent(events, "ai-synthesis", "running") {
 		t.Fatalf("expected running synthesis event, got %#v", events)
 	}
-	if events[2].Status != "succeeded" {
+	if !hasProgressEvent(events, "ai-synthesis", "succeeded") {
 		t.Fatalf("expected successful synthesis event, got %#v", events)
 	}
+}
+
+func hasProgressEvent(events []AnalyzeProgressEvent, stage string, status string) bool {
+	for _, event := range events {
+		if event.Stage == stage && event.Status == status {
+			return true
+		}
+	}
+	return false
 }
