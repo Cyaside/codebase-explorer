@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "Segoe UI Variable", "Aptos", "IBM Plex Sans", sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-sidebar: var(--sidebar-background);
+}
+
+:root {
+  color-scheme: dark;
+  --background: oklch(0.14 0.015 255);
+  --foreground: oklch(0.95 0.01 255);
+  --card: oklch(0.19 0.015 255 / 0.92);
+  --card-foreground: oklch(0.96 0.01 255);
+  --muted: oklch(0.24 0.015 255);
+  --muted-foreground: oklch(0.73 0.02 255);
+  --border: oklch(0.3 0.015 255 / 0.65);
+  --border-strong: oklch(0.4 0.018 255 / 0.8);
+  --primary: oklch(0.72 0.1 245);
+  --primary-foreground: oklch(0.97 0.01 255);
+  --accent: oklch(0.23 0.02 255);
+  --accent-foreground: oklch(0.97 0.01 255);
+  --danger: oklch(0.68 0.16 25);
+  --danger-foreground: oklch(0.96 0.02 25);
+  --sidebar-background: oklch(0.12 0.012 255);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at top left, color-mix(in oklab, var(--primary) 18%, transparent), transparent 26%),
+      radial-gradient(circle at 82% 8%, color-mix(in oklab, var(--danger) 10%, transparent), transparent 22%),
+      linear-gradient(180deg, oklch(0.12 0.013 255) 0%, oklch(0.1 0.012 255) 100%);
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    @apply font-sans;
+  }
+}
+
+@layer components {
+  .field {
+    @apply grid gap-2;
+  }
+
+  .field-label {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+  }
+
+  .field-input {
+    @apply w-full rounded-2xl border border-border bg-background/70 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/50 focus:ring-2 focus:ring-primary/30;
+  }
+
+  .field-textarea {
+    @apply min-h-28 resize-y rounded-2xl border border-border bg-background/70 px-3 py-3 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/50 focus:ring-2 focus:ring-primary/30;
+  }
+
+  .action-button {
+    @apply inline-flex items-center gap-2 rounded-2xl border border-primary/40 bg-primary/15 px-4 py-3 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-primary/60 hover:bg-primary/20 disabled:cursor-wait disabled:opacity-60;
+  }
+
+  .secondary-button {
+    @apply inline-flex items-center gap-2 rounded-2xl border border-border bg-background/60 px-4 py-3 text-sm font-medium text-foreground transition hover:-translate-y-0.5 hover:border-border-strong hover:bg-card disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .secondary-button.danger {
+    @apply border-danger/30 text-danger hover:border-danger/45 hover:bg-danger/10;
+  }
+
+  .status-pill {
+    @apply inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em];
+  }
+
+  .status-pill-neutral {
+    @apply border-border bg-background/70 text-muted-foreground;
+  }
+
+  .status-pill-active {
+    @apply border-primary/35 bg-primary/15 text-primary-foreground;
+  }
+
+  .code-block {
+    @apply overflow-x-auto rounded-2xl border border-border bg-background/80 p-4 font-mono text-xs leading-6 text-muted-foreground;
+  }
+}
