@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/Cyaside/codebase-explorer/internal/provider"
-	"github.com/Cyaside/codebase-explorer/internal/workbench"
+	"github.com/Cyaside/codebase-explorer/workbench"
 )
 
 type workbenchStatusResponse struct {
