@@ -9,6 +9,7 @@ import (
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/bundle"
+	"github.com/Cyaside/codebase-explorer/internal/changes"
 	"github.com/Cyaside/codebase-explorer/internal/config"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
@@ -52,6 +53,8 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	}
 
 	analysis := s.analyzer.Analyze(scanResult, request.DeterministicOnly)
+	supportFiles := resolveSupportFiles(repoPath, request.OptionalSupportFiles)
+	changeResult := changes.Analyze(analysis.GeneratedAt, analysis, supportFiles)
 	aiContext := buildCondensedContext(analysis)
 	emitAnalyzeProgress(request, "ai-context", "ready", summarizeAIContext(aiContext))
 	aiResult := s.buildAIResult(ctx, request, analysis, request.DeterministicOnly, aiContext)
@@ -61,6 +64,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 		DeterministicOnly: request.DeterministicOnly,
 		ScanResult:        scanResult,
 		Analysis:          analysis,
+		Changes:           changeResult,
 		AIContext:         aiContext,
 		AIResult:          aiResult,
 	})

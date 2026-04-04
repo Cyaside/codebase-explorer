@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
+	"github.com/Cyaside/codebase-explorer/internal/changes"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 	"github.com/Cyaside/codebase-explorer/internal/report"
@@ -21,6 +22,7 @@ type WriteRequest struct {
 	DeterministicOnly bool
 	ScanResult        repo.ScanResult
 	Analysis          analyzer.Result
+	Changes           changes.Result
 	AIContext         provider.CondensedContext
 	AIResult          provider.Result
 }
@@ -73,7 +75,7 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		filepath.Join(bundlePath, "dependencies", "README.md"):            report.DependenciesREADME(request.Analysis),
 		filepath.Join(bundlePath, "dependencies", "dependency-graph.mmd"): report.DependenciesMermaid(request.Analysis),
 		filepath.Join(bundlePath, "reading-path", "README.md"):            report.ReadingPathREADME(request.Analysis, request.AIResult),
-		filepath.Join(bundlePath, "changes", "README.md"):                 report.ChangesREADME(),
+		filepath.Join(bundlePath, "changes", "README.md"):                 report.ChangesREADME(request.Changes),
 		filepath.Join(bundlePath, "data", "README.md"):                    report.DataREADME(),
 	}
 
@@ -112,12 +114,16 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	if err := writeJSON(filepath.Join(bundlePath, "data", "ai-result.json"), request.AIResult); err != nil {
 		return WriteResult{}, err
 	}
+	if err := writeJSON(filepath.Join(bundlePath, "changes", "issue-correlation.json"), request.Changes); err != nil {
+		return WriteResult{}, err
+	}
 	contractMeta := map[string]any{
 		"bundle_schema_version":     request.Analysis.SchemaVersion,
 		"analysis_schema_version":   request.Analysis.SchemaVersion,
 		"metrics_schema_version":    request.Analysis.SchemaVersion,
 		"files_schema_version":      request.Analysis.SchemaVersion,
 		"modules_schema_version":    request.Analysis.SchemaVersion,
+		"changes_schema_version":    request.Changes.SchemaVersion,
 		"ai_context_schema_version": request.AIContext.SchemaVersion,
 		"ai_result_schema_version":  request.AIResult.SchemaVersion,
 		"tool_version":              w.version,

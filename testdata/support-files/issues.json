@@ -1,0 +1,12 @@
+[
+  {
+    "title": "Stabilize internal/app bootstrap",
+    "body": "A startup panic still appears in internal/app when cmd/sample/main.go initializes services too early.",
+    "labels": ["bug", "app"]
+  },
+  {
+    "title": "Reduce internal/core coupling",
+    "body": "internal/core remains noisy during parser refactors and keeps resurfacing in issue triage.",
+    "labels": ["refactor", "core"]
+  }
+]
