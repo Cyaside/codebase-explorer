@@ -76,6 +76,19 @@ type OpenResult struct {
 	ResolvedLatest bool
 }
 
+type ServeReadyReporter func(ServeResult)
+
+type ServeRequest struct {
+	Addr      string
+	NoBrowser bool
+	Ready     ServeReadyReporter
+}
+
+type ServeResult struct {
+	URL        string
+	OutputRoot string
+}
+
 type ExportRequest struct {
 	BundlePath string
 	OutputPath string

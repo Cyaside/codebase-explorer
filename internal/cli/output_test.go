@@ -118,6 +118,27 @@ func TestPrintOpenResultIncludesResolvedViewerPath(t *testing.T) {
 	}
 }
 
+func TestPrintServeResult(t *testing.T) {
+	t.Parallel()
+
+	var builder strings.Builder
+	printServeResult(&builder, app.ServeResult{
+		URL:        "http://127.0.0.1:4120",
+		OutputRoot: "/tmp/out",
+	}, nil, true)
+
+	output := builder.String()
+	if !strings.Contains(output, "Workbench ready.") {
+		t.Fatalf("expected serve result header, got %q", output)
+	}
+	if !strings.Contains(output, "URL: http://127.0.0.1:4120") {
+		t.Fatalf("expected workbench URL, got %q", output)
+	}
+	if !strings.Contains(output, "Browser launch: skipped by flag") {
+		t.Fatalf("expected browser skip note, got %q", output)
+	}
+}
+
 func TestPrintCacheClearResult(t *testing.T) {
 	t.Parallel()
 

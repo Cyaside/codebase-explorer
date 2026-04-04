@@ -11,6 +11,7 @@ import (
 func printUsage(output io.Writer) {
 	fmt.Fprintln(output, "Usage:")
 	fmt.Fprintln(output, "  codearch analyze <repo-path> [support-file ...] [--support <file>] [--issues <file>] [--changelog <file>] [--output <dir>] [--deterministic-only] [--ignore <pattern>]")
+	fmt.Fprintln(output, "  codearch serve [--addr <host:port>] [--no-browser]")
 	fmt.Fprintln(output, "  codearch open [bundle-path] [--no-browser]")
 	fmt.Fprintln(output, "  codearch export [bundle-path] [--output <zip-path>]")
 	fmt.Fprintln(output, "  codearch doctor")
@@ -118,6 +119,21 @@ func printOpenResult(output io.Writer, result app.OpenResult, openErr error, noB
 	if result.ResolvedLatest {
 		fmt.Fprintf(output, "Bundle source: latest bundle in output root\n")
 	}
+	if noBrowser {
+		fmt.Fprintf(output, "Browser launch: skipped by flag\n")
+		return
+	}
+	if openErr != nil {
+		fmt.Fprintf(output, "Browser launch: failed (%v)\n", openErr)
+		return
+	}
+	fmt.Fprintf(output, "Browser launch: requested\n")
+}
+
+func printServeResult(output io.Writer, result app.ServeResult, openErr error, noBrowser bool) {
+	fmt.Fprintf(output, "Workbench ready.\n")
+	fmt.Fprintf(output, "URL: %s\n", result.URL)
+	fmt.Fprintf(output, "Output root: %s\n", result.OutputRoot)
 	if noBrowser {
 		fmt.Fprintf(output, "Browser launch: skipped by flag\n")
 		return

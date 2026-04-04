@@ -16,6 +16,7 @@ import (
 type Service interface {
 	Analyze(context.Context, app.AnalyzeRequest) (app.AnalyzeResult, error)
 	Doctor(context.Context, app.DoctorRequest) (app.DoctorResult, error)
+	Serve(context.Context, app.ServeRequest) error
 	Open(context.Context, app.OpenRequest) (app.OpenResult, error)
 	Export(context.Context, app.ExportRequest) (app.ExportResult, error)
 	ClearCache(context.Context, app.CacheClearRequest) (app.CacheClearResult, error)
@@ -48,6 +49,18 @@ func Run(ctx context.Context, args []string, service Service, stdout, stderr io.
 		}
 		printDoctorResult(stdout, result)
 		return 0, nil
+	case "serve":
+		command.serveRequest.Ready = func(result app.ServeResult) {
+			var openErr error
+			if !command.serveRequest.NoBrowser {
+				openErr = openTarget(ctx, result.URL)
+			}
+			printServeResult(stdout, result, openErr, command.serveRequest.NoBrowser)
+		}
+		if runErr := service.Serve(ctx, command.serveRequest); runErr != nil {
+			return 1, runErr
+		}
+		return 0, nil
 	case "cache-clear":
 		result, runErr := service.ClearCache(ctx, app.CacheClearRequest{})
 		if runErr != nil {
@@ -63,7 +76,7 @@ func Run(ctx context.Context, args []string, service Service, stdout, stderr io.
 
 		var openErr error
 		if !command.openRequest.NoBrowser {
-			openErr = openViewer(ctx, result.ViewerPath)
+			openErr = openTarget(ctx, result.ViewerPath)
 		}
 		printOpenResult(stdout, result, openErr, command.openRequest.NoBrowser)
 		return 0, nil
@@ -82,6 +95,7 @@ func Run(ctx context.Context, args []string, service Service, stdout, stderr io.
 type parsedCommand struct {
 	name           string
 	analyzeRequest app.AnalyzeRequest
+	serveRequest   app.ServeRequest
 	openRequest    app.OpenRequest
 	exportRequest  app.ExportRequest
 }
@@ -106,6 +120,8 @@ func parse(args []string) (parsedCommand, error) {
 			return parsedCommand{}, fmt.Errorf("doctor does not accept additional arguments")
 		}
 		return parsedCommand{name: "doctor"}, nil
+	case "serve", "ui":
+		return parseServe(args[1:])
 	case "open":
 		return parseOpen(args[1:])
 	case "export":
@@ -115,6 +131,33 @@ func parse(args []string) (parsedCommand, error) {
 	default:
 		return parsedCommand{}, fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+func parseServe(args []string) (parsedCommand, error) {
+	request := app.ServeRequest{}
+
+	for index := 0; index < len(args); index++ {
+		current := args[index]
+		switch {
+		case current == "--addr":
+			index++
+			if index >= len(args) {
+				return parsedCommand{}, fmt.Errorf("--addr requires a value")
+			}
+			request.Addr = args[index]
+		case current == "--no-browser":
+			request.NoBrowser = true
+		case strings.HasPrefix(current, "--"):
+			return parsedCommand{}, fmt.Errorf("unknown serve flag %q", current)
+		default:
+			return parsedCommand{}, fmt.Errorf("serve does not accept positional arguments")
+		}
+	}
+
+	return parsedCommand{
+		name:         "serve",
+		serveRequest: request,
+	}, nil
 }
 
 func parseAnalyze(args []string) (parsedCommand, error) {
@@ -212,25 +255,34 @@ func parseExport(args []string) (parsedCommand, error) {
 	}, nil
 }
 
-func openViewer(ctx context.Context, viewerPath string) error {
-	absolutePath, err := filepath.Abs(viewerPath)
-	if err != nil {
-		return fmt.Errorf("resolve viewer path %q: %w", viewerPath, err)
+func openTarget(ctx context.Context, target string) error {
+	resolvedTarget := strings.TrimSpace(target)
+	if !looksLikeURLTarget(resolvedTarget) {
+		absolutePath, err := filepath.Abs(resolvedTarget)
+		if err != nil {
+			return fmt.Errorf("resolve target %q: %w", target, err)
+		}
+		resolvedTarget = absolutePath
 	}
 
 	var command *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
-		command = exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", absolutePath)
+		command = exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", resolvedTarget)
 	case "darwin":
-		command = exec.CommandContext(ctx, "open", absolutePath)
+		command = exec.CommandContext(ctx, "open", resolvedTarget)
 	default:
-		command = exec.CommandContext(ctx, "xdg-open", absolutePath)
+		command = exec.CommandContext(ctx, "xdg-open", resolvedTarget)
 	}
 
 	if err := command.Start(); err != nil {
-		return fmt.Errorf("open viewer %q: %w", absolutePath, err)
+		return fmt.Errorf("open target %q: %w", resolvedTarget, err)
 	}
 
 	return nil
+}
+
+func looksLikeURLTarget(target string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(target))
+	return strings.HasPrefix(normalized, "http://") || strings.HasPrefix(normalized, "https://")
 }

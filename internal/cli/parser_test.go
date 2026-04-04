@@ -42,6 +42,21 @@ func TestParseCacheClearCommand(t *testing.T) {
 	}
 }
 
+func TestParseServeAcceptsAddrAndNoBrowser(t *testing.T) {
+	t.Parallel()
+
+	command, err := parse([]string{"serve", "--addr", "127.0.0.1:4180", "--no-browser"})
+	if err != nil {
+		t.Fatalf("parse serve command: %v", err)
+	}
+	if command.name != "serve" {
+		t.Fatalf("expected serve command, got %#v", command)
+	}
+	if command.serveRequest.Addr != "127.0.0.1:4180" || !command.serveRequest.NoBrowser {
+		t.Fatalf("expected parsed serve request, got %#v", command.serveRequest)
+	}
+}
+
 func TestParseExportAcceptsOutputFlag(t *testing.T) {
 	t.Parallel()
 

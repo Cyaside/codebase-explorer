@@ -7,10 +7,10 @@ import (
 )
 
 type Config struct {
-	Name    string
-	Model   string
-	APIKey  string
-	BaseURL string
+	Name    string `json:"name"`
+	Model   string `json:"model"`
+	APIKey  string `json:"api_key"`
+	BaseURL string `json:"base_url"`
 }
 
 func (c Config) Enabled() bool {
