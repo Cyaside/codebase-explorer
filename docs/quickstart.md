@@ -8,7 +8,7 @@
 
 ## Local Workbench
 
-1. Jalankan `go run ./cmd/codearch serve`
+1. Jalankan `go run ./cmd/codearch start`
 2. Masukkan local repo path di form workbench
 3. Pilih connection profile:
    `Deterministic only`, `OpenAI`, `OpenRouter`, `Mistral`, atau custom compatible profile
@@ -44,7 +44,7 @@ export CODEARCH_API_KEY=...
 2. Jalankan `go run ./cmd/codearch doctor`
 3. Jalankan `go run ./cmd/codearch analyze <repo-path>`
 
-Alternatifnya, gunakan `go run ./cmd/codearch serve` lalu simpan beberapa connection profile di workbench bila kamu ingin berganti API key atau vendor per analisis.
+Alternatifnya, gunakan `go run ./cmd/codearch start` lalu simpan beberapa connection profile di workbench bila kamu ingin berganti API key atau vendor per analisis.
 
 ## Export Bundle
 

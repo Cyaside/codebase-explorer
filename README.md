@@ -15,7 +15,7 @@ Saat ini tool ini fokus pada deterministic repository orientation:
 ```bash
 go run ./cmd/codearch doctor
 go run ./cmd/codearch analyze <repo-path> --deterministic-only
-go run ./cmd/codearch serve --no-browser
+go run ./cmd/codearch start --no-browser
 go run ./cmd/codearch analyze <repo-path> --support ./issues.json --changelog ./CHANGELOG.md
 go run ./cmd/codearch open --no-browser
 go run ./cmd/codearch export --output ./out/latest-bundle.zip
@@ -30,8 +30,10 @@ Panduan langkah cepat yang lebih lengkap ada di [docs/quickstart.md](docs/quicks
   Validasi config, output root, cache root, dan provider setup.
 - `codearch analyze <repo-path>`
   Menjalankan scan, deterministic analysis, support-file correlation opsional, dan AI synthesis opsional.
+- `codearch start [--addr <host:port>] [--no-browser]`
+  Menjalankan local web workbench untuk membuka project, memilih koneksi provider, dan membaca bundle dengan UI dark mode. Ini adalah command yang direkomendasikan untuk pemakaian harian.
 - `codearch serve [--addr <host:port>] [--no-browser]`
-  Menjalankan local web workbench untuk membuka project, memilih koneksi provider, dan membaca bundle dengan UI dark mode.
+  Alias lama untuk `codearch start`.
 - `codearch open [bundle-path] [--no-browser]`
   Membuka viewer bundle terbaru atau bundle yang dipilih.
 - `codearch export [bundle-path] [--output <zip-path>]`
@@ -60,7 +62,7 @@ Variabel environment yang didukung:
 - `CODEARCH_BASE_URL`
   Base URL untuk provider `openai-compatible`
 
-Environment tetap cocok untuk satu default provider. Kalau butuh beberapa API key sekaligus, gunakan `codearch serve` lalu simpan connection profile lokal di browser untuk OpenAI, OpenRouter, Mistral, atau endpoint compatible lain. Profile itu hanya dipakai per run dan tidak ikut ditulis ke bundle output.
+Environment tetap cocok untuk satu default provider. Kalau butuh beberapa API key sekaligus, gunakan `codearch start` lalu simpan connection profile lokal di browser untuk OpenAI, OpenRouter, Mistral, atau endpoint compatible lain. Profile itu hanya dipakai per run dan tidak ikut ditulis ke bundle output.
 
 ## Output Bundle
 
