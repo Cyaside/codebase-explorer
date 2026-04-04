@@ -11,6 +11,7 @@ import (
 func printUsage(output io.Writer) {
 	fmt.Fprintln(output, "Usage:")
 	fmt.Fprintln(output, "  codearch analyze <repo-path> [support-file ...] [--support <file>] [--issues <file>] [--changelog <file>] [--output <dir>] [--deterministic-only] [--ignore <pattern>]")
+	fmt.Fprintln(output, "  codearch start [--addr <host:port>] [--no-browser]")
 	fmt.Fprintln(output, "  codearch serve [--addr <host:port>] [--no-browser]")
 	fmt.Fprintln(output, "  codearch open [bundle-path] [--no-browser]")
 	fmt.Fprintln(output, "  codearch export [bundle-path] [--output <zip-path>]")

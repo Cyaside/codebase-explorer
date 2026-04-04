@@ -120,7 +120,7 @@ func parse(args []string) (parsedCommand, error) {
 			return parsedCommand{}, fmt.Errorf("doctor does not accept additional arguments")
 		}
 		return parsedCommand{name: "doctor"}, nil
-	case "serve", "ui":
+	case "serve", "start", "ui":
 		return parseServe(args[1:])
 	case "open":
 		return parseOpen(args[1:])

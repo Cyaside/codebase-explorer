@@ -57,6 +57,21 @@ func TestParseServeAcceptsAddrAndNoBrowser(t *testing.T) {
 	}
 }
 
+func TestParseStartAliasAcceptsServeFlags(t *testing.T) {
+	t.Parallel()
+
+	command, err := parse([]string{"start", "--addr", "127.0.0.1:4215", "--no-browser"})
+	if err != nil {
+		t.Fatalf("parse start command: %v", err)
+	}
+	if command.name != "serve" {
+		t.Fatalf("expected start alias to map to serve command, got %#v", command)
+	}
+	if command.serveRequest.Addr != "127.0.0.1:4215" || !command.serveRequest.NoBrowser {
+		t.Fatalf("expected parsed serve request from start alias, got %#v", command.serveRequest)
+	}
+}
+
 func TestParseExportAcceptsOutputFlag(t *testing.T) {
 	t.Parallel()
 
