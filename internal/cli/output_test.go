@@ -19,6 +19,12 @@ func TestPrintAnalyzeResultIncludesAISummary(t *testing.T) {
 		EntryPoints:     []string{"cmd/codearch/main.go"},
 		PrimaryLanguage: "Go",
 		OutputPath:      "/tmp/out",
+		Changes: app.AnalyzeChangesSummary{
+			SupportFileCount: 2,
+			ParsedItemCount:  5,
+			MentionedAreas:   3,
+			Note:             "supporting files were parsed successfully",
+		},
 		AI: app.AnalyzeAISummary{
 			Status:         "fallback",
 			Provider:       "openai-compatible",
@@ -44,6 +50,15 @@ func TestPrintAnalyzeResultIncludesAISummary(t *testing.T) {
 	}
 	if !strings.Contains(output, "AI note: parse synthesis response: invalid character") {
 		t.Fatalf("expected AI note in analyze output, got %q", output)
+	}
+	if !strings.Contains(output, "Support files: 2 input(s), 5 parsed item(s)") {
+		t.Fatalf("expected support-file summary in analyze output, got %q", output)
+	}
+	if !strings.Contains(output, "Change awareness: 3 area(s) correlated") {
+		t.Fatalf("expected change-awareness summary in analyze output, got %q", output)
+	}
+	if !strings.Contains(output, "Change note: supporting files were parsed successfully") {
+		t.Fatalf("expected change note in analyze output, got %q", output)
 	}
 	if !strings.Contains(output, "Output retention: keep latest 10 bundle(s)") {
 		t.Fatalf("expected output retention line in analyze output, got %q", output)

@@ -113,6 +113,12 @@ func parseAnalyze(args []string) (parsedCommand, error) {
 				return parsedCommand{}, fmt.Errorf("--ignore requires a value")
 			}
 			request.ExtraIgnorePatterns = append(request.ExtraIgnorePatterns, args[index])
+		case current == "--support" || current == "--issues" || current == "--changelog":
+			index++
+			if index >= len(args) {
+				return parsedCommand{}, fmt.Errorf("%s requires a value", current)
+			}
+			request.OptionalSupportFiles = append(request.OptionalSupportFiles, args[index])
 		case strings.HasPrefix(current, "--"):
 			return parsedCommand{}, fmt.Errorf("unknown analyze flag %q", current)
 		case request.RepoPath == "":

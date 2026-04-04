@@ -10,7 +10,7 @@ import (
 
 func printUsage(output io.Writer) {
 	fmt.Fprintln(output, "Usage:")
-	fmt.Fprintln(output, "  codearch analyze <repo-path> [--output <dir>] [--deterministic-only] [--ignore <pattern>]")
+	fmt.Fprintln(output, "  codearch analyze <repo-path> [support-file ...] [--support <file>] [--issues <file>] [--changelog <file>] [--output <dir>] [--deterministic-only] [--ignore <pattern>]")
 	fmt.Fprintln(output, "  codearch open [bundle-path] [--no-browser]")
 	fmt.Fprintln(output, "  codearch doctor")
 }
@@ -42,6 +42,15 @@ func printAnalyzeResult(output io.Writer, result app.AnalyzeResult) {
 	}
 	if result.AI.Note != "" {
 		fmt.Fprintf(output, "AI note: %s\n", result.AI.Note)
+	}
+	if result.Changes.SupportFileCount > 0 {
+		fmt.Fprintf(output, "Support files: %d input(s), %d parsed item(s)\n", result.Changes.SupportFileCount, result.Changes.ParsedItemCount)
+		if result.Changes.MentionedAreas > 0 {
+			fmt.Fprintf(output, "Change awareness: %d area(s) correlated\n", result.Changes.MentionedAreas)
+		}
+		if result.Changes.Note != "" {
+			fmt.Fprintf(output, "Change note: %s\n", result.Changes.Note)
+		}
 	}
 	if result.Output.RetentionLimit > 0 {
 		fmt.Fprintf(output, "Output retention: keep latest %d bundle(s)\n", result.Output.RetentionLimit)

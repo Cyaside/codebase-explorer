@@ -86,7 +86,14 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 		TotalLines:      analysis.Metrics.TotalLines,
 		EntryPoints:     analysis.EntryPoints,
 		PrimaryLanguage: primaryLanguage,
-		AI:              buildAISummary(aiContext, aiResult),
+		Changes: AnalyzeChangesSummary{
+			Available:        changeResult.Available,
+			SupportFileCount: changeResult.SupportFileCount,
+			ParsedItemCount:  changeResult.ParsedItemCount,
+			MentionedAreas:   len(changeResult.FrequentlyMentionedAreas),
+			Note:             changeResult.Note,
+		},
+		AI: buildAISummary(aiContext, aiResult),
 		Output: AnalyzeOutputSummary{
 			RetentionLimit: writeResult.RetentionLimit,
 			PrunedBundles:  writeResult.PrunedBundles,

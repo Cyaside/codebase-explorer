@@ -17,6 +17,7 @@ type AnalyzeResult struct {
 	TotalLines      int
 	EntryPoints     []string
 	PrimaryLanguage string
+	Changes         AnalyzeChangesSummary
 	AI              AnalyzeAISummary
 	Output          AnalyzeOutputSummary
 }
@@ -42,6 +43,14 @@ type AnalyzeAISummary struct {
 type AnalyzeOutputSummary struct {
 	RetentionLimit int
 	PrunedBundles  int
+}
+
+type AnalyzeChangesSummary struct {
+	Available        bool
+	SupportFileCount int
+	ParsedItemCount  int
+	MentionedAreas   int
+	Note             string
 }
 
 type OpenRequest struct {
