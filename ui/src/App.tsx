@@ -132,6 +132,12 @@ export function App() {
   useWorkbenchShortcuts({
     activeTab,
     busy,
+    onNextBundle: () => {
+      void selectRelativeBundle(1);
+    },
+    onPreviousBundle: () => {
+      void selectRelativeBundle(-1);
+    },
     onAnalyze: () => {
       void handleAnalyze();
     },
@@ -187,6 +193,17 @@ export function App() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load bundle.");
     }
+  }
+
+  async function selectRelativeBundle(direction: -1 | 1) {
+    if (!bundles.length) {
+      return;
+    }
+
+    const currentIndex = bundles.findIndex((bundle) => bundle.name === selectedBundle);
+    const startIndex = currentIndex >= 0 ? currentIndex : 0;
+    const nextIndex = (startIndex + direction + bundles.length) % bundles.length;
+    await loadBundle(bundles[nextIndex].name);
   }
 
   function applyRunSnapshot(run: AnalyzeRun) {

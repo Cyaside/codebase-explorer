@@ -5,6 +5,8 @@ import type { TabKey } from "@/lib/types";
 interface UseWorkbenchShortcutsOptions {
   activeTab: TabKey;
   busy: boolean;
+  onNextBundle: () => void;
+  onPreviousBundle: () => void;
   onAnalyze: () => void;
   onCancel: () => void;
   onFocusAnalyze: () => void;
@@ -16,6 +18,8 @@ interface UseWorkbenchShortcutsOptions {
 export function useWorkbenchShortcuts({
   activeTab,
   busy,
+  onNextBundle,
+  onPreviousBundle,
   onAnalyze,
   onCancel,
   onFocusAnalyze,
@@ -64,6 +68,16 @@ export function useWorkbenchShortcuts({
           event.preventDefault();
           onRefresh();
           return;
+        case "j":
+        case "J":
+          event.preventDefault();
+          onNextBundle();
+          return;
+        case "k":
+        case "K":
+          event.preventDefault();
+          onPreviousBundle();
+          return;
         default:
           return;
       }
@@ -71,7 +85,7 @@ export function useWorkbenchShortcuts({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeTab, busy, onAnalyze, onCancel, onFocusAnalyze, onRefresh, onSelectTab, tabs]);
+  }, [activeTab, busy, onAnalyze, onCancel, onFocusAnalyze, onNextBundle, onPreviousBundle, onRefresh, onSelectTab, tabs]);
 }
 
 function isTypingTarget(target: EventTarget | null) {

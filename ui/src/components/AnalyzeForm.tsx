@@ -105,6 +105,7 @@ export function AnalyzeForm({ activeProfileLabel, form, onChange, onSubmit, onCa
               <ShortcutHint keys="Esc" label="Cancel run" />
               <ShortcutHint keys="[" label="Prev tab" />
               <ShortcutHint keys="]" label="Next tab" />
+              <ShortcutHint keys="J / K" label="Switch bundle" />
               <ShortcutHint keys="R" label="Refresh" />
             </div>
           </div>
