@@ -17,7 +17,7 @@ func (s Service) buildAIResult(ctx context.Context, request AnalyzeRequest, anal
 		return provider.SkippedResult(analysis.GeneratedAt, "deterministic-only mode enabled"), cache.StatusDisabled
 	}
 
-	providerConfig := s.providerConfig()
+	providerConfig := s.providerConfig(request)
 	if !providerConfig.Enabled() {
 		emitAnalyzeProgress(request, "ai-synthesis", "disabled", "no provider configured")
 		return provider.DisabledResult(analysis.GeneratedAt, "no provider configured"), cache.StatusDisabled
@@ -83,7 +83,16 @@ func (s Service) buildAIResult(ctx context.Context, request AnalyzeRequest, anal
 	return result, cache.StatusDisabled
 }
 
-func (s Service) providerConfig() provider.Config {
+func (s Service) providerConfig(request AnalyzeRequest) provider.Config {
+	if request.ProviderOverride != nil {
+		return provider.Config{
+			Name:    request.ProviderOverride.Name,
+			Model:   request.ProviderOverride.Model,
+			APIKey:  request.ProviderOverride.APIKey,
+			BaseURL: request.ProviderOverride.BaseURL,
+		}
+	}
+
 	return provider.Config{
 		Name:    s.settings.Provider.Name,
 		Model:   s.settings.Provider.Model,

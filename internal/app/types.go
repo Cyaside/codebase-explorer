@@ -1,11 +1,14 @@
 package app
 
+import "github.com/Cyaside/codebase-explorer/internal/provider"
+
 type AnalyzeRequest struct {
 	RepoPath             string
 	OutputRoot           string
 	DeterministicOnly    bool
 	ExtraIgnorePatterns  []string
 	OptionalSupportFiles []string
+	ProviderOverride     *provider.Config
 	Progress             AnalyzeProgressReporter
 }
 

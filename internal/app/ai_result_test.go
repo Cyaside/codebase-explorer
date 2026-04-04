@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Cyaside/codebase-explorer/internal/config"
+	"github.com/Cyaside/codebase-explorer/internal/provider"
 )
 
 func TestAnalyzeFallsBackWhenProviderConfigIsInvalid(t *testing.T) {
@@ -193,5 +194,69 @@ func TestAnalyzeFallsBackWhenProviderSynthesisFails(t *testing.T) {
 	}
 	if !strings.Contains(aiResult.FallbackReason, "parse synthesis response") {
 		t.Fatalf("expected parse failure to be surfaced, got %#v", aiResult)
+	}
+}
+
+func TestAnalyzeUsesRequestProviderOverrideWhenConfigured(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if authorization := r.Header.Get("Authorization"); authorization != "Bearer request-key" {
+			t.Fatalf("expected request override auth header, got %q", authorization)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"choices": [
+				{
+					"message": {
+						"content": "{\"project_summary\":\"Request-level AI summary\",\"architecture_narrative\":\"Request-level AI narrative\"}"
+					}
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	service := New(config.Settings{
+		DefaultOutputRoot: t.TempDir(),
+		AppVersion:        "test",
+		ConfigSource:      "test",
+	})
+
+	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
+	result, err := service.Analyze(t.Context(), AnalyzeRequest{
+		RepoPath: repoPath,
+		ProviderOverride: &provider.Config{
+			Name:    "openai-compatible",
+			Model:   "mistral-small-latest",
+			APIKey:  "request-key",
+			BaseURL: server.URL,
+		},
+	})
+	if err != nil {
+		t.Fatalf("analyze sample repo with request provider override: %v", err)
+	}
+
+	if result.AI.Status != "succeeded" || !result.AI.Used {
+		t.Fatalf("expected request override provider to succeed, got %#v", result.AI)
+	}
+	if result.AI.Provider != "openai-compatible" || result.AI.Model != "mistral-small-latest" {
+		t.Fatalf("expected request override provider identity to be preserved, got %#v", result.AI)
+	}
+
+	aiResultContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "ai-result.json"))
+	if err != nil {
+		t.Fatalf("read ai result contract: %v", err)
+	}
+
+	var aiResult struct {
+		ProjectSummary string `json:"project_summary"`
+	}
+	if err := json.Unmarshal(aiResultContents, &aiResult); err != nil {
+		t.Fatalf("unmarshal ai result contract: %v", err)
+	}
+	if aiResult.ProjectSummary != "Request-level AI summary" {
+		t.Fatalf("expected request override synthesis payload to be persisted, got %#v", aiResult)
 	}
 }

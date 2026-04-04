@@ -185,7 +185,7 @@ func (s Service) Doctor(_ context.Context, _ DoctorRequest) (DoctorResult, error
 }
 
 func (s Service) providerDoctorCheck() DoctorCheck {
-	providerConfig := s.providerConfig()
+	providerConfig := s.providerConfig(AnalyzeRequest{})
 	if !providerConfig.Enabled() {
 		return DoctorCheck{
 			Name:   "provider",
