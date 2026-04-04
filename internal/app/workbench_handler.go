@@ -65,7 +65,7 @@ func (s Service) workbenchHandler(outputRoot string) (http.Handler, error) {
 	assetHandler := http.FileServer(http.FS(assets))
 	bundleHandler := http.StripPrefix("/bundles/", http.FileServer(http.Dir(outputRoot)))
 
-	mux.Handle("/assets/", http.StripPrefix("/assets/", assetHandler))
+	mux.Handle("/assets/", http.StripPrefix("/assets", assetHandler))
 	mux.Handle("/bundles/", bundleHandler)
 	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkbenchStatus(w, r, outputRoot)

@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,7 +11,40 @@ import (
 	"testing"
 
 	"github.com/Cyaside/codebase-explorer/internal/config"
+	"github.com/Cyaside/codebase-explorer/ui"
 )
+
+func TestWorkbenchServesNestedAssetChunks(t *testing.T) {
+	t.Parallel()
+
+	service := New(config.Settings{
+		DefaultOutputRoot: t.TempDir(),
+		AppVersion:        "test",
+		ConfigSource:      "test",
+	})
+
+	handler, err := service.workbenchHandler(service.settings.DefaultOutputRoot)
+	if err != nil {
+		t.Fatalf("build workbench handler: %v", err)
+	}
+
+	assets, err := ui.Assets()
+	if err != nil {
+		t.Fatalf("load workbench assets: %v", err)
+	}
+	entries, err := fs.ReadDir(assets, "chunks")
+	if err != nil || len(entries) == 0 {
+		t.Fatalf("read embedded chunk assets: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/assets/chunks/"+entries[0].Name(), nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected nested chunk asset to be served, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+}
 
 func TestWorkbenchStatusListsRecentBundles(t *testing.T) {
 	t.Parallel()

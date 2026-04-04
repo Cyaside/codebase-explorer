@@ -26,7 +26,15 @@ func TestAssetsExposeWorkbenchShell(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read app.js: %v", err)
 	}
-	if !strings.Contains(string(appJS), "Codebase Explorer Workbench") {
-		t.Fatalf("expected workbench title in bundled app.js")
+	if !strings.Contains(string(appJS), "chunks/") {
+		t.Fatalf("expected chunk preload path in bundled app.js")
+	}
+
+	entries, err := fs.ReadDir(assets, "chunks")
+	if err != nil {
+		t.Fatalf("read chunks directory: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatalf("expected at least one embedded chunk asset")
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"io/fs"
 )
 
-//go:embed assets/*
+//go:embed assets
 var embeddedAssets embed.FS
 
 func Assets() (fs.FS, error) {
