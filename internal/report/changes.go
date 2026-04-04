@@ -64,5 +64,14 @@ func ChangesREADME(result changes.Result) string {
 		}
 	}
 
+	builder.WriteString("\n## Hotspot Correlations\n\n")
+	if len(result.HotspotCorrelations) == 0 {
+		builder.WriteString("- No deterministic hotspot overlapped with supporting-file signals.\n")
+	} else {
+		for _, correlation := range result.HotspotCorrelations {
+			builder.WriteString(fmt.Sprintf("- `%s`: %d mention(s), confidence `%s`\n", correlation.Path, correlation.MentionCount, correlation.Confidence))
+		}
+	}
+
 	return builder.String()
 }

@@ -93,12 +93,30 @@
     "No reading path guidance was recorded."
   );
 
-  document.getElementById("changes-body").innerHTML = `
-    <article class="item">
-      <strong>Changes report</strong>
-      <p>This bundle does not yet include enriched change-correlation output.</p>
-    </article>
-  `;
+  document.getElementById("changes-body").innerHTML = [
+    infoBlock("Status", `<p>${html(data.changes.note || (data.changes.available ? "Support files were parsed for this bundle." : "No supporting files were available for this bundle."))}</p>`),
+    infoBlock("Supporting files", sectionList(data.changes.sources, (source) => `
+      <article class="item">
+        <strong>${html(source.path)}</strong>
+        <span>${html(source.kind)} Â· ${html(source.format)} Â· ${html(source.status)}</span>
+        ${source.message ? `<p>${html(source.message)}</p>` : ""}
+      </article>
+    `, "No supporting files were recorded.")),
+    infoBlock("Frequently mentioned areas", sectionList(data.changes.frequently_mentioned_areas, (area) => `
+      <article class="item">
+        <strong>${html(area.path)}</strong>
+        <span>${area.mention_count} mention(s) Â· ${html(area.confidence)} confidence</span>
+        ${area.reasons && area.reasons.length ? `<p>${html(area.reasons.join("; "))}</p>` : ""}
+      </article>
+    `, "No repository areas were matched strongly enough.")),
+    infoBlock("Repeated themes", sectionList(data.changes.repeated_themes, (theme) => `
+      <article class="item">
+        <strong>${html(theme.name)}</strong>
+        <span>${theme.mention_count} mention(s) Â· ${theme.source_count} source(s)</span>
+        ${theme.related_areas && theme.related_areas.length ? `<p>Related areas: ${html(theme.related_areas.join(", "))}</p>` : ""}
+      </article>
+    `, "No repeated themes met the reporting threshold."))
+  ].join("");
 
   document.getElementById("diagrams-body").innerHTML = [
     diagramBlock("Architecture Mermaid", data.mermaid.architecture, data.links.architecture_diagram),

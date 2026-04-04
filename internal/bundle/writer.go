@@ -71,7 +71,7 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		filepath.Join(bundlePath, "overview", "README.md"):                report.OverviewREADME(request.Analysis, request.AIResult),
 		filepath.Join(bundlePath, "architecture", "README.md"):            report.ArchitectureREADME(request.Analysis, request.AIResult),
 		filepath.Join(bundlePath, "architecture", "module-graph.mmd"):     report.ArchitectureMermaid(request.Analysis),
-		filepath.Join(bundlePath, "hotspots", "README.md"):                report.HotspotsREADME(request.Analysis, request.AIResult),
+		filepath.Join(bundlePath, "hotspots", "README.md"):                report.HotspotsREADME(request.Analysis, request.AIResult, request.Changes),
 		filepath.Join(bundlePath, "dependencies", "README.md"):            report.DependenciesREADME(request.Analysis),
 		filepath.Join(bundlePath, "dependencies", "dependency-graph.mmd"): report.DependenciesMermaid(request.Analysis),
 		filepath.Join(bundlePath, "reading-path", "README.md"):            report.ReadingPathREADME(request.Analysis, request.AIResult),
@@ -210,6 +210,7 @@ func buildViewerData(request WriteRequest, bundleName string) viewer.BundleData 
 		Hotspots:             request.Analysis.Hotspots,
 		Dependencies:         request.Analysis.DependencyRisks,
 		ReadingPath:          request.Analysis.ReadingPath,
+		Changes:              request.Changes,
 		AI:                   request.AIResult,
 		Mermaid: viewer.MermaidData{
 			Architecture: report.ArchitectureMermaid(request.Analysis),

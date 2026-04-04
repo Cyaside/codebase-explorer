@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
+	"github.com/Cyaside/codebase-explorer/internal/changes"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 )
 
@@ -27,6 +28,7 @@ type BundleData struct {
 	Hotspots             []analyzer.Hotspot         `json:"hotspots"`
 	Dependencies         []analyzer.DependencyRisk  `json:"dependencies"`
 	ReadingPath          []analyzer.ReadingPathItem `json:"reading_path"`
+	Changes              changes.Result             `json:"changes"`
 	AI                   provider.Result            `json:"ai"`
 	Mermaid              MermaidData                `json:"mermaid"`
 	Links                LinkData                   `json:"links"`

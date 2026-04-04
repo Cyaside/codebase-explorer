@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
+	"github.com/Cyaside/codebase-explorer/internal/changes"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 )
 
@@ -25,6 +26,12 @@ func TestFilesIncludeViewerAssetsAndData(t *testing.T) {
 		Metrics: analyzer.Metrics{
 			TotalFiles: 42,
 			TotalLines: 1200,
+		},
+		Changes: changes.Result{
+			Available: true,
+			FrequentlyMentionedAreas: []changes.AreaMention{
+				{Path: "internal/app", MentionCount: 2, Confidence: changes.ConfidenceStrong},
+			},
 		},
 		AI: provider.Result{
 			Status:         provider.ResultStatusSkipped,
@@ -49,5 +56,8 @@ func TestFilesIncludeViewerAssetsAndData(t *testing.T) {
 	}
 	if !strings.Contains(string(files["viewer-data.js"]), "Codebase Explorer") {
 		t.Fatalf("expected viewer data payload to include project details")
+	}
+	if !strings.Contains(string(files["viewer-data.js"]), "internal/app") {
+		t.Fatalf("expected viewer data payload to include change-awareness output")
 	}
 }

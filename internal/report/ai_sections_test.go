@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
+	"github.com/Cyaside/codebase-explorer/internal/changes"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 )
@@ -44,10 +45,54 @@ func TestHotspotsREADMEIncludesMatchingAIExplanation(t *testing.T) {
 				Explanation: "This is the orchestration hotspot.",
 			},
 		},
-	})
+	}, changes.Result{})
 
 	if !strings.Contains(output, "ai note: This is the orchestration hotspot.") {
 		t.Fatalf("expected AI hotspot explanation to be rendered, got %q", output)
+	}
+}
+
+func TestHotspotsREADMEIncludesChangeMentions(t *testing.T) {
+	t.Parallel()
+
+	output := HotspotsREADME(testAnalysis(), provider.Result{}, changes.Result{
+		FrequentlyMentionedAreas: []changes.AreaMention{
+			{
+				Path:         "internal/app/service.go",
+				MentionCount: 2,
+				Confidence:   changes.ConfidenceStrong,
+			},
+		},
+	})
+
+	if !strings.Contains(output, "change mentions: 2 (strong confidence)") {
+		t.Fatalf("expected change mention to be rendered, got %q", output)
+	}
+}
+
+func TestChangesREADMEIncludesCorrelations(t *testing.T) {
+	t.Parallel()
+
+	output := ChangesREADME(changes.Result{
+		Available: true,
+		Sources: []changes.Source{
+			{Path: "issues.json", Kind: "issue-export", Format: "json", Status: "parsed", ItemCount: 2},
+		},
+		FrequentlyMentionedAreas: []changes.AreaMention{
+			{Path: "internal/app", MentionCount: 3, Confidence: changes.ConfidenceStrong},
+		},
+		RepeatedThemes: []changes.Theme{
+			{Name: "bootstrap", MentionCount: 2, SourceCount: 1},
+		},
+		HotspotCorrelations: []changes.HotspotCorrelation{
+			{Path: "internal/app/service.go", MentionCount: 2, Confidence: changes.ConfidenceModerate},
+		},
+	})
+
+	for _, expected := range []string{"internal/app", "bootstrap", "internal/app/service.go"} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("expected changes README to include %q", expected)
+		}
 	}
 }
 
