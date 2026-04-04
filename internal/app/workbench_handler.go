@@ -242,6 +242,9 @@ func (s Service) handleWorkbenchAnalyzeRun(w http.ResponseWriter, r *http.Reques
 			"run": run,
 		})
 		return
+	case len(parts) == 2 && parts[1] == "events" && r.Method == http.MethodGet:
+		s.handleWorkbenchAnalyzeRunEvents(w, r, runtime, runID)
+		return
 	case len(parts) == 2 && parts[1] == "cancel" && r.Method == http.MethodPost:
 		run, ok := runtime.cancel(runID)
 		if !ok {
