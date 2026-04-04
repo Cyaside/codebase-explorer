@@ -1,5 +1,6 @@
 import type {
   AnalyzeResponse,
+  AnalyzeRun,
   BundleSummary,
   ConnectionProfile,
   WorkbenchBundle,
@@ -43,6 +44,23 @@ export function analyzeRepository(payload: AnalyzePayload) {
   return requestJSON<AnalyzeResponse>("/api/analyze", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export function startAnalyzeRun(payload: AnalyzePayload) {
+  return requestJSON<{ run: AnalyzeRun }>("/api/analyze-runs", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchAnalyzeRun(runID: string) {
+  return requestJSON<{ run: AnalyzeRun }>(`/api/analyze-runs/${encodeURIComponent(runID)}`);
+}
+
+export function cancelAnalyzeRun(runID: string) {
+  return requestJSON<{ run: AnalyzeRun }>(`/api/analyze-runs/${encodeURIComponent(runID)}/cancel`, {
+    method: "POST",
   });
 }
 

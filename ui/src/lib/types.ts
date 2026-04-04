@@ -53,6 +53,22 @@ export interface AnalyzeResponse {
   data: BundleData;
 }
 
+export interface AnalyzeProgressEvent {
+  stage: string;
+  status: string;
+  detail: string;
+}
+
+export interface AnalyzeRun {
+  id: string;
+  status: "queued" | "running" | "canceling" | "succeeded" | "failed" | "canceled" | string;
+  created_at: string;
+  updated_at: string;
+  progress: AnalyzeProgressEvent[];
+  error?: string;
+  response?: AnalyzeResponse;
+}
+
 export interface BundleSummary {
   name: string;
   path: string;

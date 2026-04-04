@@ -6,9 +6,9 @@ import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { Sidebar } from "@/components/Sidebar";
 import { StatsGrid } from "@/components/StatsGrid";
 import { TabPanels } from "@/components/TabPanels";
-import { analyzeRepository, buildProviderPayload, fetchBundle, fetchStatus, mergeBundleSummary } from "@/lib/api";
+import { buildProviderPayload, cancelAnalyzeRun, fetchAnalyzeRun, fetchBundle, fetchStatus, mergeBundleSummary, startAnalyzeRun } from "@/lib/api";
 import { defaultProfiles, loadProfiles, loadUIState, persistProfiles, persistUIState } from "@/lib/storage";
-import type { AnalyzeFormState, ConnectionProfile, TabKey, WorkbenchBundle, WorkbenchStatusResponse } from "@/lib/types";
+import type { AnalyzeFormState, AnalyzeRun, ConnectionProfile, TabKey, WorkbenchBundle, WorkbenchStatusResponse } from "@/lib/types";
 import { bundleLink, splitLines } from "@/lib/utils";
 import { validateProfile } from "@/lib/validation";
 
@@ -29,7 +29,7 @@ export function App() {
     ignorePatterns: "",
   });
   const [profileSecrets, setProfileSecrets] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
+  const [activeRun, setActiveRun] = useState<AnalyzeRun | null>(null);
   const [busyDetail, setBusyDetail] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [toastMessage, setToastMessage] = useState("");
@@ -39,6 +39,7 @@ export function App() {
   const providerOptions = status?.supported_providers || [];
   const apiKey = profileSecrets[profile.id] || "";
   const validationErrors = validateProfile(profile, apiKey, providerOptions);
+  const busy = !!activeRun && ["queued", "running", "canceling"].includes(activeRun.status);
 
   useEffect(() => {
     void refreshStatus();
@@ -67,6 +68,23 @@ export function App() {
 
     return () => window.clearTimeout(timeoutID);
   }, [toastMessage]);
+
+  useEffect(() => {
+    if (!activeRun || !["queued", "running", "canceling"].includes(activeRun.status)) {
+      return;
+    }
+
+    const intervalID = window.setInterval(async () => {
+      try {
+        const response = await fetchAnalyzeRun(activeRun.id);
+        applyRunSnapshot(response.run);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Failed to poll analyze run.");
+      }
+    }, 700);
+
+    return () => window.clearInterval(intervalID);
+  }, [activeRun?.id, activeRun?.status]);
 
   async function refreshStatus(preferredBundleName?: string) {
     try {
@@ -105,6 +123,39 @@ export function App() {
       setSelectedBundle(bundleName);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load bundle.");
+    }
+  }
+
+  function applyRunSnapshot(run: AnalyzeRun) {
+    setActiveRun(run);
+    const latestEvent = run.progress[run.progress.length - 1];
+    setBusyDetail(latestEvent?.detail || run.status);
+
+    const response = run.response;
+    if (run.status === "succeeded" && response) {
+      setErrorMessage("");
+      setBundleCache((current) => ({
+        ...current,
+        [response.bundle.name]: {
+          summary: response.bundle,
+          data: response.data,
+        },
+      }));
+      setBundles((current) => mergeBundleSummary(current, response.bundle));
+      setSelectedBundle(response.bundle.name);
+      setToastMessage(`Analysis ready for ${response.bundle.project_name || response.result.project_name || "repository"}.`);
+      void refreshStatus(response.bundle.name);
+      return;
+    }
+
+    if (run.status === "failed") {
+      setErrorMessage(run.error || "Analyze run failed.");
+      return;
+    }
+
+    if (run.status === "canceled") {
+      setErrorMessage("");
+      setToastMessage("Analyze run canceled.");
     }
   }
 
@@ -174,35 +225,33 @@ export function App() {
       return;
     }
 
-    setBusy(true);
     setBusyDetail("Submitting analyze request...");
     setErrorMessage("");
 
     try {
-      const response = await analyzeRepository({
+      const response = await startAnalyzeRun({
         repo_path: repoPath,
         deterministic_only: !profile.provider,
         support_files: splitLines(form.supportFiles),
         extra_ignore_patterns: splitLines(form.ignorePatterns),
         provider: buildProviderPayload(profile, apiKey),
       });
-
-      setBusyDetail("Loading returned bundle...");
-      setBundleCache((current) => ({
-        ...current,
-        [response.bundle.name]: {
-          summary: response.bundle,
-          data: response.data,
-        },
-      }));
-      setBundles((current) => mergeBundleSummary(current, response.bundle));
-      setSelectedBundle(response.bundle.name);
-      setToastMessage(`Analysis ready for ${response.bundle.project_name || response.result.project_name || "repository"}.`);
+      applyRunSnapshot(response.run);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Analyze request failed.");
-    } finally {
-      setBusy(false);
-      setBusyDetail("");
+    }
+  }
+
+  async function handleCancelAnalyze() {
+    if (!activeRun || !busy) {
+      return;
+    }
+
+    try {
+      const response = await cancelAnalyzeRun(activeRun.id);
+      applyRunSnapshot(response.run);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to cancel analyze run.");
     }
   }
 
@@ -270,7 +319,15 @@ export function App() {
           ) : null}
 
           <section className="grid gap-4 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-            <AnalyzeForm busy={busy} busyDetail={busyDetail} form={form} onChange={setForm} onSubmit={handleAnalyze} />
+            <AnalyzeForm
+              busy={busy}
+              busyDetail={busyDetail}
+              form={form}
+              onCancel={handleCancelAnalyze}
+              onChange={setForm}
+              onSubmit={handleAnalyze}
+              run={activeRun}
+            />
             <ConnectionPanel
               apiKey={apiKey}
               onAPIKeyChange={(value) =>

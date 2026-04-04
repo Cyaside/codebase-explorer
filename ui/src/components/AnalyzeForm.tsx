@@ -1,16 +1,20 @@
-import { LoaderCircle, Play } from "lucide-react";
+import { LoaderCircle, OctagonX, Play } from "lucide-react";
 
-import type { AnalyzeFormState } from "@/lib/types";
+import type { AnalyzeFormState, AnalyzeRun } from "@/lib/types";
 
 interface AnalyzeFormProps {
   form: AnalyzeFormState;
   onChange: (next: AnalyzeFormState) => void;
   onSubmit: () => void;
+  onCancel: () => void;
   busy: boolean;
   busyDetail: string;
+  run: AnalyzeRun | null;
 }
 
-export function AnalyzeForm({ form, onChange, onSubmit, busy, busyDetail }: AnalyzeFormProps) {
+export function AnalyzeForm({ form, onChange, onSubmit, onCancel, busy, busyDetail, run }: AnalyzeFormProps) {
+  const recentProgress = run?.progress.slice(-6).reverse() || [];
+
   return (
     <section className="rounded-3xl border border-border bg-card/90 p-5 shadow-sm">
       <div className="mb-5 flex items-start justify-between gap-3">
@@ -66,11 +70,60 @@ export function AnalyzeForm({ form, onChange, onSubmit, busy, busyDetail }: Anal
           <div className="text-sm text-muted-foreground">
             GitHub URLs still intentionally stay out of scope here. Keep analysis local for predictable, lightweight runs.
           </div>
-          <button className="action-button" disabled={busy} onClick={onSubmit} type="button">
-            {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />}
-            {busy ? busyDetail || "Analyzing..." : "Analyze Project"}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button className="action-button" disabled={busy} onClick={onSubmit} type="button">
+              {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />}
+              {busy ? busyDetail || "Analyzing..." : "Analyze Project"}
+            </button>
+            {busy ? (
+              <button className="secondary-button danger" onClick={onCancel} type="button">
+                <OctagonX className="size-4" />
+                Cancel Run
+              </button>
+            ) : null}
+          </div>
         </div>
+
+        {run ? (
+          <div className="rounded-2xl border border-border bg-background/70 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Analyze progress</p>
+                <p className="mt-1 text-sm text-foreground">
+                  Run <span className="font-mono text-xs text-muted-foreground">{run.id}</span>
+                </p>
+              </div>
+              <span
+                className={
+                  run.status === "failed" || run.status === "canceled"
+                    ? "status-pill border-danger/35 bg-danger/10 text-danger"
+                    : busy
+                      ? "status-pill status-pill-active"
+                      : "status-pill status-pill-neutral"
+                }
+              >
+                {run.status}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {recentProgress.length ? (
+                recentProgress.map((event, index) => (
+                  <article className="rounded-2xl border border-border bg-card/70 px-3 py-3" key={`${event.stage}-${event.status}-${index}`}>
+                    <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                      <span>{event.stage || "stage"}</span>
+                      <span>/</span>
+                      <span>{event.status || "status"}</span>
+                    </div>
+                    <p className="mt-2 text-sm text-foreground">{event.detail || "No extra detail."}</p>
+                  </article>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">Waiting for progress events from the backend.</p>
+              )}
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );
