@@ -54,7 +54,10 @@ func NewWriter(version string, keepLatest int) Writer {
 }
 
 func (w Writer) Write(request WriteRequest) (WriteResult, error) {
-	bundleName := fmt.Sprintf("%s_%s", time.Now().UTC().Format("2006-01-02_150405"), sanitizeName(request.Analysis.ProjectName))
+	bundleName, err := nextBundleName(request.OutputRoot, request.Analysis.ProjectName, time.Now().UTC())
+	if err != nil {
+		return WriteResult{}, fmt.Errorf("allocate bundle name: %w", err)
+	}
 	bundlePath := filepath.Join(request.OutputRoot, bundleName)
 
 	directories := []string{
