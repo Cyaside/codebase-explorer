@@ -22,6 +22,7 @@ type workbenchStatusResponse struct {
 	DefaultProvider    workbenchProviderConfig   `json:"default_provider"`
 	SupportedProviders []workbenchProviderOption `json:"supported_providers"`
 	RecentBundles      []workbenchBundleSummary  `json:"recent_bundles"`
+	BundleWarnings     []string                  `json:"bundle_warnings"`
 }
 
 type workbenchProviderOption struct {
@@ -103,7 +104,7 @@ func (s Service) handleWorkbenchStatus(w http.ResponseWriter, r *http.Request, o
 		return
 	}
 
-	bundles, err := listWorkbenchBundles(outputRoot, s.settings.OutputKeepLatest)
+	bundles, warnings, err := listWorkbenchBundles(outputRoot, s.settings.OutputKeepLatest)
 	if err != nil {
 		writeWorkbenchError(w, http.StatusInternalServerError, err)
 		return
@@ -132,6 +133,7 @@ func (s Service) handleWorkbenchStatus(w http.ResponseWriter, r *http.Request, o
 		},
 		SupportedProviders: options,
 		RecentBundles:      bundles,
+		BundleWarnings:     warnings,
 	}
 
 	writeWorkbenchJSON(w, http.StatusOK, response)
@@ -222,7 +224,7 @@ func (s Service) handleWorkbenchBundles(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	bundles, err := listWorkbenchBundles(outputRoot, s.settings.OutputKeepLatest)
+	bundles, _, err := listWorkbenchBundles(outputRoot, s.settings.OutputKeepLatest)
 	if err != nil {
 		writeWorkbenchError(w, http.StatusInternalServerError, err)
 		return

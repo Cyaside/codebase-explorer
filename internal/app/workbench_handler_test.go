@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -44,6 +45,7 @@ func TestWorkbenchStatusListsRecentBundles(t *testing.T) {
 	var response struct {
 		RecentBundles      []workbenchBundleSummary  `json:"recent_bundles"`
 		SupportedProviders []workbenchProviderOption `json:"supported_providers"`
+		BundleWarnings     []string                  `json:"bundle_warnings"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode status response: %v", err)
@@ -53,6 +55,67 @@ func TestWorkbenchStatusListsRecentBundles(t *testing.T) {
 	}
 	if len(response.SupportedProviders) == 0 {
 		t.Fatalf("expected supported providers to be exposed")
+	}
+	if len(response.BundleWarnings) != 0 {
+		t.Fatalf("expected no bundle warnings, got %#v", response.BundleWarnings)
+	}
+}
+
+func TestWorkbenchStatusReportsSkippedBundleWarnings(t *testing.T) {
+	t.Parallel()
+
+	outputRoot := t.TempDir()
+	bundlePath := filepath.Join(outputRoot, "2026-04-04_010101_broken-bundle")
+	if err := os.MkdirAll(filepath.Join(bundlePath, "ui"), 0o755); err != nil {
+		t.Fatalf("create broken bundle: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(bundlePath, "data"), 0o755); err != nil {
+		t.Fatalf("create broken bundle data dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(bundlePath, "README.md"), []byte("# broken\n"), 0o644); err != nil {
+		t.Fatalf("write broken bundle readme: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(bundlePath, "data", "contract.json"), []byte(`{"version":"test"}`), 0o644); err != nil {
+		t.Fatalf("write broken bundle contract: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(bundlePath, "ui", "index.html"), []byte("<!doctype html><title>broken</title>"), 0o644); err != nil {
+		t.Fatalf("write broken viewer index: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(bundlePath, "ui", "viewer-data.js"), []byte("window.CODEARCH_VIEWER_DATA = invalid;"), 0o644); err != nil {
+		t.Fatalf("write broken viewer payload: %v", err)
+	}
+
+	service := New(config.Settings{
+		DefaultOutputRoot: outputRoot,
+		AppVersion:        "test",
+		ConfigSource:      "test",
+	})
+
+	handler, err := service.workbenchHandler(outputRoot)
+	if err != nil {
+		t.Fatalf("build workbench handler: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/api/status", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+
+	var response struct {
+		RecentBundles  []workbenchBundleSummary `json:"recent_bundles"`
+		BundleWarnings []string                 `json:"bundle_warnings"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode status response: %v", err)
+	}
+	if len(response.RecentBundles) != 0 {
+		t.Fatalf("expected broken bundle to be skipped, got %#v", response.RecentBundles)
+	}
+	if len(response.BundleWarnings) != 1 {
+		t.Fatalf("expected one bundle warning, got %#v", response.BundleWarnings)
 	}
 }
 

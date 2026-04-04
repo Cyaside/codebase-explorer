@@ -39,10 +39,10 @@ type workbenchBundleLocation struct {
 	modTime time.Time
 }
 
-func listWorkbenchBundles(outputRoot string, limit int) ([]workbenchBundleSummary, error) {
+func listWorkbenchBundles(outputRoot string, limit int) ([]workbenchBundleSummary, []string, error) {
 	locations, err := listBundleLocations(outputRoot)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if limit > 0 && len(locations) > limit {
@@ -50,15 +50,17 @@ func listWorkbenchBundles(outputRoot string, limit int) ([]workbenchBundleSummar
 	}
 
 	summaries := make([]workbenchBundleSummary, 0, len(locations))
+	warnings := make([]string, 0)
 	for _, location := range locations {
 		data, err := loadViewerBundleData(location.path)
 		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("Skipped bundle %q: %v", location.name, err))
 			continue
 		}
 		summaries = append(summaries, summarizeWorkbenchBundle(location, data))
 	}
 
-	return summaries, nil
+	return summaries, warnings, nil
 }
 
 func loadWorkbenchBundle(outputRoot, bundleName string) (workbenchBundle, error) {
