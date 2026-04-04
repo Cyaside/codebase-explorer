@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/Cyaside/codebase-explorer/internal/provider"
-	"github.com/Cyaside/codebase-explorer/workbench"
+	"github.com/Cyaside/codebase-explorer/ui"
 )
 
 type workbenchStatusResponse struct {
@@ -54,7 +54,7 @@ type workbenchAnalyzeResponse struct {
 type appAnalyzeResult = AnalyzeResult
 
 func (s Service) workbenchHandler(outputRoot string) (http.Handler, error) {
-	assets, err := workbench.Assets()
+	assets, err := ui.Assets()
 	if err != nil {
 		return nil, fmt.Errorf("load workbench assets: %w", err)
 	}

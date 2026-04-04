@@ -1,4 +1,4 @@
-package workbench
+package ui
 
 import (
 	"io/fs"
