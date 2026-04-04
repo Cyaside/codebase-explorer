@@ -10,6 +10,8 @@ import (
 func DependenciesREADME(analysis analyzer.Result) string {
 	var builder strings.Builder
 	builder.WriteString("# Dependencies\n\n")
+	builder.WriteString("## Dependency Graph\n\n")
+	builder.WriteString("- [dependency-graph.mmd](dependency-graph.mmd)\n\n")
 	if len(analysis.DependencyRisks) == 0 {
 		builder.WriteString("No concentrated dependency points were detected from import-like heuristics.\n")
 		return builder.String()

@@ -16,6 +16,8 @@ func ArchitectureREADME(analysis analyzer.Result, aiResult provider.Result) stri
 		builder.WriteString(narrative)
 		builder.WriteString("\n\n")
 	}
+	builder.WriteString("## Orientation Graph\n\n")
+	builder.WriteString("- [module-graph.mmd](module-graph.mmd)\n\n")
 	builder.WriteString("## Core Modules\n\n")
 	for _, module := range analysis.Modules {
 		builder.WriteString(fmt.Sprintf("- `%s`: %d files, %d lines, %d entry point(s)\n", module.Path, module.FileCount, module.TotalLines, module.EntryPointCount))

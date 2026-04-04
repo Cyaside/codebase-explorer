@@ -43,5 +43,8 @@ func RootREADME(_ repo.ScanResult, analysis analyzer.Result, aiResult provider.R
 	builder.WriteString("- [Reading Path](reading-path/README.md)\n")
 	builder.WriteString("- [Changes](changes/README.md)\n")
 	builder.WriteString("- [Data](data/README.md)\n")
+	builder.WriteString("\n## Diagrams\n\n")
+	builder.WriteString("- [Architecture Mermaid](architecture/module-graph.mmd)\n")
+	builder.WriteString("- [Dependency Mermaid](dependencies/dependency-graph.mmd)\n")
 	return builder.String()
 }
