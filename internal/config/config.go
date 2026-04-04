@@ -9,7 +9,7 @@ import (
 
 const (
 	defaultOutputRoot       = "out"
-	defaultAppVersion       = "phase1"
+	defaultAppVersion       = "dev"
 	defaultOutputKeepLatest = 10
 )
 
