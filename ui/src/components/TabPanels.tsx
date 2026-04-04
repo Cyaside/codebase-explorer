@@ -71,7 +71,7 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
               <div className="space-y-3">
                 {bundle ? (
                   <a
-                    className="inline-flex text-sm text-primary transition hover:text-primary-foreground"
+                    className="focus-shell inline-flex text-sm text-primary transition hover:text-primary-foreground"
                     href={bundleLink(bundle.summary.name, bundle.data.links.architecture_diagram)}
                     rel="noreferrer"
                     target="_blank"
@@ -87,7 +87,7 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
               <div className="space-y-3">
                 {bundle ? (
                   <a
-                    className="inline-flex text-sm text-primary transition hover:text-primary-foreground"
+                    className="focus-shell inline-flex text-sm text-primary transition hover:text-primary-foreground"
                     href={bundleLink(bundle.summary.name, bundle.data.links.dependency_diagram)}
                     rel="noreferrer"
                     target="_blank"
@@ -194,7 +194,7 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
 function TabTrigger({ children, value }: { children: ReactNode; value: TabKey }) {
   return (
     <Tabs.Trigger
-      className="rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+      className="focus-shell rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
       value={value}
     >
       {children}
@@ -322,7 +322,7 @@ function SignalChip({
 function QuickLink({ href, label }: { href: string; label: string }) {
   return (
     <a
-      className="inline-flex items-center rounded-full border border-border bg-background/60 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground transition hover:border-border-strong hover:bg-background hover:text-foreground"
+      className="focus-shell inline-flex items-center rounded-full border border-border bg-background/60 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground transition hover:border-border-strong hover:bg-background hover:text-foreground"
       href={href}
       rel="noreferrer"
       target="_blank"

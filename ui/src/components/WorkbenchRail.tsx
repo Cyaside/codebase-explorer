@@ -159,7 +159,7 @@ function QuickLinksCard({ bundle }: { bundle: WorkbenchBundle | null }) {
     <div className="space-y-2">
       {links.map((link) => (
         <a
-          className="flex items-center justify-between rounded-2xl border border-border bg-background/60 px-3 py-3 text-sm text-foreground transition hover:border-border-strong hover:bg-background"
+          className="focus-shell flex items-center justify-between rounded-2xl border border-border bg-background/60 px-3 py-3 text-sm text-foreground transition hover:border-border-strong hover:bg-background"
           href={link.href}
           key={link.label}
           rel="noreferrer"

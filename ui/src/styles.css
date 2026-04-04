@@ -116,6 +116,10 @@
     @apply rounded-2xl border border-border bg-background/55 px-3 py-3;
   }
 
+  .focus-shell {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
   .command-item {
     @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-background/45 px-3 py-3 text-left transition hover:border-border-strong hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }

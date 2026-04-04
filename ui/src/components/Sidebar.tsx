@@ -42,7 +42,7 @@ export function Sidebar({
           icon={<PlugZap className="size-4 text-muted-foreground" />}
           title="Connections"
           action={
-            <button className="text-xs text-muted-foreground transition hover:text-foreground" onClick={onRefresh} type="button">
+            <button className="focus-shell text-xs text-muted-foreground transition hover:text-foreground" onClick={onRefresh} type="button">
               sync
             </button>
           }
@@ -51,13 +51,13 @@ export function Sidebar({
             {profiles.map((profile) => {
               const selected = profile.id === selectedProfile;
               const meta = profile.provider
-                ? `${profile.provider.name}${profile.provider.model ? ` • ${profile.provider.model}` : ""}`
+                ? `${profile.provider.name}${profile.provider.model ? ` · ${profile.provider.model}` : ""}`
                 : "Deterministic only";
 
               return (
                 <button
                   className={cn(
-                    "w-full rounded-xl border px-3 py-3 text-left transition",
+                    "focus-shell w-full rounded-xl border px-3 py-3 text-left transition",
                     selected
                       ? "border-primary/40 bg-accent text-accent-foreground"
                       : "border-border bg-card/80 text-foreground hover:border-border-strong hover:bg-card",
@@ -78,7 +78,7 @@ export function Sidebar({
           icon={<FolderKanban className="size-4 text-muted-foreground" />}
           title="Recent Bundles"
           action={
-            <button className="text-xs text-muted-foreground transition hover:text-foreground" onClick={onRefresh} type="button">
+            <button className="focus-shell text-xs text-muted-foreground transition hover:text-foreground" onClick={onRefresh} type="button">
               <RefreshCw className="size-3.5" />
             </button>
           }
@@ -88,7 +88,7 @@ export function Sidebar({
               bundles.map((bundle) => (
                 <button
                   className={cn(
-                    "w-full rounded-xl border px-3 py-3 text-left transition",
+                    "focus-shell w-full rounded-xl border px-3 py-3 text-left transition",
                     bundle.name === selectedBundle
                       ? "border-primary/40 bg-accent text-accent-foreground"
                       : "border-border bg-card/80 text-foreground hover:border-border-strong hover:bg-card",
@@ -99,7 +99,7 @@ export function Sidebar({
                 >
                   <strong className="block text-sm font-semibold">{bundle.project_name || bundle.name}</strong>
                   <span className="mt-1 block text-xs text-muted-foreground">
-                    {bundle.ai_status || "deterministic"} • {bundle.total_files} files
+                    {bundle.ai_status || "deterministic"} · {bundle.total_files} files
                   </span>
                 </button>
               ))
