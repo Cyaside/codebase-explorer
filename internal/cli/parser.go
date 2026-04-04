@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/Cyaside/codebase-explorer/internal/app"
@@ -13,6 +16,7 @@ import (
 type Service interface {
 	Analyze(context.Context, app.AnalyzeRequest) (app.AnalyzeResult, error)
 	Doctor(context.Context, app.DoctorRequest) (app.DoctorResult, error)
+	Open(context.Context, app.OpenRequest) (app.OpenResult, error)
 }
 
 func Run(ctx context.Context, args []string, service Service, stdout, stderr io.Writer) (int, error) {
@@ -42,6 +46,18 @@ func Run(ctx context.Context, args []string, service Service, stdout, stderr io.
 		}
 		printDoctorResult(stdout, result)
 		return 0, nil
+	case "open":
+		result, runErr := service.Open(ctx, command.openRequest)
+		if runErr != nil {
+			return 1, runErr
+		}
+
+		var openErr error
+		if !command.openRequest.NoBrowser {
+			openErr = openViewer(ctx, result.ViewerPath)
+		}
+		printOpenResult(stdout, result, openErr, command.openRequest.NoBrowser)
+		return 0, nil
 	default:
 		return 2, fmt.Errorf("unknown command %q", command.name)
 	}
@@ -50,6 +66,7 @@ func Run(ctx context.Context, args []string, service Service, stdout, stderr io.
 type parsedCommand struct {
 	name           string
 	analyzeRequest app.AnalyzeRequest
+	openRequest    app.OpenRequest
 }
 
 var errUsage = errors.New("usage requested")
@@ -67,6 +84,8 @@ func parse(args []string) (parsedCommand, error) {
 			return parsedCommand{}, fmt.Errorf("doctor does not accept additional arguments")
 		}
 		return parsedCommand{name: "doctor"}, nil
+	case "open":
+		return parseOpen(args[1:])
 	case "analyze":
 		return parseAnalyze(args[1:])
 	default:
@@ -111,4 +130,50 @@ func parseAnalyze(args []string) (parsedCommand, error) {
 		name:           "analyze",
 		analyzeRequest: request,
 	}, nil
+}
+
+func parseOpen(args []string) (parsedCommand, error) {
+	request := app.OpenRequest{}
+
+	for index := 0; index < len(args); index++ {
+		current := args[index]
+		switch {
+		case current == "--no-browser":
+			request.NoBrowser = true
+		case strings.HasPrefix(current, "--"):
+			return parsedCommand{}, fmt.Errorf("unknown open flag %q", current)
+		case request.BundlePath == "":
+			request.BundlePath = current
+		default:
+			return parsedCommand{}, fmt.Errorf("open accepts at most one bundle path")
+		}
+	}
+
+	return parsedCommand{
+		name:        "open",
+		openRequest: request,
+	}, nil
+}
+
+func openViewer(ctx context.Context, viewerPath string) error {
+	absolutePath, err := filepath.Abs(viewerPath)
+	if err != nil {
+		return fmt.Errorf("resolve viewer path %q: %w", viewerPath, err)
+	}
+
+	var command *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		command = exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", absolutePath)
+	case "darwin":
+		command = exec.CommandContext(ctx, "open", absolutePath)
+	default:
+		command = exec.CommandContext(ctx, "xdg-open", absolutePath)
+	}
+
+	if err := command.Start(); err != nil {
+		return fmt.Errorf("open viewer %q: %w", absolutePath, err)
+	}
+
+	return nil
 }

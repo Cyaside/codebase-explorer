@@ -68,3 +68,25 @@ func TestPrintAnalyzeProgressFormatsEvent(t *testing.T) {
 		t.Fatalf("expected progress line to be formatted, got %q", output)
 	}
 }
+
+func TestPrintOpenResultIncludesResolvedViewerPath(t *testing.T) {
+	t.Parallel()
+
+	var builder strings.Builder
+	printOpenResult(&builder, app.OpenResult{
+		BundlePath:     "/tmp/out/bundle",
+		ViewerPath:     "/tmp/out/bundle/ui/index.html",
+		ResolvedLatest: true,
+	}, nil, true)
+
+	output := builder.String()
+	if !strings.Contains(output, "Viewer ready.") {
+		t.Fatalf("expected open result header, got %q", output)
+	}
+	if !strings.Contains(output, "Bundle source: latest bundle in output root") {
+		t.Fatalf("expected latest bundle note, got %q", output)
+	}
+	if !strings.Contains(output, "Browser launch: skipped by flag") {
+		t.Fatalf("expected browser skip note, got %q", output)
+	}
+}

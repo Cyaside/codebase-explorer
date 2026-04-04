@@ -11,6 +11,7 @@ import (
 func printUsage(output io.Writer) {
 	fmt.Fprintln(output, "Usage:")
 	fmt.Fprintln(output, "  codearch analyze <repo-path> [--output <dir>] [--deterministic-only] [--ignore <pattern>]")
+	fmt.Fprintln(output, "  codearch open [bundle-path] [--no-browser]")
 	fmt.Fprintln(output, "  codearch doctor")
 }
 
@@ -85,4 +86,22 @@ func printDoctorResult(output io.Writer, result app.DoctorResult) {
 	for _, check := range result.Checks {
 		fmt.Fprintf(output, "- [%s] %s: %s\n", strings.ToUpper(check.Status), check.Name, check.Detail)
 	}
+}
+
+func printOpenResult(output io.Writer, result app.OpenResult, openErr error, noBrowser bool) {
+	fmt.Fprintf(output, "Viewer ready.\n")
+	fmt.Fprintf(output, "Bundle: %s\n", result.BundlePath)
+	fmt.Fprintf(output, "Viewer: %s\n", result.ViewerPath)
+	if result.ResolvedLatest {
+		fmt.Fprintf(output, "Bundle source: latest bundle in output root\n")
+	}
+	if noBrowser {
+		fmt.Fprintf(output, "Browser launch: skipped by flag\n")
+		return
+	}
+	if openErr != nil {
+		fmt.Fprintf(output, "Browser launch: failed (%v)\n", openErr)
+		return
+	}
+	fmt.Fprintf(output, "Browser launch: requested\n")
 }

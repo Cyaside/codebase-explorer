@@ -44,6 +44,17 @@ type AnalyzeOutputSummary struct {
 	PrunedBundles  int
 }
 
+type OpenRequest struct {
+	BundlePath string
+	NoBrowser  bool
+}
+
+type OpenResult struct {
+	BundlePath     string
+	ViewerPath     string
+	ResolvedLatest bool
+}
+
 type DoctorRequest struct{}
 
 type DoctorCheck struct {
