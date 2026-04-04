@@ -8,23 +8,32 @@ import (
 )
 
 const (
-	defaultOutputRoot = "out"
-	defaultAppVersion = "phase1"
+	defaultOutputRoot       = "out"
+	defaultAppVersion       = "phase1"
+	defaultOutputKeepLatest = 10
 )
 
 type Settings struct {
 	DefaultOutputRoot string
 	AppVersion        string
 	ConfigSource      string
+	OutputKeepLatest  int
 	Provider          ProviderSettings
 }
 
 func Load() (Settings, error) {
 	outputRoot := strings.TrimSpace(getEnv("CODEARCH_OUTPUT_ROOT"))
+	outputKeepLatest, outputKeepLatestFromEnv, err := loadOutputKeepLatest()
+	if err != nil {
+		return Settings{}, err
+	}
 	source := "defaults"
 	if outputRoot == "" {
 		outputRoot = defaultOutputRoot
 	} else {
+		source = "environment"
+	}
+	if outputKeepLatestFromEnv {
 		source = "environment"
 	}
 
@@ -42,6 +51,7 @@ func Load() (Settings, error) {
 		DefaultOutputRoot: cleanRoot,
 		AppVersion:        defaultAppVersion,
 		ConfigSource:      source,
+		OutputKeepLatest:  outputKeepLatest,
 		Provider:          providerSettings,
 	}, nil
 }

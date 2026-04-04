@@ -18,6 +18,7 @@ type AnalyzeResult struct {
 	EntryPoints     []string
 	PrimaryLanguage string
 	AI              AnalyzeAISummary
+	Output          AnalyzeOutputSummary
 }
 
 type AnalyzeProgressEvent struct {
@@ -36,6 +37,11 @@ type AnalyzeAISummary struct {
 	Note             string
 	ContextSummary   string
 	ContextTruncated bool
+}
+
+type AnalyzeOutputSummary struct {
+	RetentionLimit int
+	PrunedBundles  int
 }
 
 type DoctorRequest struct{}

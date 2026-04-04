@@ -25,15 +25,21 @@ type WriteRequest struct {
 }
 
 type WriteResult struct {
-	BundlePath string
+	BundlePath     string
+	PrunedBundles  int
+	RetentionLimit int
 }
 
 type Writer struct {
-	version string
+	version    string
+	keepLatest int
 }
 
-func NewWriter(version string) Writer {
-	return Writer{version: version}
+func NewWriter(version string, keepLatest int) Writer {
+	return Writer{
+		version:    version,
+		keepLatest: keepLatest,
+	}
 }
 
 func (w Writer) Write(request WriteRequest) (WriteResult, error) {
@@ -124,7 +130,16 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		return WriteResult{}, err
 	}
 
-	return WriteResult{BundlePath: bundlePath}, nil
+	prunedBundles, err := pruneBundles(request.OutputRoot, bundlePath, w.keepLatest)
+	if err != nil {
+		return WriteResult{}, err
+	}
+
+	return WriteResult{
+		BundlePath:     bundlePath,
+		PrunedBundles:  prunedBundles,
+		RetentionLimit: w.keepLatest,
+	}, nil
 }
 
 func writeJSON(pathOnDisk string, value any) error {

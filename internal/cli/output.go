@@ -42,6 +42,12 @@ func printAnalyzeResult(output io.Writer, result app.AnalyzeResult) {
 	if result.AI.Note != "" {
 		fmt.Fprintf(output, "AI note: %s\n", result.AI.Note)
 	}
+	if result.Output.RetentionLimit > 0 {
+		fmt.Fprintf(output, "Output retention: keep latest %d bundle(s)\n", result.Output.RetentionLimit)
+	}
+	if result.Output.PrunedBundles > 0 {
+		fmt.Fprintf(output, "Output cleanup: removed %d older bundle(s)\n", result.Output.PrunedBundles)
+	}
 	fmt.Fprintf(output, "Bundle: %s\n", result.OutputPath)
 }
 

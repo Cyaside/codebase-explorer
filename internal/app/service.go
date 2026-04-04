@@ -28,7 +28,7 @@ func New(settings config.Settings) Service {
 		scanner:   repo.NewScanner(),
 		analyzer:  analyzer.NewService(settings.AppVersion),
 		providers: provider.NewRegistry(),
-		writer:    bundle.NewWriter(settings.AppVersion),
+		writer:    bundle.NewWriter(settings.AppVersion, settings.OutputKeepLatest),
 	}
 }
 
@@ -67,6 +67,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	if err != nil {
 		return AnalyzeResult{}, fmt.Errorf("write bundle: %w", err)
 	}
+	emitAnalyzeProgress(request, "output-cleanup", cleanupStatus(writeResult.PrunedBundles), cleanupDetail(writeResult.PrunedBundles, writeResult.RetentionLimit))
 
 	primaryLanguage := ""
 	if len(analysis.Languages) > 0 {
@@ -82,6 +83,10 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 		EntryPoints:     analysis.EntryPoints,
 		PrimaryLanguage: primaryLanguage,
 		AI:              buildAISummary(aiContext, aiResult),
+		Output: AnalyzeOutputSummary{
+			RetentionLimit: writeResult.RetentionLimit,
+			PrunedBundles:  writeResult.PrunedBundles,
+		},
 	}, nil
 }
 
@@ -109,7 +114,7 @@ func (s Service) Doctor(_ context.Context, _ DoctorRequest) (DoctorResult, error
 		checks = append(checks, DoctorCheck{
 			Name:   "output-root",
 			Status: "pass",
-			Detail: fmt.Sprintf("output root is ready at %s", outputRoot),
+			Detail: fmt.Sprintf("output root is ready at %s; keeping latest %d bundle(s)", outputRoot, s.settings.OutputKeepLatest),
 		})
 	}
 

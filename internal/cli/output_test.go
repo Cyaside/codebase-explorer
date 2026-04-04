@@ -26,6 +26,10 @@ func TestPrintAnalyzeResultIncludesAISummary(t *testing.T) {
 			ContextSummary: "modules=5 hotspots=5 dependencies=5 reading_path=6 (truncated)",
 			Note:           "parse synthesis response: invalid character",
 		},
+		Output: app.AnalyzeOutputSummary{
+			RetentionLimit: 10,
+			PrunedBundles:  2,
+		},
 	})
 
 	output := builder.String()
@@ -40,6 +44,12 @@ func TestPrintAnalyzeResultIncludesAISummary(t *testing.T) {
 	}
 	if !strings.Contains(output, "AI note: parse synthesis response: invalid character") {
 		t.Fatalf("expected AI note in analyze output, got %q", output)
+	}
+	if !strings.Contains(output, "Output retention: keep latest 10 bundle(s)") {
+		t.Fatalf("expected output retention line in analyze output, got %q", output)
+	}
+	if !strings.Contains(output, "Output cleanup: removed 2 older bundle(s)") {
+		t.Fatalf("expected output cleanup line in analyze output, got %q", output)
 	}
 }
 
