@@ -7,10 +7,156 @@
     <link rel="stylesheet" href="/assets/style.css" />
   </head>
   <body>
-    <main class="boot-shell">
-      <h1>Codebase Explorer</h1>
-      <p>Loading local workbench…</p>
-    </main>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">C</div>
+          <div>
+            <p class="eyebrow">Codebase Explorer</p>
+            <h1>Workbench</h1>
+          </div>
+        </div>
+
+        <section class="sidebar-section">
+          <div class="section-heading">
+            <span>Connections</span>
+            <button id="new-profile-button" class="ghost-button" type="button">+</button>
+          </div>
+          <div id="profile-list" class="stack-list"></div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="section-heading">
+            <span>Recent Bundles</span>
+            <button id="refresh-button" class="ghost-button" type="button">Refresh</button>
+          </div>
+          <div id="bundle-list" class="stack-list"></div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="section-heading">
+            <span>System</span>
+          </div>
+          <div id="system-facts" class="fact-list"></div>
+        </section>
+      </aside>
+
+      <main class="main-shell">
+        <header class="topbar glass-panel">
+          <div>
+            <p class="eyebrow">Local-First Repository Orientation</p>
+            <h2 id="workspace-title">Loading workbench...</h2>
+            <p id="workspace-subtitle" class="muted">Preparing local analysis workspace.</p>
+          </div>
+          <div class="topbar-actions">
+            <button id="reload-dashboard-button" class="ghost-button" type="button">Reload</button>
+            <a id="bundle-readme-link" class="ghost-link" href="#" target="_blank" rel="noreferrer">Open Bundle README</a>
+          </div>
+        </header>
+
+        <section class="hero-grid">
+          <form id="analyze-form" class="glass-panel form-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Analyze</p>
+                <h3>Open a local project</h3>
+              </div>
+              <span id="analyze-state-badge" class="status-pill neutral">Idle</span>
+            </div>
+
+            <label class="field">
+              <span>Repository path</span>
+              <input id="repo-path-input" type="text" placeholder="C:\projects\my-repo" autocomplete="off" />
+            </label>
+
+            <div class="split-grid">
+              <label class="field">
+                <span>Support files</span>
+                <textarea id="support-files-input" rows="4" placeholder="One path per line for issues, changelog, or notes"></textarea>
+              </label>
+              <label class="field">
+                <span>Ignore patterns</span>
+                <textarea id="ignore-patterns-input" rows="4" placeholder="Optional extra ignore patterns, one per line"></textarea>
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button id="analyze-button" class="primary-button" type="submit">Analyze Project</button>
+              <p class="field-note">Use a local checkout path. GitHub URLs are intentionally not cloned yet to keep execution lightweight and local.</p>
+            </div>
+          </form>
+
+          <section class="glass-panel connection-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Connection</p>
+                <h3 id="connection-title">Selected local profile</h3>
+              </div>
+              <span id="connection-mode-pill" class="status-pill neutral">Deterministic</span>
+            </div>
+
+            <div class="split-grid">
+              <label class="field">
+                <span>Label</span>
+                <input id="profile-label-input" type="text" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Provider mode</span>
+                <select id="profile-provider-input">
+                  <option value="">Deterministic only</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="openai-compatible">OpenAI-compatible</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="split-grid">
+              <label class="field">
+                <span>Model</span>
+                <input id="profile-model-input" type="text" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Base URL</span>
+                <input id="profile-base-url-input" type="text" autocomplete="off" placeholder="https://api.openai.com/v1" />
+              </label>
+            </div>
+
+            <label class="field">
+              <span>API key</span>
+              <input id="profile-api-key-input" type="password" autocomplete="off" placeholder="Stored only in this browser when you click save" />
+            </label>
+
+            <div class="form-actions compact">
+              <button id="save-profile-button" class="primary-button" type="button">Save Connection</button>
+              <button id="duplicate-profile-button" class="ghost-button" type="button">Duplicate</button>
+              <button id="delete-profile-button" class="ghost-button danger" type="button">Delete</button>
+            </div>
+            <p id="profile-hint" class="field-note"></p>
+          </section>
+        </section>
+
+        <section id="stats-row" class="stats-row"></section>
+
+        <nav id="tab-row" class="tab-row">
+          <button class="tab-button active" data-tab="summary" type="button">Summary</button>
+          <button class="tab-button" data-tab="architecture" type="button">Architecture</button>
+          <button class="tab-button" data-tab="flowchart" type="button">Flowchart</button>
+          <button class="tab-button" data-tab="issues" type="button">Issue Tracking</button>
+          <button class="tab-button" data-tab="recommendations" type="button">Recommendations</button>
+        </nav>
+
+        <section class="content-grid">
+          <article id="panel-summary" class="glass-panel tab-panel active"></article>
+          <article id="panel-architecture" class="glass-panel tab-panel"></article>
+          <article id="panel-flowchart" class="glass-panel tab-panel"></article>
+          <article id="panel-issues" class="glass-panel tab-panel"></article>
+          <article id="panel-recommendations" class="glass-panel tab-panel"></article>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
     <script src="/assets/app.js"></script>
   </body>
   </html>
