@@ -8,6 +8,7 @@ import { StatsGrid } from "@/components/StatsGrid";
 import { TabPanels } from "@/components/TabPanels";
 import { buildProviderPayload, cancelAnalyzeRun, fetchAnalyzeRun, fetchBundle, fetchStatus, mergeBundleSummary, startAnalyzeRun } from "@/lib/api";
 import { defaultProfiles, loadProfiles, loadUIState, persistProfiles, persistUIState } from "@/lib/storage";
+import { openAnalyzeRunStream } from "@/lib/stream";
 import type { AnalyzeFormState, AnalyzeRun, ConnectionProfile, TabKey, WorkbenchBundle, WorkbenchStatusResponse } from "@/lib/types";
 import { bundleLink, splitLines } from "@/lib/utils";
 import { validateProfile } from "@/lib/validation";
@@ -74,16 +75,53 @@ export function App() {
       return;
     }
 
-    const intervalID = window.setInterval(async () => {
+    let canceled = false;
+    let intervalID = 0;
+
+    const pollOnce = async () => {
       try {
         const response = await fetchAnalyzeRun(activeRun.id);
-        applyRunSnapshot(response.run);
+        if (!canceled) {
+          applyRunSnapshot(response.run);
+        }
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to poll analyze run.");
+        if (!canceled) {
+          setErrorMessage(error instanceof Error ? error.message : "Failed to poll analyze run.");
+        }
       }
-    }, 700);
+    };
 
-    return () => window.clearInterval(intervalID);
+    const startPolling = () => {
+      if (intervalID) {
+        return;
+      }
+
+      intervalID = window.setInterval(async () => {
+        await pollOnce();
+      }, 700);
+      void pollOnce();
+    };
+
+    const stopStream = openAnalyzeRunStream(activeRun.id, {
+      onRun: (run) => {
+        if (!canceled) {
+          applyRunSnapshot(run);
+        }
+      },
+      onFallback: () => {
+        if (!canceled) {
+          startPolling();
+        }
+      },
+    });
+
+    return () => {
+      canceled = true;
+      stopStream();
+      if (intervalID) {
+        window.clearInterval(intervalID);
+      }
+    };
   }, [activeRun?.id, activeRun?.status]);
 
   async function refreshStatus(preferredBundleName?: string) {
