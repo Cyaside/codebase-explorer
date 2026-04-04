@@ -41,3 +41,15 @@ func TestParseCacheClearCommand(t *testing.T) {
 		t.Fatalf("expected cache-clear command, got %#v", command)
 	}
 }
+
+func TestParseExportAcceptsOutputFlag(t *testing.T) {
+	t.Parallel()
+
+	command, err := parse([]string{"export", "./bundle", "--output", "./bundle.zip"})
+	if err != nil {
+		t.Fatalf("parse export command: %v", err)
+	}
+	if command.name != "export" || command.exportRequest.OutputPath != "./bundle.zip" {
+		t.Fatalf("expected parsed export request, got %#v", command)
+	}
+}

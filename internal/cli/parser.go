@@ -17,6 +17,7 @@ type Service interface {
 	Analyze(context.Context, app.AnalyzeRequest) (app.AnalyzeResult, error)
 	Doctor(context.Context, app.DoctorRequest) (app.DoctorResult, error)
 	Open(context.Context, app.OpenRequest) (app.OpenResult, error)
+	Export(context.Context, app.ExportRequest) (app.ExportResult, error)
 	ClearCache(context.Context, app.CacheClearRequest) (app.CacheClearResult, error)
 }
 
@@ -66,6 +67,13 @@ func Run(ctx context.Context, args []string, service Service, stdout, stderr io.
 		}
 		printOpenResult(stdout, result, openErr, command.openRequest.NoBrowser)
 		return 0, nil
+	case "export":
+		result, runErr := service.Export(ctx, command.exportRequest)
+		if runErr != nil {
+			return 1, runErr
+		}
+		printExportResult(stdout, result)
+		return 0, nil
 	default:
 		return 2, fmt.Errorf("unknown command %q", command.name)
 	}
@@ -75,6 +83,7 @@ type parsedCommand struct {
 	name           string
 	analyzeRequest app.AnalyzeRequest
 	openRequest    app.OpenRequest
+	exportRequest  app.ExportRequest
 }
 
 var errUsage = errors.New("usage requested")
@@ -99,6 +108,8 @@ func parse(args []string) (parsedCommand, error) {
 		return parsedCommand{name: "doctor"}, nil
 	case "open":
 		return parseOpen(args[1:])
+	case "export":
+		return parseExport(args[1:])
 	case "analyze":
 		return parseAnalyze(args[1:])
 	default:
@@ -171,6 +182,33 @@ func parseOpen(args []string) (parsedCommand, error) {
 	return parsedCommand{
 		name:        "open",
 		openRequest: request,
+	}, nil
+}
+
+func parseExport(args []string) (parsedCommand, error) {
+	request := app.ExportRequest{}
+
+	for index := 0; index < len(args); index++ {
+		current := args[index]
+		switch {
+		case current == "--output":
+			index++
+			if index >= len(args) {
+				return parsedCommand{}, fmt.Errorf("--output requires a value")
+			}
+			request.OutputPath = args[index]
+		case strings.HasPrefix(current, "--"):
+			return parsedCommand{}, fmt.Errorf("unknown export flag %q", current)
+		case request.BundlePath == "":
+			request.BundlePath = current
+		default:
+			return parsedCommand{}, fmt.Errorf("export accepts at most one bundle path")
+		}
+	}
+
+	return parsedCommand{
+		name:          "export",
+		exportRequest: request,
 	}, nil
 }
 

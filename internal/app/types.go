@@ -73,9 +73,8 @@ type OpenResult struct {
 }
 
 type ExportRequest struct {
-	BundlePath  string
-	OutputPath  string
-	IncludeName bool
+	BundlePath string
+	OutputPath string
 }
 
 type ExportResult struct {

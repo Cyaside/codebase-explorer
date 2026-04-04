@@ -128,3 +128,18 @@ func TestPrintCacheClearResult(t *testing.T) {
 		t.Fatalf("expected cache clear output, got %q", output)
 	}
 }
+
+func TestPrintExportResult(t *testing.T) {
+	t.Parallel()
+
+	var builder strings.Builder
+	printExportResult(&builder, app.ExportResult{
+		BundlePath:  "/tmp/out/bundle",
+		ArchivePath: "/tmp/out/bundle.zip",
+	})
+
+	output := builder.String()
+	if !strings.Contains(output, "Bundle exported.") || !strings.Contains(output, "bundle.zip") {
+		t.Fatalf("expected export output, got %q", output)
+	}
+}

@@ -12,6 +12,7 @@ func printUsage(output io.Writer) {
 	fmt.Fprintln(output, "Usage:")
 	fmt.Fprintln(output, "  codearch analyze <repo-path> [support-file ...] [--support <file>] [--issues <file>] [--changelog <file>] [--output <dir>] [--deterministic-only] [--ignore <pattern>]")
 	fmt.Fprintln(output, "  codearch open [bundle-path] [--no-browser]")
+	fmt.Fprintln(output, "  codearch export [bundle-path] [--output <zip-path>]")
 	fmt.Fprintln(output, "  codearch doctor")
 	fmt.Fprintln(output, "  codearch cache clear")
 }
@@ -123,4 +124,10 @@ func printOpenResult(output io.Writer, result app.OpenResult, openErr error, noB
 		return
 	}
 	fmt.Fprintf(output, "Browser launch: requested\n")
+}
+
+func printExportResult(output io.Writer, result app.ExportResult) {
+	fmt.Fprintf(output, "Bundle exported.\n")
+	fmt.Fprintf(output, "Bundle: %s\n", result.BundlePath)
+	fmt.Fprintf(output, "Archive: %s\n", result.ArchivePath)
 }
