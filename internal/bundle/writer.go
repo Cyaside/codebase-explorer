@@ -23,6 +23,7 @@ type WriteRequest struct {
 	ScanResult        repo.ScanResult
 	Analysis          analyzer.Result
 	Changes           changes.Result
+	Warnings          []string
 	Cache             CacheMeta
 	AIContext         provider.CondensedContext
 	AIResult          provider.Result
@@ -78,7 +79,7 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	}
 
 	files := map[string]string{
-		filepath.Join(bundlePath, "README.md"):                            report.RootREADME(request.ScanResult, request.Analysis, request.AIResult, bundleName),
+		filepath.Join(bundlePath, "README.md"):                            report.RootREADME(request.ScanResult, request.Analysis, request.AIResult, request.Warnings, bundleName),
 		filepath.Join(bundlePath, "overview", "README.md"):                report.OverviewREADME(request.Analysis, request.AIResult),
 		filepath.Join(bundlePath, "architecture", "README.md"):            report.ArchitectureREADME(request.Analysis, request.AIResult),
 		filepath.Join(bundlePath, "architecture", "module-graph.mmd"):     report.ArchitectureMermaid(request.Analysis),
@@ -216,6 +217,7 @@ func buildViewerData(request WriteRequest, bundleName string) viewer.BundleData 
 			ProviderMode: request.Analysis.Provider,
 		},
 		Metrics:              request.Analysis.Metrics,
+		Warnings:             request.Warnings,
 		Languages:            request.Analysis.Languages,
 		ImportantDirectories: request.Analysis.ImportantDirectories,
 		EntryPoints:          request.Analysis.EntryPoints,

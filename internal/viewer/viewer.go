@@ -20,6 +20,7 @@ type BundleData struct {
 	GeneratedAt          time.Time                  `json:"generated_at"`
 	Project              ProjectData                `json:"project"`
 	Metrics              analyzer.Metrics           `json:"metrics"`
+	Warnings             []string                   `json:"warnings"`
 	Languages            []analyzer.LanguageSummary `json:"languages"`
 	ImportantDirectories []string                   `json:"important_directories"`
 	EntryPoints          []string                   `json:"entry_points"`

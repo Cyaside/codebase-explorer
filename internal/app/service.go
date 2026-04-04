@@ -68,6 +68,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	scanResult := state.ScanResult
 	analysis := state.Analysis
 	changeResult := state.Changes
+	warnings := buildWarnings(analysis, len(supportFiles))
 	aiContext := buildCondensedContext(analysis)
 	emitAnalyzeProgress(request, "ai-context", "ready", summarizeAIContext(aiContext))
 	aiResult, providerCacheStatus := s.buildAIResult(ctx, request, analysis, request.DeterministicOnly, aiContext)
@@ -78,6 +79,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 		ScanResult:        scanResult,
 		Analysis:          analysis,
 		Changes:           changeResult,
+		Warnings:          warnings,
 		Cache: bundle.CacheMeta{
 			Enabled:             s.cache.Enabled(),
 			Root:                s.cache.Root(),
@@ -105,6 +107,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 		TotalLines:      analysis.Metrics.TotalLines,
 		EntryPoints:     analysis.EntryPoints,
 		PrimaryLanguage: primaryLanguage,
+		Warnings:        warnings,
 		Cache: AnalyzeCacheSummary{
 			Enabled:             s.cache.Enabled(),
 			Root:                s.cache.Root(),

@@ -17,6 +17,7 @@ type AnalyzeResult struct {
 	TotalLines      int
 	EntryPoints     []string
 	PrimaryLanguage string
+	Warnings        []string
 	Cache           AnalyzeCacheSummary
 	Changes         AnalyzeChangesSummary
 	AI              AnalyzeAISummary

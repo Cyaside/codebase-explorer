@@ -39,6 +39,7 @@
   ].join("");
 
   document.getElementById("overview-body").innerHTML = [
+    infoBlock("Warnings", data.warnings && data.warnings.length ? `<div class="stack">${data.warnings.map((warning) => `<article class="item"><p>${html(warning)}</p></article>`).join("")}</div>` : `<p class="empty">No runtime warnings for this bundle.</p>`),
     infoBlock("Primary languages", sectionList(data.languages, (language) => `<article class="item"><strong>${html(language.name)}</strong><span>${language.file_count} files · ${language.line_count} lines</span></article>`, "No language summary available.")),
     infoBlock("Important directories", pillList(data.important_directories)),
     infoBlock("Entry points", pillList(data.entry_points)),

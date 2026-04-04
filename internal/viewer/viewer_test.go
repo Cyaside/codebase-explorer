@@ -27,6 +27,7 @@ func TestFilesIncludeViewerAssetsAndData(t *testing.T) {
 			TotalFiles: 42,
 			TotalLines: 1200,
 		},
+		Warnings: []string{"Large repository detected."},
 		Changes: changes.Result{
 			Available: true,
 			FrequentlyMentionedAreas: []changes.AreaMention{
@@ -59,5 +60,8 @@ func TestFilesIncludeViewerAssetsAndData(t *testing.T) {
 	}
 	if !strings.Contains(string(files["viewer-data.js"]), "internal/app") {
 		t.Fatalf("expected viewer data payload to include change-awareness output")
+	}
+	if !strings.Contains(string(files["viewer-data.js"]), "Large repository detected.") {
+		t.Fatalf("expected viewer data payload to include warnings")
 	}
 }

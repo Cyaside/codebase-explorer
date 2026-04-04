@@ -9,7 +9,7 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 )
 
-func RootREADME(_ repo.ScanResult, analysis analyzer.Result, aiResult provider.Result, bundleName string) string {
+func RootREADME(_ repo.ScanResult, analysis analyzer.Result, aiResult provider.Result, warnings []string, bundleName string) string {
 	var builder strings.Builder
 	builder.WriteString("# Codebase Explorer Report\n\n")
 	builder.WriteString(fmt.Sprintf("- Project: `%s`\n", analysis.ProjectName))
@@ -31,6 +31,12 @@ func RootREADME(_ repo.ScanResult, analysis analyzer.Result, aiResult provider.R
 	builder.WriteString("\n")
 	builder.WriteString("## Summary\n\n")
 	builder.WriteString(analysis.Summary)
+	if len(warnings) > 0 {
+		builder.WriteString("\n\n## Warnings\n\n")
+		for _, warning := range warnings {
+			builder.WriteString(fmt.Sprintf("- %s\n", warning))
+		}
+	}
 	if summary := strings.TrimSpace(aiResult.ProjectSummary); summary != "" {
 		builder.WriteString("\n\n## AI Snapshot\n\n")
 		builder.WriteString(summary)

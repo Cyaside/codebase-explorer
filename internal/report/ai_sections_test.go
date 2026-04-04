@@ -119,10 +119,13 @@ func TestRootREADMEIncludesAISnapshot(t *testing.T) {
 	output := RootREADME(repo.ScanResult{}, testAnalysis(), provider.Result{
 		Status:         provider.ResultStatusAvailable,
 		ProjectSummary: "AI snapshot",
-	}, "bundle-name")
+	}, []string{"Large repository detected."}, "bundle-name")
 
 	if !strings.Contains(output, "## AI Snapshot") {
 		t.Fatalf("expected AI snapshot section to be rendered, got %q", output)
+	}
+	if !strings.Contains(output, "## Warnings") {
+		t.Fatalf("expected warnings section to be rendered, got %q", output)
 	}
 }
 

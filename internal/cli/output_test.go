@@ -19,6 +19,7 @@ func TestPrintAnalyzeResultIncludesAISummary(t *testing.T) {
 		EntryPoints:     []string{"cmd/codearch/main.go"},
 		PrimaryLanguage: "Go",
 		OutputPath:      "/tmp/out",
+		Warnings:        []string{"Large repository detected."},
 		Cache: app.AnalyzeCacheSummary{
 			Enabled:             true,
 			DeterministicStatus: "hit",
@@ -67,6 +68,9 @@ func TestPrintAnalyzeResultIncludesAISummary(t *testing.T) {
 	}
 	if !strings.Contains(output, "Cache: deterministic hit, provider miss") {
 		t.Fatalf("expected cache summary in analyze output, got %q", output)
+	}
+	if !strings.Contains(output, "Warning: Large repository detected.") {
+		t.Fatalf("expected warning line in analyze output, got %q", output)
 	}
 	if !strings.Contains(output, "Output retention: keep latest 10 bundle(s)") {
 		t.Fatalf("expected output retention line in analyze output, got %q", output)

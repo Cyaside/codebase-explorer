@@ -57,6 +57,9 @@ func printAnalyzeResult(output io.Writer, result app.AnalyzeResult) {
 	if result.Cache.Enabled {
 		fmt.Fprintf(output, "Cache: deterministic %s, provider %s\n", result.Cache.DeterministicStatus, result.Cache.ProviderStatus)
 	}
+	for _, warning := range result.Warnings {
+		fmt.Fprintf(output, "Warning: %s\n", warning)
+	}
 	if result.Output.RetentionLimit > 0 {
 		fmt.Fprintf(output, "Output retention: keep latest %d bundle(s)\n", result.Output.RetentionLimit)
 	}
