@@ -5,11 +5,14 @@ import type { TabKey } from "@/lib/types";
 interface UseWorkbenchShortcutsOptions {
   activeTab: TabKey;
   busy: boolean;
+  commandPaletteOpen: boolean;
   onNextBundle: () => void;
   onPreviousBundle: () => void;
   onAnalyze: () => void;
   onCancel: () => void;
+  onCloseCommandPalette: () => void;
   onFocusAnalyze: () => void;
+  onOpenCommandPalette: () => void;
   onRefresh: () => void;
   onSelectTab: (tab: TabKey) => void;
   tabs: TabKey[];
@@ -18,11 +21,14 @@ interface UseWorkbenchShortcutsOptions {
 export function useWorkbenchShortcuts({
   activeTab,
   busy,
+  commandPaletteOpen,
   onNextBundle,
   onPreviousBundle,
   onAnalyze,
   onCancel,
+  onCloseCommandPalette,
   onFocusAnalyze,
+  onOpenCommandPalette,
   onRefresh,
   onSelectTab,
   tabs,
@@ -31,6 +37,21 @@ export function useWorkbenchShortcuts({
     const handleKeyDown = (event: KeyboardEvent) => {
       const key = event.key;
       const hasCommandModifier = event.metaKey || event.ctrlKey;
+      const keyLower = key.toLowerCase();
+
+      if (hasCommandModifier && keyLower === "k") {
+        event.preventDefault();
+        onOpenCommandPalette();
+        return;
+      }
+
+      if (commandPaletteOpen) {
+        if (key === "Escape") {
+          event.preventDefault();
+          onCloseCommandPalette();
+        }
+        return;
+      }
 
       if (hasCommandModifier && key === "Enter") {
         event.preventDefault();
@@ -85,7 +106,21 @@ export function useWorkbenchShortcuts({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeTab, busy, onAnalyze, onCancel, onFocusAnalyze, onNextBundle, onPreviousBundle, onRefresh, onSelectTab, tabs]);
+  }, [
+    activeTab,
+    busy,
+    commandPaletteOpen,
+    onAnalyze,
+    onCancel,
+    onCloseCommandPalette,
+    onFocusAnalyze,
+    onNextBundle,
+    onOpenCommandPalette,
+    onPreviousBundle,
+    onRefresh,
+    onSelectTab,
+    tabs,
+  ]);
 }
 
 function isTypingTarget(target: EventTarget | null) {

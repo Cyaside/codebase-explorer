@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleAlert, FolderOpenDot } from "lucide-react";
+import { CircleAlert, Command, FolderOpenDot } from "lucide-react";
 
 import { AnalyzeForm } from "@/components/AnalyzeForm";
+import { CommandPalette, type CommandPaletteAction } from "@/components/CommandPalette";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { Sidebar } from "@/components/Sidebar";
 import { StatsGrid } from "@/components/StatsGrid";
@@ -36,6 +37,7 @@ export function App() {
   const [profileSecrets, setProfileSecrets] = useState<Record<string, string>>({});
   const [activeRun, setActiveRun] = useState<AnalyzeRun | null>(null);
   const [busyDetail, setBusyDetail] = useState("");
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [toastMessage, setToastMessage] = useState("");
 
@@ -132,6 +134,7 @@ export function App() {
   useWorkbenchShortcuts({
     activeTab,
     busy,
+    commandPaletteOpen,
     onNextBundle: () => {
       void selectRelativeBundle(1);
     },
@@ -144,6 +147,33 @@ export function App() {
     onCancel: () => {
       void handleCancelAnalyze();
     },
+    onCloseCommandPalette: () => {
+      setCommandPaletteOpen(false);
+    },
+    onFocusAnalyze: () => {
+      repoInputRef.current?.focus();
+      repoInputRef.current?.select();
+    },
+    onOpenCommandPalette: () => {
+      setCommandPaletteOpen(true);
+    },
+    onRefresh: () => {
+      void refreshStatus();
+    },
+    onSelectTab: setActiveTab,
+    tabs: workbenchTabs,
+  });
+
+  const commandActions = buildCommandActions({
+    activeProfileLabel: profile.label,
+    bundles,
+    busy,
+    onAnalyze: () => {
+      void handleAnalyze();
+    },
+    onCancelAnalyze: () => {
+      void handleCancelAnalyze();
+    },
     onFocusAnalyze: () => {
       repoInputRef.current?.focus();
       repoInputRef.current?.select();
@@ -151,8 +181,12 @@ export function App() {
     onRefresh: () => {
       void refreshStatus();
     },
+    onSelectBundle: (bundleName) => {
+      void loadBundle(bundleName);
+    },
+    onSelectProfile: setSelectedProfile,
     onSelectTab: setActiveTab,
-    tabs: workbenchTabs,
+    profiles,
   });
 
   async function refreshStatus(preferredBundleName?: string) {
@@ -339,6 +373,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <CommandPalette actions={commandActions} onClose={() => setCommandPaletteOpen(false)} open={commandPaletteOpen} />
       <div className="grid min-h-screen lg:grid-cols-[17.5rem_minmax(0,1fr)]">
         <Sidebar
           bundles={bundles}
@@ -373,6 +408,10 @@ export function App() {
                   </div>
 
                   <div className="flex flex-wrap gap-3">
+                    <button className="secondary-button" onClick={() => setCommandPaletteOpen(true)} type="button">
+                      <Command className="size-4" />
+                      Command Palette
+                    </button>
                     <button className="secondary-button" onClick={() => void refreshStatus()} type="button">
                       <FolderOpenDot className="size-4" />
                       Reload Dashboard
@@ -440,4 +479,110 @@ export function App() {
       ) : null}
     </div>
   );
+}
+
+function buildCommandActions({
+  activeProfileLabel,
+  bundles,
+  busy,
+  onAnalyze,
+  onCancelAnalyze,
+  onFocusAnalyze,
+  onRefresh,
+  onSelectBundle,
+  onSelectProfile,
+  onSelectTab,
+  profiles,
+}: {
+  activeProfileLabel: string;
+  bundles: WorkbenchStatusResponse["recent_bundles"];
+  busy: boolean;
+  onAnalyze: () => void;
+  onCancelAnalyze: () => void;
+  onFocusAnalyze: () => void;
+  onRefresh: () => void;
+  onSelectBundle: (bundleName: string) => void;
+  onSelectProfile: (profileID: string) => void;
+  onSelectTab: (tab: TabKey) => void;
+  profiles: ConnectionProfile[];
+}): CommandPaletteAction[] {
+  const actions: CommandPaletteAction[] = [
+    {
+      id: "focus-analyze",
+      group: "Analyze",
+      label: "Focus repository path",
+      description: "Jump directly to the local repository input.",
+      keywords: ["repo", "path", "focus", "analyze"],
+      shortcut: "A",
+      run: onFocusAnalyze,
+    },
+    {
+      id: busy ? "cancel-run" : "run-analyze",
+      group: "Analyze",
+      label: busy ? "Cancel active analyze run" : "Run analyze",
+      description: busy
+        ? "Stop the current background analysis when it reaches a safe cancellation point."
+        : `Start a new analyze run using ${activeProfileLabel}.`,
+      keywords: ["analyze", "run", "cancel", activeProfileLabel],
+      shortcut: busy ? "Esc" : "Ctrl+Enter",
+      run: busy ? onCancelAnalyze : onAnalyze,
+    },
+    {
+      id: "refresh-dashboard",
+      group: "Workspace",
+      label: "Reload dashboard",
+      description: "Refresh recent bundles, provider metadata, and system status from the local backend.",
+      keywords: ["refresh", "reload", "status"],
+      shortcut: "R",
+      run: onRefresh,
+    },
+  ];
+
+  for (const tab of workbenchTabs) {
+    actions.push({
+      id: `tab-${tab}`,
+      group: "Views",
+      label: `Open ${tabLabel(tab)}`,
+      description: `Switch the active workbench panel to ${tabLabel(tab)}.`,
+      keywords: [tab, "view", "tab"],
+      run: () => onSelectTab(tab),
+    });
+  }
+
+  for (const bundle of bundles.slice(0, 8)) {
+    actions.push({
+      id: `bundle-${bundle.name}`,
+      group: "Bundles",
+      label: `Open ${bundle.project_name || bundle.name}`,
+      description: `${bundle.total_files} files · AI ${bundle.ai_status || "disabled"}`,
+      keywords: [bundle.name, bundle.project_name, bundle.ai_status].filter(Boolean) as string[],
+      run: () => onSelectBundle(bundle.name),
+    });
+  }
+
+  for (const profile of profiles) {
+    actions.push({
+      id: `profile-${profile.id}`,
+      group: "Connections",
+      label: `Use ${profile.label}`,
+      description: profile.provider
+        ? `${profile.provider.name}${profile.provider.model ? ` · ${profile.provider.model}` : ""}`
+        : "Deterministic only",
+      keywords: [profile.label, profile.provider?.name, profile.provider?.model].filter(Boolean) as string[],
+      run: () => onSelectProfile(profile.id),
+    });
+  }
+
+  return actions;
+}
+
+function tabLabel(tab: TabKey) {
+  switch (tab) {
+    case "flowchart":
+      return "Flowchart";
+    case "issues":
+      return "Issue Tracking";
+    default:
+      return tab.charAt(0).toUpperCase() + tab.slice(1);
+  }
 }

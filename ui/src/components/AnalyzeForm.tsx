@@ -102,6 +102,7 @@ export function AnalyzeForm({ activeProfileLabel, form, onChange, onSubmit, onCa
             <p>GitHub URLs still intentionally stay out of scope here. Keep analysis local for predictable, lightweight runs.</p>
             <div className="flex flex-wrap gap-2 text-xs">
               <ShortcutHint keys="Ctrl+Enter" label="Analyze" />
+              <ShortcutHint keys="Ctrl+K" label="Palette" />
               <ShortcutHint keys="Esc" label="Cancel run" />
               <ShortcutHint keys="[" label="Prev tab" />
               <ShortcutHint keys="]" label="Next tab" />

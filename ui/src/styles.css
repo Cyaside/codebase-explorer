@@ -85,11 +85,11 @@
   }
 
   .action-button {
-    @apply inline-flex items-center gap-2 rounded-2xl border border-primary/40 bg-primary/15 px-4 py-3 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-primary/60 hover:bg-primary/20 disabled:cursor-wait disabled:opacity-60;
+    @apply inline-flex items-center gap-2 rounded-2xl border border-primary/40 bg-primary/15 px-4 py-3 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-primary/60 hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-wait disabled:opacity-60;
   }
 
   .secondary-button {
-    @apply inline-flex items-center gap-2 rounded-2xl border border-border bg-background/60 px-4 py-3 text-sm font-medium text-foreground transition hover:-translate-y-0.5 hover:border-border-strong hover:bg-card disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex items-center gap-2 rounded-2xl border border-border bg-background/60 px-4 py-3 text-sm font-medium text-foreground transition hover:-translate-y-0.5 hover:border-border-strong hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50;
   }
 
   .secondary-button.danger {
@@ -114,6 +114,14 @@
 
   .surface-fact {
     @apply rounded-2xl border border-border bg-background/55 px-3 py-3;
+  }
+
+  .command-item {
+    @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-background/45 px-3 py-3 text-left transition hover:border-border-strong hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  .command-item-active {
+    @apply border-primary/35 bg-accent;
   }
 
   .code-block {
