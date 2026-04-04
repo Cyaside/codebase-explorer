@@ -2,6 +2,7 @@ guide/
 
 out/
 .cache/
+.codearch-cache/
 .tmp/
 bin/
 dist/
