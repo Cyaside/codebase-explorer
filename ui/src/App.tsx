@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, CircleAlert, FolderOpenDot } from "lucide-react";
+import { CircleAlert, FolderOpenDot } from "lucide-react";
 
 import { AnalyzeForm } from "@/components/AnalyzeForm";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { Sidebar } from "@/components/Sidebar";
 import { StatsGrid } from "@/components/StatsGrid";
 import { TabPanels } from "@/components/TabPanels";
+import { WorkbenchAlerts } from "@/components/WorkbenchAlerts";
+import { WorkbenchRail } from "@/components/WorkbenchRail";
 import { buildProviderPayload, cancelAnalyzeRun, fetchAnalyzeRun, fetchBundle, fetchStatus, mergeBundleSummary, startAnalyzeRun } from "@/lib/api";
 import { defaultProfiles, loadProfiles, loadUIState, persistProfiles, persistUIState } from "@/lib/storage";
 import { openAnalyzeRunStream } from "@/lib/stream";
@@ -314,79 +316,77 @@ export function App() {
         />
 
         <main className="space-y-5 px-4 py-5 lg:px-6">
-          <header className="rounded-3xl border border-border bg-card/90 p-5 shadow-sm">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.28em] text-primary">Local-First Repository Orientation</p>
-                <h1 className="mt-2 text-2xl font-bold">
-                  {currentBundle ? currentBundle.summary.project_name || "Workbench" : "Codebase Explorer Workbench"}
-                </h1>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  {currentBundle
-                    ? `${currentBundle.summary.project_type || "Repository"} • ${currentBundle.summary.total_files} files • ${currentBundle.summary.total_lines} lines`
-                    : "Open a local repository, run analysis, and navigate reusable orientation bundles without leaving your machine."}
-                </p>
-              </div>
+          <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_21rem]">
+            <div className="space-y-5">
+              <header className="rounded-3xl border border-border bg-card/90 p-5 shadow-sm">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.28em] text-primary">Local-First Repository Orientation</p>
+                    <h1 className="mt-2 text-2xl font-bold">
+                      {currentBundle ? currentBundle.summary.project_name || "Workbench" : "Codebase Explorer Workbench"}
+                    </h1>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      {currentBundle
+                        ? `${currentBundle.summary.project_type || "Repository"} · ${currentBundle.summary.total_files} files · ${currentBundle.summary.total_lines} lines`
+                        : "Open a local repository, run analysis, and navigate reusable orientation bundles without leaving your machine."}
+                    </p>
+                  </div>
 
-              <div className="flex flex-wrap gap-3">
-                <button className="secondary-button" onClick={() => void refreshStatus()} type="button">
-                  <FolderOpenDot className="size-4" />
-                  Reload Dashboard
-                </button>
-                <a
-                  aria-disabled={!currentBundle}
-                  className={!currentBundle ? "secondary-button pointer-events-none opacity-50" : "secondary-button"}
-                  href={readmeHref || undefined}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  Open Bundle README
-                </a>
-              </div>
+                  <div className="flex flex-wrap gap-3">
+                    <button className="secondary-button" onClick={() => void refreshStatus()} type="button">
+                      <FolderOpenDot className="size-4" />
+                      Reload Dashboard
+                    </button>
+                    <a
+                      aria-disabled={!currentBundle}
+                      className={!currentBundle ? "secondary-button pointer-events-none opacity-50" : "secondary-button"}
+                      href={readmeHref || undefined}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Open Bundle README
+                    </a>
+                  </div>
+                </div>
+              </header>
+
+              <WorkbenchAlerts activeRun={activeRun} bundle={currentBundle} errorMessage={errorMessage} status={status} />
+
+              <section className="grid gap-4 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+                <AnalyzeForm
+                  busy={busy}
+                  busyDetail={busyDetail}
+                  form={form}
+                  onCancel={handleCancelAnalyze}
+                  onChange={setForm}
+                  onSubmit={handleAnalyze}
+                  run={activeRun}
+                />
+                <ConnectionPanel
+                  apiKey={apiKey}
+                  onAPIKeyChange={(value) =>
+                    setProfileSecrets((current) => ({
+                      ...current,
+                      [profile.id]: value,
+                    }))
+                  }
+                  onChange={updateCurrentProfile}
+                  onDelete={handleDeleteProfile}
+                  onDuplicate={handleDuplicateProfile}
+                  onSave={handleSaveProfile}
+                  profile={profile}
+                  providerOptions={providerOptions}
+                  validationErrors={validationErrors}
+                />
+              </section>
+
+              <StatsGrid bundle={currentBundle} bundles={bundles} connections={profiles.length} status={status} />
+
+              <TabPanels activeTab={activeTab} bundle={currentBundle} onTabChange={setActiveTab} />
             </div>
-          </header>
 
-          {errorMessage ? (
-            <section className="flex items-start gap-3 rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger-foreground">
-              <AlertCircle className="mt-0.5 size-4 shrink-0 text-danger" />
-              <div>
-                <p className="font-semibold text-danger">Workbench needs attention</p>
-                <p className="mt-1 text-danger/90">{errorMessage}</p>
-              </div>
-            </section>
-          ) : null}
-
-          <section className="grid gap-4 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-            <AnalyzeForm
-              busy={busy}
-              busyDetail={busyDetail}
-              form={form}
-              onCancel={handleCancelAnalyze}
-              onChange={setForm}
-              onSubmit={handleAnalyze}
-              run={activeRun}
-            />
-            <ConnectionPanel
-              apiKey={apiKey}
-              onAPIKeyChange={(value) =>
-                setProfileSecrets((current) => ({
-                  ...current,
-                  [profile.id]: value,
-                }))
-              }
-              onChange={updateCurrentProfile}
-              onDelete={handleDeleteProfile}
-              onDuplicate={handleDuplicateProfile}
-              onSave={handleSaveProfile}
-              profile={profile}
-              providerOptions={providerOptions}
-              validationErrors={validationErrors}
-            />
-          </section>
-
-          <StatsGrid bundle={currentBundle} bundles={bundles} connections={profiles.length} status={status} />
-
-          <TabPanels activeTab={activeTab} bundle={currentBundle} onTabChange={setActiveTab} />
+            <WorkbenchRail activeRun={activeRun} bundle={currentBundle} />
+          </div>
         </main>
       </div>
 
