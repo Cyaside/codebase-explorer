@@ -1,4 +1,5 @@
 import type { AnalyzeRun } from "@/lib/types";
+import { normalizeAnalyzeRun } from "@/lib/normalize";
 
 interface AnalyzeRunStreamHandlers {
   onRun: (run: AnalyzeRun) => void;
@@ -29,8 +30,9 @@ export function openAnalyzeRunStream(runID: string, handlers: AnalyzeRunStreamHa
   events.addEventListener("run", (event) => {
     try {
       const payload = JSON.parse((event as MessageEvent<string>).data) as { run: AnalyzeRun };
-      handlers.onRun(payload.run);
-      if (isTerminalRunStatus(payload.run.status)) {
+      const run = normalizeAnalyzeRun(payload.run);
+      handlers.onRun(run);
+      if (isTerminalRunStatus(run.status)) {
         close();
       }
     } catch {

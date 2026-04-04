@@ -6,6 +6,13 @@ import type {
   WorkbenchBundle,
   WorkbenchStatusResponse,
 } from "@/lib/types";
+import {
+  normalizeAnalyzeResponse,
+  normalizeAnalyzeRun,
+  normalizeBundleSummary,
+  normalizeWorkbenchBundle,
+  normalizeWorkbenchStatusResponse,
+} from "@/lib/normalize";
 
 export interface AnalyzePayload {
   repo_path: string;
@@ -33,35 +40,41 @@ async function requestJSON<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export function fetchStatus() {
-  return requestJSON<WorkbenchStatusResponse>("/api/status");
+  return requestJSON<WorkbenchStatusResponse>("/api/status").then(normalizeWorkbenchStatusResponse);
 }
 
 export function fetchBundle(bundleName: string) {
-  return requestJSON<WorkbenchBundle>(`/api/bundles/${encodeURIComponent(bundleName)}`);
+  return requestJSON<WorkbenchBundle>(`/api/bundles/${encodeURIComponent(bundleName)}`).then(normalizeWorkbenchBundle);
 }
 
 export function analyzeRepository(payload: AnalyzePayload) {
   return requestJSON<AnalyzeResponse>("/api/analyze", {
     method: "POST",
     body: JSON.stringify(payload),
-  });
+  }).then(normalizeAnalyzeResponse);
 }
 
 export function startAnalyzeRun(payload: AnalyzePayload) {
   return requestJSON<{ run: AnalyzeRun }>("/api/analyze-runs", {
     method: "POST",
     body: JSON.stringify(payload),
-  });
+  }).then((response) => ({
+    run: normalizeAnalyzeRun(response.run),
+  }));
 }
 
 export function fetchAnalyzeRun(runID: string) {
-  return requestJSON<{ run: AnalyzeRun }>(`/api/analyze-runs/${encodeURIComponent(runID)}`);
+  return requestJSON<{ run: AnalyzeRun }>(`/api/analyze-runs/${encodeURIComponent(runID)}`).then((response) => ({
+    run: normalizeAnalyzeRun(response.run),
+  }));
 }
 
 export function cancelAnalyzeRun(runID: string) {
   return requestJSON<{ run: AnalyzeRun }>(`/api/analyze-runs/${encodeURIComponent(runID)}/cancel`, {
     method: "POST",
-  });
+  }).then((response) => ({
+    run: normalizeAnalyzeRun(response.run),
+  }));
 }
 
 export function buildProviderPayload(profile: ConnectionProfile, apiKey: string) {
@@ -78,5 +91,6 @@ export function buildProviderPayload(profile: ConnectionProfile, apiKey: string)
 }
 
 export function mergeBundleSummary(existing: BundleSummary[], next: BundleSummary) {
-  return [next, ...existing.filter((bundle) => bundle.name !== next.name)];
+  const normalized = normalizeBundleSummary(next);
+  return [normalized, ...existing.filter((bundle) => bundle.name !== normalized.name)];
 }
