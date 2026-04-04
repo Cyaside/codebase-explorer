@@ -11,27 +11,27 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 )
 
-func (s Service) buildAIResult(ctx context.Context, request AnalyzeRequest, analysis analyzer.Result, deterministicOnly bool, aiContext provider.CondensedContext) (provider.Result, string) {
+func (s Service) buildAIResult(ctx context.Context, request AnalyzeRequest, analysis analyzer.Result, deterministicOnly bool, aiContext provider.CondensedContext) (provider.Result, string, error) {
 	if deterministicOnly {
 		emitAnalyzeProgress(request, "ai-synthesis", "skipped", "deterministic-only mode enabled")
-		return provider.SkippedResult(analysis.GeneratedAt, "deterministic-only mode enabled"), cache.StatusDisabled
+		return provider.SkippedResult(analysis.GeneratedAt, "deterministic-only mode enabled"), cache.StatusDisabled, nil
 	}
 
 	providerConfig := s.providerConfig(request)
 	if !providerConfig.Enabled() {
 		emitAnalyzeProgress(request, "ai-synthesis", "disabled", "no provider configured")
-		return provider.DisabledResult(analysis.GeneratedAt, "no provider configured"), cache.StatusDisabled
+		return provider.DisabledResult(analysis.GeneratedAt, "no provider configured"), cache.StatusDisabled, nil
 	}
 
 	if err := s.providers.Validate(providerConfig); err != nil {
 		emitAnalyzeProgress(request, "ai-synthesis", "fallback", err.Error())
-		return provider.FallbackResult(analysis.GeneratedAt, providerConfig, err.Error()), cache.StatusDisabled
+		return provider.FallbackResult(analysis.GeneratedAt, providerConfig, err.Error()), cache.StatusDisabled, nil
 	}
 
 	client, err := s.providers.ClientFor(providerConfig)
 	if err != nil {
 		emitAnalyzeProgress(request, "ai-synthesis", "fallback", err.Error())
-		return provider.FallbackResult(analysis.GeneratedAt, providerConfig, err.Error()), cache.StatusDisabled
+		return provider.FallbackResult(analysis.GeneratedAt, providerConfig, err.Error()), cache.StatusDisabled, nil
 	}
 
 	if s.cache.Enabled() {
@@ -41,7 +41,7 @@ func (s Service) buildAIResult(ctx context.Context, request AnalyzeRequest, anal
 			switch {
 			case loadErr == nil:
 				emitAnalyzeProgress(request, "provider-cache", cache.StatusHit, "reused cached provider synthesis")
-				return cached.Result, cache.StatusHit
+				return cached.Result, cache.StatusHit, nil
 			case errors.Is(loadErr, cache.ErrCacheMiss):
 				emitAnalyzeProgress(request, "provider-cache", cache.StatusMiss, "provider synthesis cache miss")
 			default:
@@ -54,8 +54,12 @@ func (s Service) buildAIResult(ctx context.Context, request AnalyzeRequest, anal
 				Context: aiContext,
 			})
 			if synthErr != nil {
+				if errors.Is(synthErr, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+					emitAnalyzeProgress(request, "ai-synthesis", "canceled", "provider call canceled")
+					return provider.Result{}, cache.StatusMiss, context.Canceled
+				}
 				emitAnalyzeProgress(request, "ai-synthesis", "fallback", synthErr.Error())
-				return provider.FallbackResult(analysis.GeneratedAt, providerConfig, synthErr.Error()), cache.StatusMiss
+				return provider.FallbackResult(analysis.GeneratedAt, providerConfig, synthErr.Error()), cache.StatusMiss, nil
 			}
 
 			_ = s.cache.SaveProvider(cache.ProviderPayload{
@@ -65,7 +69,7 @@ func (s Service) buildAIResult(ctx context.Context, request AnalyzeRequest, anal
 				AppVersion: s.settings.AppVersion,
 			})
 			emitAnalyzeProgress(request, "ai-synthesis", "succeeded", fmt.Sprintf("provider %s returned structured synthesis", result.Provider))
-			return result, cache.StatusMiss
+			return result, cache.StatusMiss, nil
 		}
 	}
 
@@ -75,12 +79,16 @@ func (s Service) buildAIResult(ctx context.Context, request AnalyzeRequest, anal
 		Context: aiContext,
 	})
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+			emitAnalyzeProgress(request, "ai-synthesis", "canceled", "provider call canceled")
+			return provider.Result{}, cache.StatusDisabled, context.Canceled
+		}
 		emitAnalyzeProgress(request, "ai-synthesis", "fallback", err.Error())
-		return provider.FallbackResult(analysis.GeneratedAt, providerConfig, err.Error()), cache.StatusDisabled
+		return provider.FallbackResult(analysis.GeneratedAt, providerConfig, err.Error()), cache.StatusDisabled, nil
 	}
 
 	emitAnalyzeProgress(request, "ai-synthesis", "succeeded", fmt.Sprintf("provider %s returned structured synthesis", result.Provider))
-	return result, cache.StatusDisabled
+	return result, cache.StatusDisabled, nil
 }
 
 func (s Service) providerConfig(request AnalyzeRequest) provider.Config {

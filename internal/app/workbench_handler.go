@@ -59,6 +59,7 @@ func (s Service) workbenchHandler(outputRoot string) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load workbench assets: %w", err)
 	}
+	runtime := newWorkbenchRuntime(s, outputRoot)
 
 	mux := http.NewServeMux()
 	assetHandler := http.FileServer(http.FS(assets))
@@ -72,6 +73,12 @@ func (s Service) workbenchHandler(outputRoot string) (http.Handler, error) {
 	mux.HandleFunc("/api/doctor", s.handleWorkbenchDoctor)
 	mux.HandleFunc("/api/analyze", func(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkbenchAnalyze(w, r)
+	})
+	mux.HandleFunc("/api/analyze-runs", func(w http.ResponseWriter, r *http.Request) {
+		s.handleWorkbenchAnalyzeRuns(w, r, runtime)
+	})
+	mux.HandleFunc("/api/analyze-runs/", func(w http.ResponseWriter, r *http.Request) {
+		s.handleWorkbenchAnalyzeRun(w, r, runtime)
 	})
 	mux.HandleFunc("/api/bundles", func(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkbenchBundles(w, r, outputRoot)
@@ -160,15 +167,9 @@ func (s Service) handleWorkbenchAnalyze(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	payload, err := decodeWorkbenchAnalyzePayload(r)
 	if err != nil {
 		writeWorkbenchError(w, http.StatusBadRequest, err)
-		return
-	}
-
-	var payload workbenchAnalyzePayload
-	if err := json.Unmarshal(body, &payload); err != nil {
-		writeWorkbenchError(w, http.StatusBadRequest, fmt.Errorf("decode request: %w", err))
 		return
 	}
 
@@ -189,29 +190,72 @@ func (s Service) handleWorkbenchAnalyze(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	data, err := loadViewerBundleData(result.OutputPath)
+	response, err := s.buildWorkbenchAnalyzeResponse(result)
 	if err != nil {
 		writeWorkbenchError(w, http.StatusInternalServerError, err)
 		return
-	}
-
-	info, err := os.Stat(result.OutputPath)
-	if err != nil {
-		writeWorkbenchError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	response := workbenchAnalyzeResponse{
-		Result: result,
-		Bundle: summarizeWorkbenchBundle(workbenchBundleLocation{
-			name:    filepath.Base(result.OutputPath),
-			path:    result.OutputPath,
-			modTime: info.ModTime().UTC(),
-		}, data),
-		Data: data,
 	}
 
 	writeWorkbenchJSON(w, http.StatusOK, response)
+}
+
+func (s Service) handleWorkbenchAnalyzeRuns(w http.ResponseWriter, r *http.Request, runtime *workbenchRuntime) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	payload, err := decodeWorkbenchAnalyzePayload(r)
+	if err != nil {
+		writeWorkbenchError(w, http.StatusBadRequest, err)
+		return
+	}
+	if isRemoteRepository(payload.RepoPath) {
+		writeWorkbenchError(w, http.StatusBadRequest, fmt.Errorf("remote repository URLs are not supported yet; analyze a local checkout path"))
+		return
+	}
+
+	run := runtime.startAnalyze(payload)
+	writeWorkbenchJSON(w, http.StatusAccepted, map[string]workbenchAnalyzeRun{
+		"run": run,
+	})
+}
+
+func (s Service) handleWorkbenchAnalyzeRun(w http.ResponseWriter, r *http.Request, runtime *workbenchRuntime) {
+	trimmed := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/analyze-runs/"), "/")
+	if trimmed == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	parts := strings.Split(trimmed, "/")
+	runID := parts[0]
+
+	switch {
+	case len(parts) == 1 && r.Method == http.MethodGet:
+		run, ok := runtime.snapshot(runID)
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		writeWorkbenchJSON(w, http.StatusOK, map[string]workbenchAnalyzeRun{
+			"run": run,
+		})
+		return
+	case len(parts) == 2 && parts[1] == "cancel" && r.Method == http.MethodPost:
+		run, ok := runtime.cancel(runID)
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		writeWorkbenchJSON(w, http.StatusOK, map[string]workbenchAnalyzeRun{
+			"run": run,
+		})
+		return
+	default:
+		http.NotFound(w, r)
+		return
+	}
 }
 
 func (s Service) handleWorkbenchBundles(w http.ResponseWriter, r *http.Request, outputRoot string) {
@@ -270,6 +314,42 @@ func writeWorkbenchError(w http.ResponseWriter, statusCode int, err error) {
 	writeWorkbenchJSON(w, statusCode, map[string]string{
 		"error": strings.TrimSpace(err.Error()),
 	})
+}
+
+func decodeWorkbenchAnalyzePayload(r *http.Request) (workbenchAnalyzePayload, error) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		return workbenchAnalyzePayload{}, err
+	}
+
+	var payload workbenchAnalyzePayload
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return workbenchAnalyzePayload{}, fmt.Errorf("decode request: %w", err)
+	}
+
+	return payload, nil
+}
+
+func (s Service) buildWorkbenchAnalyzeResponse(result AnalyzeResult) (workbenchAnalyzeResponse, error) {
+	data, err := loadViewerBundleData(result.OutputPath)
+	if err != nil {
+		return workbenchAnalyzeResponse{}, err
+	}
+
+	info, err := os.Stat(result.OutputPath)
+	if err != nil {
+		return workbenchAnalyzeResponse{}, err
+	}
+
+	return workbenchAnalyzeResponse{
+		Result: result,
+		Bundle: summarizeWorkbenchBundle(workbenchBundleLocation{
+			name:    filepath.Base(result.OutputPath),
+			path:    result.OutputPath,
+			modTime: info.ModTime().UTC(),
+		}, data),
+		Data: data,
+	}, nil
 }
 
 func isRemoteRepository(value string) bool {

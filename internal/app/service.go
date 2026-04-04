@@ -49,6 +49,8 @@ func New(settings config.Settings) Service {
 }
 
 func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeResult, error) {
+	emitAnalyzeProgress(request, "analyze", "running", "starting local repository analysis")
+
 	repoPath, err := resolveRepoPath(request.RepoPath)
 	if err != nil {
 		return AnalyzeResult{}, err
@@ -71,8 +73,16 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	warnings := buildWarnings(analysis, len(supportFiles))
 	aiContext := buildCondensedContext(analysis)
 	emitAnalyzeProgress(request, "ai-context", "ready", summarizeAIContext(aiContext))
-	aiResult, providerCacheStatus := s.buildAIResult(ctx, request, analysis, request.DeterministicOnly, aiContext)
+	aiResult, providerCacheStatus, err := s.buildAIResult(ctx, request, analysis, request.DeterministicOnly, aiContext)
+	if err != nil {
+		return AnalyzeResult{}, err
+	}
 
+	if err := ctx.Err(); err != nil {
+		return AnalyzeResult{}, err
+	}
+
+	emitAnalyzeProgress(request, "bundle-write", "running", "writing bundle output")
 	writeResult, err := s.writer.Write(bundle.WriteRequest{
 		OutputRoot:        outputRoot,
 		DeterministicOnly: request.DeterministicOnly,
@@ -92,7 +102,9 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	if err != nil {
 		return AnalyzeResult{}, fmt.Errorf("write bundle: %w", err)
 	}
+	emitAnalyzeProgress(request, "bundle-write", "succeeded", fmt.Sprintf("bundle written to %s", writeResult.BundlePath))
 	emitAnalyzeProgress(request, "output-cleanup", cleanupStatus(writeResult.PrunedBundles), cleanupDetail(writeResult.PrunedBundles, writeResult.RetentionLimit))
+	emitAnalyzeProgress(request, "analyze", "succeeded", fmt.Sprintf("analysis completed for %s", analysis.ProjectName))
 
 	primaryLanguage := ""
 	if len(analysis.Languages) > 0 {

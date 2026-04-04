@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
@@ -68,6 +69,7 @@ func (s Service) loadDeterministicState(ctx context.Context, request AnalyzeRequ
 }
 
 func (s Service) computeDeterministicState(ctx context.Context, request AnalyzeRequest, repoPath string, supportFiles []string, status string) (deterministicState, error) {
+	emitAnalyzeProgress(request, "scan", "running", fmt.Sprintf("scanning %s", repoPath))
 	scanResult, err := s.scanner.Scan(ctx, repo.ScanOptions{
 		RootPath:            repoPath,
 		ExtraIgnorePatterns: request.ExtraIgnorePatterns,
@@ -75,9 +77,15 @@ func (s Service) computeDeterministicState(ctx context.Context, request AnalyzeR
 	if err != nil {
 		return deterministicState{}, err
 	}
+	emitAnalyzeProgress(request, "scan", "succeeded", fmt.Sprintf("scanned %d file(s)", len(scanResult.Files)))
 
+	emitAnalyzeProgress(request, "deterministic-analysis", "running", "building repository summary and heuristics")
 	analysis := s.analyzer.Analyze(scanResult, request.DeterministicOnly)
+	emitAnalyzeProgress(request, "deterministic-analysis", "succeeded", fmt.Sprintf("identified %d file(s) and %d line(s)", analysis.Metrics.TotalFiles, analysis.Metrics.TotalLines))
+
+	emitAnalyzeProgress(request, "change-awareness", "running", fmt.Sprintf("correlating %d support file(s)", len(supportFiles)))
 	changeResult := changes.Analyze(analysis.GeneratedAt, analysis, supportFiles)
+	emitAnalyzeProgress(request, "change-awareness", "succeeded", changeResult.Note)
 
 	return deterministicState{
 		ScanResult: scanResult,
