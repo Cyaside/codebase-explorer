@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
+import { BookOpenText, Files, ShieldAlert, Sparkles } from "lucide-react";
 
 import type { TabKey, WorkbenchBundle } from "@/lib/types";
 import { bundleLink } from "@/lib/utils";
@@ -31,7 +32,7 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
               "Languages",
               <TextList
                 emptyText="No language data."
-                items={(bundle?.data.languages || []).map((item) => `${item.name} • ${item.file_count} files • ${item.line_count} lines`)}
+                items={(bundle?.data.languages || []).map((item) => `${item.name} · ${item.file_count} files · ${item.line_count} lines`)}
               />,
             ],
             ["Entry points", <TextList emptyText="No entry points recorded." items={bundle?.data.entry_points || []} />],
@@ -52,7 +53,7 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
               "Module inventory",
               <TextList
                 emptyText="No module inventory recorded."
-                items={(bundle?.data.modules || []).slice(0, 12).map((item) => `${item.path} • ${item.file_count} files • ${item.total_lines} lines`)}
+                items={(bundle?.data.modules || []).slice(0, 12).map((item) => `${item.path} · ${item.file_count} files · ${item.total_lines} lines`)}
               />,
             ],
           ]}
@@ -101,7 +102,7 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
               "Top modules",
               <TextList
                 emptyText="No module topology available."
-                items={(bundle?.data.modules || []).slice(0, 8).map((item) => `${item.path} • ${item.entry_point_count} entry point(s)`)}
+                items={(bundle?.data.modules || []).slice(0, 8).map((item) => `${item.path} · ${item.entry_point_count} entry point(s)`)}
               />,
             ],
           ]}
@@ -119,7 +120,7 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
               "Support files",
               <TextList
                 emptyText="No support files were recorded."
-                items={(bundle?.data.changes.sources || []).map((item) => `${item.path} • ${item.kind} • ${item.status}`)}
+                items={(bundle?.data.changes.sources || []).map((item) => `${item.path} · ${item.kind} · ${item.status}`)}
               />,
             ],
             [
@@ -127,7 +128,7 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
               <TextList
                 emptyText="No repository areas were matched strongly enough."
                 items={(bundle?.data.changes.frequently_mentioned_areas || []).map(
-                  (item) => `${item.path} • ${item.mention_count} mention(s) • ${item.confidence}`,
+                  (item) => `${item.path} · ${item.mention_count} mention(s) · ${item.confidence}`,
                 )}
               />,
             ],
@@ -135,7 +136,7 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
               "Repeated themes",
               <TextList
                 emptyText="No repeated themes crossed the reporting threshold."
-                items={(bundle?.data.changes.repeated_themes || []).map((item) => `${item.name} • ${item.mention_count} mention(s)`)}
+                items={(bundle?.data.changes.repeated_themes || []).map((item) => `${item.name} · ${item.mention_count} mention(s)`)}
               />,
             ],
           ]}
@@ -154,8 +155,8 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
                 emptyText="No reading path recommendation available."
                 items={
                   (bundle?.data.ai.reading_path_explanations || []).length
-                    ? (bundle?.data.ai.reading_path_explanations || []).map((item) => `${item.path} • ${item.rationale}`)
-                    : (bundle?.data.reading_path || []).map((item) => `${item.path} • ${item.reason}`)
+                    ? (bundle?.data.ai.reading_path_explanations || []).map((item) => `${item.path} · ${item.rationale}`)
+                    : (bundle?.data.reading_path || []).map((item) => `${item.path} · ${item.reason}`)
                 }
               />,
             ],
@@ -163,7 +164,7 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
               "Hotspot guidance",
               <TextList
                 emptyText="AI hotspot notes are unavailable for this bundle."
-                items={(bundle?.data.ai.hotspot_explanations || []).map((item) => `${item.path} • ${item.explanation}`)}
+                items={(bundle?.data.ai.hotspot_explanations || []).map((item) => `${item.path} · ${item.explanation}`)}
               />,
             ],
             [
@@ -173,9 +174,9 @@ export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
                 items={
                   bundle
                     ? [
-                        `Open raw README • ${bundleLink(bundle.summary.name, "README.md")}`,
-                        `Open viewer snapshot • ${bundleLink(bundle.summary.name, "ui/index.html")}`,
-                        `Review bundle warnings • ${bundle.data.warnings.length} warning(s)`,
+                        `Open raw README · ${bundleLink(bundle.summary.name, "README.md")}`,
+                        `Open viewer snapshot · ${bundleLink(bundle.summary.name, "ui/index.html")}`,
+                        `Review bundle warnings · ${bundle.data.warnings.length} warning(s)`,
                       ]
                     : []
                 }
@@ -219,11 +220,47 @@ function PanelLayout({
   return (
     <div className="space-y-4">
       <div className="rounded-3xl border border-border bg-card/90 p-5 shadow-sm">
-        <p className="text-[10px] uppercase tracking-[0.28em] text-primary">{title}</p>
-        <h3 className="mt-2 text-xl font-bold">{bundle.summary.project_name || bundle.summary.name}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {bundle.summary.project_type || "Repository"} • {bundle.summary.total_files} files • {bundle.summary.total_lines} lines
-        </p>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.28em] text-primary">{title}</p>
+            <h3 className="mt-2 text-xl font-bold">{bundle.summary.project_name || bundle.summary.name}</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {bundle.summary.project_type || "Repository"} · {bundle.summary.total_files} files · {bundle.summary.total_lines} lines
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <QuickLink href={bundleLink(bundle.summary.name, "README.md")} label="README" />
+            <QuickLink href={bundleLink(bundle.summary.name, "ui/index.html")} label="Viewer" />
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
+          <SignalChip
+            icon={<Sparkles className="size-4 text-primary" />}
+            label="AI"
+            note={bundle.data.ai.provider || "deterministic"}
+            value={bundle.data.ai.status || "disabled"}
+          />
+          <SignalChip
+            icon={<ShieldAlert className="size-4 text-primary" />}
+            label="Warnings"
+            note="Runtime checks"
+            value={String(bundle.data.warnings.length)}
+          />
+          <SignalChip
+            icon={<Files className="size-4 text-primary" />}
+            label="Support files"
+            note="Change awareness inputs"
+            value={String(bundle.data.changes.support_file_count)}
+          />
+          <SignalChip
+            icon={<BookOpenText className="size-4 text-primary" />}
+            label="Reading path"
+            note="Suggested checkpoints"
+            value={String(bundle.data.reading_path.length)}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -245,11 +282,52 @@ function TextList({ emptyText, items }: { emptyText: string; items: string[] }) 
 
   return (
     <ul className="space-y-2">
-      {items.map((item) => (
-        <li className="rounded-2xl border border-border bg-background/60 px-3 py-2 text-sm text-muted-foreground" key={item}>
-          {item}
+      {items.map((item, index) => (
+        <li className="rounded-2xl border border-border bg-background/60 px-3 py-3 text-sm text-muted-foreground" key={`${item}-${index}`}>
+          <div className="flex gap-3">
+            <span className="mt-0.5 text-xs font-semibold uppercase tracking-[0.18em] text-primary/75">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <span>{item}</span>
+          </div>
         </li>
       ))}
     </ul>
+  );
+}
+
+function SignalChip({
+  icon,
+  label,
+  note,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  note: string;
+  value: string;
+}) {
+  return (
+    <article className="rounded-2xl border border-border bg-background/55 px-3 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
+        {icon}
+      </div>
+      <strong className="mt-3 block text-base font-semibold text-foreground">{value}</strong>
+      <p className="mt-1 text-xs text-muted-foreground">{note}</p>
+    </article>
+  );
+}
+
+function QuickLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      className="inline-flex items-center rounded-full border border-border bg-background/60 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground transition hover:border-border-strong hover:bg-background hover:text-foreground"
+      href={href}
+      rel="noreferrer"
+      target="_blank"
+    >
+      {label}
+    </a>
   );
 }
