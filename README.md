@@ -10,14 +10,52 @@ Saat ini tool ini fokus pada deterministic repository orientation:
 - optional support-file correlation untuk issue export atau changelog lokal
 - output bundle reusable dalam format Markdown, JSON, Mermaid, dan viewer lokal statis
 
-## Menjalankan
+## Quickstart
 
 ```bash
 go run ./cmd/codearch doctor
 go run ./cmd/codearch analyze <repo-path> --deterministic-only
 go run ./cmd/codearch analyze <repo-path> --support ./issues.json --changelog ./CHANGELOG.md
 go run ./cmd/codearch open --no-browser
+go run ./cmd/codearch export --output ./out/latest-bundle.zip
+go run ./cmd/codearch cache clear
 ```
+
+Panduan langkah cepat yang lebih lengkap ada di [docs/quickstart.md](docs/quickstart.md).
+
+## Commands
+
+- `codearch doctor`
+  Validasi config, output root, cache root, dan provider setup.
+- `codearch analyze <repo-path>`
+  Menjalankan scan, deterministic analysis, support-file correlation opsional, dan AI synthesis opsional.
+- `codearch open [bundle-path] [--no-browser]`
+  Membuka viewer bundle terbaru atau bundle yang dipilih.
+- `codearch export [bundle-path] [--output <zip-path>]`
+  Mengekspor bundle yang sudah ada ke file `.zip` tanpa analisis ulang.
+- `codearch cache clear`
+  Menghapus cache filesystem dengan aman tanpa menyentuh bundle di `out/`.
+
+## Environment
+
+Variabel environment yang didukung:
+
+- `CODEARCH_OUTPUT_ROOT`
+  Override root output bundle. Default: `out/`
+- `CODEARCH_OUTPUT_KEEP`
+  Jumlah bundle terbaru yang dipertahankan. Default: `10`
+- `CODEARCH_CACHE`
+  Aktif/nonaktifkan cache filesystem. Nilai: `true/false`
+- `CODEARCH_CACHE_ROOT`
+  Override lokasi cache filesystem
+- `CODEARCH_PROVIDER`
+  Provider AI opsional, misalnya `openai` atau `openai-compatible`
+- `CODEARCH_MODEL`
+  Model provider AI
+- `CODEARCH_API_KEY`
+  API key provider AI
+- `CODEARCH_BASE_URL`
+  Base URL untuk provider `openai-compatible`
 
 ## Output Bundle
 
@@ -34,6 +72,28 @@ Hasil analisis ditulis ke folder `out/` dan berisi:
 
 Support files tetap opsional. Kalau file issue/changelog tidak diberikan atau tidak valid, hasil utama deterministic tetap jadi dan bundle tetap ditulis.
 
-## Fokus Saat Ini
+## Build
 
-Fase fondasi analyzer, synthesis AI opsional, dan visual report inti sudah aktif. Fokus berikutnya adalah memperkaya kualitas konsumsi hasil tanpa mengorbankan local-first workflow dan efisiensi runtime.
+Single binary tetap jadi jalur distribusi utama. Contoh build:
+
+```bash
+go build -o ./dist/codearch ./cmd/codearch
+GOOS=windows GOARCH=amd64 go build -o ./dist/codearch-windows-amd64.exe ./cmd/codearch
+GOOS=darwin GOARCH=arm64 go build -o ./dist/codearch-darwin-arm64 ./cmd/codearch
+GOOS=linux GOARCH=amd64 go build -o ./dist/codearch-linux-amd64 ./cmd/codearch
+```
+
+Release checklist ringkas ada di [docs/release-checklist.md](docs/release-checklist.md).
+
+## Troubleshooting
+
+Kalau run tidak sesuai harapan, lihat [docs/troubleshooting.md](docs/troubleshooting.md).
+
+Masalah yang paling umum:
+- provider belum dikonfigurasi, jadi AI otomatis `disabled` atau `fallback`
+- support file tidak valid, jadi change-awareness ditulis sebagai partial result
+- repo cukup besar, sehingga CLI memberi warning performa dan bundle bisa lebih berat
+
+## Status
+
+Deterministic analyzer, AI synthesis opsional, visual report, change-awareness, cache filesystem, `export`, dan `cache clear` sudah aktif. Produk sekarang sudah nyaman dipakai end-to-end sebagai local-first repository orientation tool.
