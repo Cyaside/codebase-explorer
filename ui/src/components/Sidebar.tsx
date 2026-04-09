@@ -4,8 +4,10 @@ import {
   BookOpenText,
   FileSearch2,
   FolderPlus,
+  FolderCog,
   LayoutDashboard,
   Network,
+  PanelRightOpen,
   Shapes,
   Sparkles,
 } from "lucide-react";
@@ -30,6 +32,9 @@ interface SidebarProps {
 }
 
 const viewItems: Array<{ icon: ReactNode; label: string; value: TabKey }> = [
+  { icon: <FolderCog className="size-4" />, label: "Project", value: "project" },
+  { icon: <Bot className="size-4" />, label: "Connections", value: "connections" },
+  { icon: <PanelRightOpen className="size-4" />, label: "Properties", value: "properties" },
   { icon: <LayoutDashboard className="size-4" />, label: "Dashboard", value: "dashboard" },
   { icon: <BookOpenText className="size-4" />, label: "Summary", value: "summary" },
   { icon: <Shapes className="size-4" />, label: "Architecture", value: "architecture" },

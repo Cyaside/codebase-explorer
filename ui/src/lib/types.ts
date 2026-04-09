@@ -1,4 +1,7 @@
 export type TabKey =
+  | "project"
+  | "connections"
+  | "properties"
   | "dashboard"
   | "summary"
   | "architecture"

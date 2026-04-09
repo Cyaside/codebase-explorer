@@ -1,11 +1,9 @@
 import { startTransition, useEffect, useRef, useState } from "react";
 import { Command, FolderOpenDot, RefreshCw } from "lucide-react";
 
-import { AnalyzeForm } from "@/components/AnalyzeForm";
 import { CommandPalette, type CommandPaletteAction } from "@/components/CommandPalette";
 import { Sidebar } from "@/components/Sidebar";
 import { TabPanels } from "@/components/TabPanels";
-import { WorkbenchRail } from "@/components/WorkbenchRail";
 import { buildProviderPayload, cancelAnalyzeRun, fetchAnalyzeRun, fetchBundle, fetchStatus, mergeBundleSummary, startAnalyzeRun } from "@/lib/api";
 import { useWorkbenchShortcuts } from "@/hooks/useWorkbenchShortcuts";
 import { createWorkspace, defaultProfiles, loadProfiles, loadUIState, loadWorkspaces, persistProfiles, persistUIState, persistWorkspaces } from "@/lib/storage";
@@ -25,7 +23,7 @@ import { validateProfile } from "@/lib/validation";
 const initialUIState = loadUIState();
 const initialProfiles = loadProfiles();
 const initialWorkspaces = loadWorkspaces();
-const workbenchTabs: TabKey[] = ["dashboard", "summary", "architecture", "flowchart", "issues", "recommendations"];
+const workbenchTabs: TabKey[] = ["project", "connections", "properties", "dashboard", "summary", "architecture", "flowchart", "issues", "recommendations"];
 
 export function App() {
   const [status, setStatus] = useState<WorkbenchStatusResponse | null>(null);
@@ -285,7 +283,7 @@ export function App() {
 
     setWorkspaces((current) => [nextWorkspace, ...current]);
     setActiveWorkspaceID(nextWorkspace.id);
-    setActiveTab("dashboard");
+    setActiveTab("project");
     setToastMessage(`Created workspace "${nextWorkspace.label}".`);
     window.setTimeout(() => {
       repoInputRef.current?.focus();
@@ -467,71 +465,55 @@ export function App() {
         />
 
         <main className="px-4 py-4 xl:px-5">
-          <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_20.5rem]">
-            <div className="space-y-4">
-              <header className="topbar-shell">
-                <div>
-                  <p className="panel-kicker">{tabTitle(activeTab)}</p>
-                  <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50">
-                    {activeWorkspace?.label || "Codebase Explorer"}
-                  </h1>
-                  <p className="mt-2 text-sm text-zinc-500">
-                    {activeWorkspace?.repoPath || "Create a project workspace and point it at one local repository."}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button className="secondary-control" onClick={() => setCommandPaletteOpen(true)} type="button">
-                    <Command className="size-4" />
-                    Command
-                  </button>
-                  <button className="secondary-control" onClick={() => void refreshStatus()} type="button">
-                    <RefreshCw className="size-4" />
-                    Refresh
-                  </button>
-                  <a
-                    aria-disabled={!currentBundle}
-                    className={!currentBundle ? "secondary-control pointer-events-none opacity-50" : "secondary-control"}
-                    href={readmeHref || undefined}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    <FolderOpenDot className="size-4" />
-                    Open README
-                  </a>
-                </div>
-              </header>
+          <div className="space-y-4">
+            <header className="topbar-shell">
+              <div>
+                <p className="panel-kicker">{tabTitle(activeTab)}</p>
+                <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50">
+                  {activeWorkspace?.label || "Codebase Explorer"}
+                </h1>
+                <p className="mt-2 text-sm text-zinc-500">
+                  {activeWorkspace?.repoPath || "Create a project workspace and point it at one local repository."}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button className="secondary-control" onClick={() => setCommandPaletteOpen(true)} type="button">
+                  <Command className="size-4" />
+                  Command
+                </button>
+                <button className="secondary-control" onClick={() => void refreshStatus()} type="button">
+                  <RefreshCw className="size-4" />
+                  Refresh
+                </button>
+                <a
+                  aria-disabled={!currentBundle}
+                  className={!currentBundle ? "secondary-control pointer-events-none opacity-50" : "secondary-control"}
+                  href={readmeHref || undefined}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <FolderOpenDot className="size-4" />
+                  Open README
+                </a>
+              </div>
+            </header>
 
-              {errorMessage ? <div className="error-strip">{errorMessage}</div> : null}
-              {status?.bundle_warnings?.length ? (
-                <div className="warning-strip">
-                  {status.bundle_warnings.map((warning) => (
-                    <p key={warning}>{warning}</p>
-                  ))}
-                </div>
-              ) : null}
+            {errorMessage ? <div className="error-strip">{errorMessage}</div> : null}
+            {status?.bundle_warnings?.length ? (
+              <div className="warning-strip">
+                {status.bundle_warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            ) : null}
 
-              <AnalyzeForm
-                busy={busy}
-                busyDetail={busyDetail}
-                onCancel={handleCancelAnalyze}
-                onCreateWorkspace={handleCreateWorkspace}
-                onSubmit={handleAnalyze}
-                onWorkspaceChange={(workspace) => {
-                  updateWorkspace(workspace.id, workspace);
-                }}
-                profiles={profiles}
-                repoInputRef={repoInputRef}
-                run={activeRun}
-                workspace={activeWorkspace}
-              />
-
-              <TabPanels activeTab={activeTab} bundle={currentBundle} onInspect={setInspector} onTabChange={setActiveTab} />
-            </div>
-
-            <WorkbenchRail
-              activeRun={activeRun}
+            <TabPanels
+              activeTab={activeTab}
+              activeWorkspace={activeWorkspace}
               apiKey={apiKey}
               bundle={currentBundle}
+              busy={busy}
+              busyDetail={busyDetail}
               inspector={inspector}
               onAPIKeyChange={(value) =>
                 setProfileSecrets((current) => ({
@@ -539,16 +521,36 @@ export function App() {
                   [profile.id]: value,
                 }))
               }
-              onChangeProfile={(nextProfile) => {
-                setProfiles((current) => current.map((item) => (item.id === nextProfile.id ? nextProfile : item)));
-              }}
+              onCancelAnalyze={handleCancelAnalyze}
+              onCreateWorkspace={handleCreateWorkspace}
               onDeleteProfile={handleDeleteProfile}
               onDuplicateProfile={handleDuplicateProfile}
+              onInspect={(value) => {
+                setInspector(value);
+                if (value) {
+                  setActiveTab("properties");
+                }
+              }}
+              onProfileChange={(nextProfile) => {
+                setProfiles((current) => current.map((item) => (item.id === nextProfile.id ? nextProfile : item)));
+              }}
               onSaveProfile={handleSaveProfile}
+              onSelectProfile={(profileID) => {
+                if (activeWorkspace) {
+                  updateWorkspace(activeWorkspace.id, { selectedProfile: profileID, updatedAt: new Date().toISOString() });
+                }
+              }}
+              onSubmitAnalyze={handleAnalyze}
+              onTabChange={setActiveTab}
+              onWorkspaceChange={(workspace) => {
+                updateWorkspace(workspace.id, workspace);
+              }}
               profile={profile}
+              profiles={profiles}
               providerOptions={providerOptions}
+              repoInputRef={repoInputRef}
+              run={activeRun}
               validationErrors={validationErrors}
-              workspace={activeWorkspace}
             />
           </div>
         </main>
@@ -708,6 +710,12 @@ function tabTitle(tab: TabKey) {
   switch (tab) {
     case "dashboard":
       return "Dashboard";
+    case "project":
+      return "Project Setup";
+    case "connections":
+      return "Connections";
+    case "properties":
+      return "Properties";
     case "summary":
       return "Summary";
     case "architecture":

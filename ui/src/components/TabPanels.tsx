@@ -1,23 +1,76 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
-import { BookOpenText, FileCode2, Files, FolderClock, Sparkles } from "lucide-react";
+import { BookOpenText, Bot, FileCode2, Files, FolderClock, FolderCog, Settings2, Sparkles } from "lucide-react";
 
+import { AnalyzeForm } from "@/components/AnalyzeForm";
+import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { FlowchartCanvas } from "@/components/FlowchartCanvas";
+import { PropertiesPanel } from "@/components/PropertiesPanel";
 import { StatsGrid } from "@/components/StatsGrid";
-import type { InspectorState, TabKey, WorkbenchBundle } from "@/lib/types";
+import type { AnalyzeRun, ConnectionProfile, InspectorState, SavedWorkspace, SupportedProviderOption, TabKey, WorkbenchBundle } from "@/lib/types";
 import { bundleLink, formatRelativeTime } from "@/lib/utils";
 
 interface TabPanelsProps {
   activeTab: TabKey;
+  activeWorkspace: SavedWorkspace | null;
+  apiKey: string;
   bundle: WorkbenchBundle | null;
+  busy: boolean;
+  busyDetail: string;
+  inspector: InspectorState | null;
+  onAPIKeyChange: (value: string) => void;
+  onCancelAnalyze: () => void;
+  onCreateWorkspace: () => void;
+  onDeleteProfile: () => void;
+  onDuplicateProfile: () => void;
   onInspect: (value: InspectorState | null) => void;
+  onProfileChange: (profile: ConnectionProfile) => void;
+  onSaveProfile: () => void;
+  onSelectProfile: (profileID: string) => void;
+  onSubmitAnalyze: () => void;
   onTabChange: (value: TabKey) => void;
+  onWorkspaceChange: (workspace: SavedWorkspace) => void;
+  profile: ConnectionProfile;
+  profiles: ConnectionProfile[];
+  providerOptions: SupportedProviderOption[];
+  repoInputRef: RefObject<HTMLInputElement | null>;
+  run: AnalyzeRun | null;
+  validationErrors: string[];
 }
 
-export function TabPanels({ activeTab, bundle, onInspect, onTabChange }: TabPanelsProps) {
+export function TabPanels({
+  activeTab,
+  activeWorkspace,
+  apiKey,
+  bundle,
+  busy,
+  busyDetail,
+  inspector,
+  onAPIKeyChange,
+  onCancelAnalyze,
+  onCreateWorkspace,
+  onDeleteProfile,
+  onDuplicateProfile,
+  onInspect,
+  onProfileChange,
+  onSaveProfile,
+  onSelectProfile,
+  onSubmitAnalyze,
+  onTabChange,
+  onWorkspaceChange,
+  profile,
+  profiles,
+  providerOptions,
+  repoInputRef,
+  run,
+  validationErrors,
+}: TabPanelsProps) {
   return (
     <Tabs.Root className="space-y-4" onValueChange={(value) => onTabChange(value as TabKey)} value={activeTab}>
       <Tabs.List className="tab-strip">
+        <TabTrigger value="project">Project</TabTrigger>
+        <TabTrigger value="connections">Connections</TabTrigger>
+        <TabTrigger value="properties">Properties</TabTrigger>
         <TabTrigger value="dashboard">Dashboard</TabTrigger>
         <TabTrigger value="summary">Summary</TabTrigger>
         <TabTrigger value="architecture">Architecture</TabTrigger>
@@ -25,6 +78,64 @@ export function TabPanels({ activeTab, bundle, onInspect, onTabChange }: TabPane
         <TabTrigger value="issues">Issues</TabTrigger>
         <TabTrigger value="recommendations">Recommendations</TabTrigger>
       </Tabs.List>
+
+      <Tabs.Content value="project">
+        <AnalyzeForm
+          busy={busy}
+          busyDetail={busyDetail}
+          onCancel={onCancelAnalyze}
+          onCreateWorkspace={onCreateWorkspace}
+          onSubmit={onSubmitAnalyze}
+          onWorkspaceChange={onWorkspaceChange}
+          profiles={profiles}
+          repoInputRef={repoInputRef}
+          run={run}
+          workspace={activeWorkspace}
+        />
+      </Tabs.Content>
+
+      <Tabs.Content value="connections">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <section className="panel-block">
+            <div className="flex items-center gap-3">
+              <FolderCog className="size-4 text-zinc-500" />
+              <p className="panel-kicker">Connection profiles</p>
+            </div>
+            <div className="mt-4 space-y-2">
+              {profiles.map((item) => (
+                <button
+                  className={`panel-row${item.id === profile.id ? " border-zinc-800 bg-zinc-950" : ""}`}
+                  key={item.id}
+                  onClick={() => onSelectProfile(item.id)}
+                  type="button"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-zinc-100">{item.label}</p>
+                    <p className="mt-1 truncate text-xs text-zinc-500">{item.provider ? `${item.provider.name} · ${item.provider.model}` : "Deterministic only"}</p>
+                  </div>
+                  <span className="text-xs text-zinc-600">{item.id === profile.id ? "Active" : ""}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <ConnectionPanel
+            apiKey={apiKey}
+            onAPIKeyChange={onAPIKeyChange}
+            onChange={onProfileChange}
+            onDelete={onDeleteProfile}
+            onDuplicate={onDuplicateProfile}
+            onSave={onSaveProfile}
+            profile={profile}
+            providerOptions={providerOptions}
+            validationErrors={validationErrors}
+          />
+        </div>
+      </Tabs.Content>
+
+      <Tabs.Content value="properties">
+        <PropertiesPanel activeRun={run} bundle={bundle} inspector={inspector} workspace={activeWorkspace} />
+      </Tabs.Content>
 
       <Tabs.Content value="dashboard">
         <DashboardView bundle={bundle} onInspect={onInspect} />
@@ -42,12 +153,8 @@ export function TabPanels({ activeTab, bundle, onInspect, onTabChange }: TabPane
         <div className="space-y-4">
           <SurfaceHeader
             eyebrow="Flowchart"
+            note={bundle ? "Interactive topology rendered directly in the workbench." : "Run an analysis to unlock the project graph."}
             title={bundle ? `${bundle.summary.project_name || bundle.summary.name} graph` : "Project graph"}
-            note={
-              bundle
-                ? "Interactive topology rendered directly in the workbench."
-                : "Run an analysis to unlock the project graph."
-            }
           />
           <FlowchartCanvas bundle={bundle} onInspect={onInspect} />
         </div>
@@ -73,8 +180,8 @@ function DashboardView({ bundle, onInspect }: { bundle: WorkbenchBundle | null; 
     <div className="space-y-4">
       <SurfaceHeader
         eyebrow="Dashboard"
-        title={bundle.summary.project_name || bundle.summary.name}
         note={`${bundle.summary.project_type || "Repository"} · ${bundle.summary.total_files} files · ${bundle.summary.total_lines} lines`}
+        title={bundle.summary.project_name || bundle.summary.name}
       />
       <StatsGrid bundle={bundle} />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)]">

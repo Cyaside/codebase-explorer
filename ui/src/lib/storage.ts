@@ -195,19 +195,19 @@ export function loadUIState(): PersistedUIState {
     const raw = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
     if (!raw) {
       return {
-        activeTab: "dashboard",
+        activeTab: "project",
         activeWorkspace: "",
       };
     }
 
     const parsed = JSON.parse(raw) as Partial<PersistedUIState>;
     return {
-      activeTab: parsed.activeTab ?? "dashboard",
+      activeTab: parsed.activeTab ?? "project",
       activeWorkspace: parsed.activeWorkspace ?? "",
     };
   } catch {
     return {
-      activeTab: "dashboard",
+      activeTab: "project",
       activeWorkspace: "",
     };
   }
