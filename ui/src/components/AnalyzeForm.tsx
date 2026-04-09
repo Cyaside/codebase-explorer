@@ -1,17 +1,18 @@
 import { useState, type RefObject } from "react";
-import { ChevronDown, LoaderCircle, OctagonX, Play, Plus, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, Link2, LoaderCircle, OctagonX, Play, Plus, SlidersHorizontal } from "lucide-react";
 
-import type { AnalyzeRun, ConnectionProfile, SavedWorkspace } from "@/lib/types";
+import type { AnalyzeRun, SavedWorkspace } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils";
 
 interface AnalyzeFormProps {
   busy: boolean;
   busyDetail: string;
+  currentConnectionLabel: string;
   onCancel: () => void;
   onCreateWorkspace: () => void;
+  onOpenConnections: () => void;
   onSubmit: () => void;
   onWorkspaceChange: (workspace: SavedWorkspace) => void;
-  profiles: ConnectionProfile[];
   repoInputRef: RefObject<HTMLInputElement | null>;
   run: AnalyzeRun | null;
   workspace: SavedWorkspace | null;
@@ -20,11 +21,12 @@ interface AnalyzeFormProps {
 export function AnalyzeForm({
   busy,
   busyDetail,
+  currentConnectionLabel,
   onCancel,
   onCreateWorkspace,
+  onOpenConnections,
   onSubmit,
   onWorkspaceChange,
-  profiles,
   repoInputRef,
   run,
   workspace,
@@ -69,7 +71,7 @@ export function AnalyzeForm({
         </div>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,13rem)_auto]">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,14rem)_auto]">
         <label className="compact-field">
           <span className="compact-label">Workspace</span>
           <input
@@ -92,20 +94,18 @@ export function AnalyzeForm({
           />
         </label>
 
-        <label className="compact-field">
+        <div className="compact-field">
           <span className="compact-label">Connection</span>
-          <select
-            className="compact-input"
-            onChange={(event) => onWorkspaceChange({ ...workspace, selectedProfile: event.target.value, updatedAt: new Date().toISOString() })}
-            value={workspace.selectedProfile}
-          >
-            {profiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {profile.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <div className="flex gap-2">
+            <div className="compact-input flex items-center justify-between gap-3">
+              <span className="truncate">{currentConnectionLabel}</span>
+              <Link2 className="size-4 text-zinc-600" />
+            </div>
+            <button className="secondary-control shrink-0" onClick={onOpenConnections} type="button">
+              Manage
+            </button>
+          </div>
+        </div>
 
         <div className="flex items-end gap-2">
           <button className="primary-control" disabled={busy} onClick={onSubmit} type="button">
@@ -163,7 +163,7 @@ export function AnalyzeForm({
           <span className="hint-chip">Ctrl+Enter analyze</span>
           <span className="hint-chip">Ctrl+K command</span>
           <span className="hint-chip">[ ] tabs</span>
-          <span className="hint-chip">J / K bundles</span>
+          <span className="hint-chip">J / K projects</span>
         </div>
         <p className="text-sm text-zinc-500">{busy ? busyDetail || "Background analysis is running." : "Local-first path only. GitHub URLs stay out of scope here."}</p>
       </div>

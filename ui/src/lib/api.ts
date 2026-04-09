@@ -47,6 +47,12 @@ export function fetchBundle(bundleName: string) {
   return requestJSON<WorkbenchBundle>(`/api/bundles/${encodeURIComponent(bundleName)}`).then(normalizeWorkbenchBundle);
 }
 
+export function deleteBundle(bundleName: string) {
+  return requestJSON<{ deleted: string }>(`/api/bundles/${encodeURIComponent(bundleName)}`, {
+    method: "DELETE",
+  });
+}
+
 export function analyzeRepository(payload: AnalyzePayload) {
   return requestJSON<AnalyzeResponse>("/api/analyze", {
     method: "POST",
@@ -78,10 +84,6 @@ export function cancelAnalyzeRun(runID: string) {
 }
 
 export function buildProviderPayload(profile: ConnectionProfile, apiKey: string) {
-  if (!profile.provider) {
-    return null;
-  }
-
   return {
     name: profile.provider.name,
     model: profile.provider.model,

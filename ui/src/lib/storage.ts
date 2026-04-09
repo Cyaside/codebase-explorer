@@ -5,7 +5,6 @@ const UI_STATE_STORAGE_KEY = "codearch.workbench.state.v2";
 const WORKSPACE_STORAGE_KEY = "codearch.workbench.workspaces.v1";
 
 const presetProfiles: ConnectionProfile[] = [
-  { id: "deterministic", label: "Deterministic", provider: null, locked: true },
   { id: "openai", label: "OpenAI", provider: { name: "openai", model: "gpt-4.1-mini", baseUrl: "" } },
   {
     id: "openrouter",
@@ -45,14 +44,18 @@ function sanitizeProfile(value: unknown): ConnectionProfile | null {
   const profile = value as Record<string, unknown>;
   const id = typeof profile.id === "string" ? profile.id.trim() : "";
   const label = typeof profile.label === "string" ? profile.label.trim() : "";
+  const provider = sanitizeProvider(profile.provider);
   if (!id || !label) {
+    return null;
+  }
+  if (!provider) {
     return null;
   }
 
   return {
     id,
     label,
-    provider: sanitizeProvider(profile.provider),
+    provider,
     locked: Boolean(profile.locked),
   };
 }
@@ -83,7 +86,7 @@ function sanitizeWorkspace(value: unknown): SavedWorkspace | null {
     repoPath,
     supportFiles: sanitizeStringArray(workspace.supportFiles),
     ignorePatterns: sanitizeStringArray(workspace.ignorePatterns),
-    selectedProfile: typeof workspace.selectedProfile === "string" ? workspace.selectedProfile.trim() : "deterministic",
+    selectedProfile: typeof workspace.selectedProfile === "string" ? workspace.selectedProfile.trim() : presetProfiles[0].id,
     activeBundle: typeof workspace.activeBundle === "string" ? workspace.activeBundle.trim() : "",
     createdAt: typeof workspace.createdAt === "string" ? workspace.createdAt : now,
     updatedAt: typeof workspace.updatedAt === "string" ? workspace.updatedAt : now,
@@ -95,7 +98,7 @@ function cloneProfile(profile: ConnectionProfile): ConnectionProfile {
     id: profile.id,
     label: profile.label,
     locked: profile.locked,
-    provider: profile.provider ? { ...profile.provider } : null,
+    provider: { ...profile.provider },
   };
 }
 
@@ -146,13 +149,11 @@ export function persistProfiles(profiles: ConnectionProfile[]) {
     id: profile.id,
     label: profile.label,
     locked: profile.locked,
-    provider: profile.provider
-      ? {
-          name: profile.provider.name,
-          model: profile.provider.model,
-          baseUrl: profile.provider.baseUrl,
-        }
-      : null,
+    provider: {
+      name: profile.provider.name,
+      model: profile.provider.model,
+      baseUrl: profile.provider.baseUrl,
+    },
   }));
 
   window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(persisted));
@@ -195,19 +196,19 @@ export function loadUIState(): PersistedUIState {
     const raw = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
     if (!raw) {
       return {
-        activeTab: "project",
+        activeTab: "projects",
         activeWorkspace: "",
       };
     }
 
     const parsed = JSON.parse(raw) as Partial<PersistedUIState>;
     return {
-      activeTab: parsed.activeTab ?? "project",
+      activeTab: parsed.activeTab ?? "projects",
       activeWorkspace: parsed.activeWorkspace ?? "",
     };
   } catch {
     return {
-      activeTab: "project",
+      activeTab: "projects",
       activeWorkspace: "",
     };
   }
@@ -225,7 +226,7 @@ export function createWorkspace(seed?: Partial<SavedWorkspace>): SavedWorkspace 
     repoPath: seed?.repoPath?.trim() || "",
     supportFiles: seed?.supportFiles ? [...seed.supportFiles] : [],
     ignorePatterns: seed?.ignorePatterns ? [...seed.ignorePatterns] : [],
-    selectedProfile: seed?.selectedProfile || "deterministic",
+    selectedProfile: seed?.selectedProfile || presetProfiles[0].id,
     activeBundle: seed?.activeBundle || "",
     createdAt: seed?.createdAt || timestamp,
     updatedAt: seed?.updatedAt || timestamp,

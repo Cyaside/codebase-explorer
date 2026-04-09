@@ -25,7 +25,7 @@ export function ConnectionPanel({
   providerOptions,
   validationErrors,
 }: ConnectionPanelProps) {
-  const providerName = profile.provider?.name || "";
+  const providerName = profile.provider.name;
   const providerMeta = providerOptions.find((item) => item.name === providerName);
 
   return (
@@ -53,18 +53,15 @@ export function ConnectionPanel({
             onChange={(event) =>
               onChange({
                 ...profile,
-                provider: event.target.value
-                  ? {
-                      name: event.target.value,
-                      model: profile.provider?.model || "",
-                      baseUrl: profile.provider?.baseUrl || "",
-                    }
-                  : null,
+                provider: {
+                  name: event.target.value,
+                  model: profile.provider.model || "",
+                  baseUrl: event.target.value === "openai" ? "" : profile.provider.baseUrl || "",
+                },
               })
             }
             value={providerName}
           >
-            <option value="">Deterministic</option>
             {providerOptions.map((option) => (
               <option key={option.name} value={option.name}>
                 {option.name}
@@ -73,47 +70,43 @@ export function ConnectionPanel({
           </select>
         </label>
 
-        {profile.provider ? (
-          <>
-            <label className="compact-field">
-              <span className="compact-label">Model</span>
-              <input
-                className="compact-input"
-                onChange={(event) =>
-                  onChange({
-                    ...profile,
-                    provider: {
-                      ...profile.provider!,
-                      model: event.target.value,
-                    },
-                  })
-                }
-                placeholder="mistral-small-latest"
-                type="text"
-                value={profile.provider.model}
-              />
-            </label>
+        <label className="compact-field">
+          <span className="compact-label">Model</span>
+          <input
+            className="compact-input"
+            onChange={(event) =>
+              onChange({
+                ...profile,
+                provider: {
+                  ...profile.provider,
+                  model: event.target.value,
+                },
+              })
+            }
+            placeholder="mistral-small-latest"
+            type="text"
+            value={profile.provider.model}
+          />
+        </label>
 
-            <label className="compact-field">
-              <span className="compact-label">Base URL</span>
-              <input
-                className="compact-input"
-                onChange={(event) =>
-                  onChange({
-                    ...profile,
-                    provider: {
-                      ...profile.provider!,
-                      baseUrl: event.target.value,
-                    },
-                  })
-                }
-                placeholder="https://api.mistral.ai/v1"
-                type="text"
-                value={profile.provider.baseUrl}
-              />
-            </label>
-          </>
-        ) : null}
+        <label className="compact-field">
+          <span className="compact-label">Base URL</span>
+          <input
+            className="compact-input"
+            onChange={(event) =>
+              onChange({
+                ...profile,
+                provider: {
+                  ...profile.provider,
+                  baseUrl: event.target.value,
+                },
+              })
+            }
+            placeholder="https://api.mistral.ai/v1"
+            type="text"
+            value={profile.provider.baseUrl}
+          />
+        </label>
 
         <label className="compact-field">
           <span className="compact-label">API key</span>

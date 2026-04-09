@@ -5,10 +5,6 @@ export function validateProfile(
   apiKey: string,
   supportedProviders: SupportedProviderOption[],
 ) {
-  if (!profile.provider) {
-    return [] as string[];
-  }
-
   const errors: string[] = [];
   const providerName = profile.provider.name.trim();
   if (!providerName) {

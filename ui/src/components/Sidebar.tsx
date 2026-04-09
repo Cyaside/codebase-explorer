@@ -5,6 +5,7 @@ import {
   FileSearch2,
   FolderPlus,
   FolderCog,
+  FolderKanban,
   LayoutDashboard,
   Network,
   PanelRightOpen,
@@ -12,26 +13,20 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import type { BundleSummary, ConnectionProfile, SavedWorkspace, TabKey } from "@/lib/types";
+import type { SavedWorkspace, TabKey } from "@/lib/types";
 import { cn, formatRelativeTime } from "@/lib/utils";
 
 interface SidebarProps {
   activeTab: TabKey;
-  bundles: BundleSummary[];
   onCreateWorkspace: () => void;
-  onSelectBundle: (bundleName: string) => void;
-  onSelectProfile: (profileID: string) => void;
   onSelectTab: (tab: TabKey) => void;
   onSelectWorkspace: (workspaceID: string) => void;
-  profiles: ConnectionProfile[];
-  selectedBundle: string;
-  selectedProfile: string;
-  workspaceBundles: BundleSummary[];
   workspaces: SavedWorkspace[];
   activeWorkspaceID: string;
 }
 
 const viewItems: Array<{ icon: ReactNode; label: string; value: TabKey }> = [
+  { icon: <FolderKanban className="size-4" />, label: "Projects", value: "projects" },
   { icon: <FolderCog className="size-4" />, label: "Project", value: "project" },
   { icon: <Bot className="size-4" />, label: "Connections", value: "connections" },
   { icon: <PanelRightOpen className="size-4" />, label: "Properties", value: "properties" },
@@ -45,19 +40,14 @@ const viewItems: Array<{ icon: ReactNode; label: string; value: TabKey }> = [
 
 export function Sidebar({
   activeTab,
-  bundles,
   onCreateWorkspace,
-  onSelectBundle,
-  onSelectProfile,
   onSelectTab,
   onSelectWorkspace,
-  profiles,
-  selectedBundle,
-  selectedProfile,
-  workspaceBundles,
   workspaces,
   activeWorkspaceID,
 }: SidebarProps) {
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceID) || null;
+
   return (
     <aside className="sidebar-shell">
       <div className="space-y-5">
@@ -93,73 +83,20 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-section">
-        <SectionLabel label="Projects" />
-        <div className="space-y-1.5">
-          {workspaces.length ? (
-            workspaces.map((workspace) => (
-              <button
-                className={cn("sidebar-project", workspace.id === activeWorkspaceID && "sidebar-project-active")}
-                key={workspace.id}
-                onClick={() => onSelectWorkspace(workspace.id)}
-                type="button"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-zinc-100">{workspace.label}</p>
-                    <p className="mt-1 truncate text-xs text-zinc-500">{workspace.repoPath || "Set a local repository path"}</p>
-                  </div>
-                  <span className="text-[10px] text-zinc-600">{formatRelativeTime(workspace.updatedAt)}</span>
-                </div>
-              </button>
-            ))
-          ) : (
-            <p className="sidebar-empty">No saved project yet.</p>
-          )}
-        </div>
-      </div>
-
-      <div className="sidebar-section">
-        <SectionLabel label="Connections" />
-        <div className="space-y-1.5">
-          {profiles.map((profile) => (
-            <button
-              className={cn("sidebar-item", profile.id === selectedProfile && "sidebar-item-active")}
-              key={profile.id}
-              onClick={() => onSelectProfile(profile.id)}
-              type="button"
-            >
-              <Bot className="size-4" />
-              <div className="min-w-0 text-left">
-                <p className="truncate text-sm">{profile.label}</p>
-                <p className="truncate text-xs text-zinc-500">{profile.provider?.name || "deterministic only"}</p>
+        <SectionLabel label="Current project" />
+        {activeWorkspace ? (
+          <button className={cn("sidebar-project", "sidebar-project-active")} onClick={() => onSelectWorkspace(activeWorkspace.id)} type="button">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-zinc-100">{activeWorkspace.label}</p>
+                <p className="mt-1 truncate text-xs text-zinc-500">{activeWorkspace.repoPath || "Set a local repository path"}</p>
               </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="sidebar-section">
-        <SectionLabel label="Bundles" />
-        <div className="space-y-1.5">
-          {(workspaceBundles.length ? workspaceBundles : bundles.slice(0, 6)).map((bundle) => (
-            <button
-              className={cn("sidebar-project", bundle.name === selectedBundle && "sidebar-project-active")}
-              key={bundle.name}
-              onClick={() => onSelectBundle(bundle.name)}
-              type="button"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-zinc-100">{bundle.project_name || bundle.name}</p>
-                  <p className="mt-1 truncate text-xs text-zinc-500">
-                    {bundle.ai_status || "deterministic"} · {bundle.total_files} files
-                  </p>
-                </div>
-                <span className="text-[10px] text-zinc-600">{formatRelativeTime(bundle.generated_at)}</span>
-              </div>
-            </button>
-          ))}
-        </div>
+              <span className="text-[10px] text-zinc-600">{formatRelativeTime(activeWorkspace.updatedAt)}</span>
+            </div>
+          </button>
+        ) : (
+          <p className="sidebar-empty">No active project yet.</p>
+        )}
       </div>
     </aside>
   );

@@ -24,7 +24,7 @@ export function StatsGrid({ bundle }: StatsGridProps) {
         {
           icon: <Bot className="size-4" />,
           label: "AI status",
-          note: bundle.data.ai.provider || "deterministic",
+          note: bundle.data.ai.provider || "AI inactive",
           value: bundle.data.ai.status || "disabled",
         },
         {

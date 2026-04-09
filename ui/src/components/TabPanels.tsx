@@ -1,32 +1,49 @@
 import type { ReactNode, RefObject } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
-import { BookOpenText, Bot, FileCode2, Files, FolderClock, FolderCog, Settings2, Sparkles } from "lucide-react";
+import { BookOpenText, FileCode2, Files, FolderClock, FolderCog, Sparkles } from "lucide-react";
 
 import { AnalyzeForm } from "@/components/AnalyzeForm";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { FlowchartCanvas } from "@/components/FlowchartCanvas";
+import { ProjectsPanel } from "@/components/ProjectsPanel";
 import { PropertiesPanel } from "@/components/PropertiesPanel";
 import { StatsGrid } from "@/components/StatsGrid";
-import type { AnalyzeRun, ConnectionProfile, InspectorState, SavedWorkspace, SupportedProviderOption, TabKey, WorkbenchBundle } from "@/lib/types";
+import type {
+  AnalyzeRun,
+  BundleSummary,
+  ConnectionProfile,
+  InspectorState,
+  SavedWorkspace,
+  SupportedProviderOption,
+  TabKey,
+  WorkbenchBundle,
+} from "@/lib/types";
 import { bundleLink, formatRelativeTime } from "@/lib/utils";
 
 interface TabPanelsProps {
   activeTab: TabKey;
   activeWorkspace: SavedWorkspace | null;
+  activeWorkspaceID: string;
   apiKey: string;
   bundle: WorkbenchBundle | null;
+  bundles: BundleSummary[];
   busy: boolean;
   busyDetail: string;
   inspector: InspectorState | null;
   onAPIKeyChange: (value: string) => void;
   onCancelAnalyze: () => void;
   onCreateWorkspace: () => void;
+  onDeleteBundle: (bundleName: string) => void;
   onDeleteProfile: () => void;
+  onDeleteWorkspace: (workspaceID: string) => void;
   onDuplicateProfile: () => void;
   onInspect: (value: InspectorState | null) => void;
+  onOpenConnections: () => void;
   onProfileChange: (profile: ConnectionProfile) => void;
   onSaveProfile: () => void;
+  onSelectBundle: (bundleName: string, workspaceID?: string) => void;
   onSelectProfile: (profileID: string) => void;
+  onSelectWorkspace: (workspaceID: string) => void;
   onSubmitAnalyze: () => void;
   onTabChange: (value: TabKey) => void;
   onWorkspaceChange: (workspace: SavedWorkspace) => void;
@@ -36,25 +53,33 @@ interface TabPanelsProps {
   repoInputRef: RefObject<HTMLInputElement | null>;
   run: AnalyzeRun | null;
   validationErrors: string[];
+  workspaces: SavedWorkspace[];
 }
 
 export function TabPanels({
   activeTab,
   activeWorkspace,
+  activeWorkspaceID,
   apiKey,
   bundle,
+  bundles,
   busy,
   busyDetail,
   inspector,
   onAPIKeyChange,
   onCancelAnalyze,
   onCreateWorkspace,
+  onDeleteBundle,
   onDeleteProfile,
+  onDeleteWorkspace,
   onDuplicateProfile,
   onInspect,
+  onOpenConnections,
   onProfileChange,
   onSaveProfile,
+  onSelectBundle,
   onSelectProfile,
+  onSelectWorkspace,
   onSubmitAnalyze,
   onTabChange,
   onWorkspaceChange,
@@ -64,11 +89,13 @@ export function TabPanels({
   repoInputRef,
   run,
   validationErrors,
+  workspaces,
 }: TabPanelsProps) {
   return (
     <Tabs.Root className="space-y-4" onValueChange={(value) => onTabChange(value as TabKey)} value={activeTab}>
       <Tabs.List className="tab-strip">
-        <TabTrigger value="project">Project</TabTrigger>
+        <TabTrigger value="projects">Projects</TabTrigger>
+        <TabTrigger value="project">Project Setup</TabTrigger>
         <TabTrigger value="connections">Connections</TabTrigger>
         <TabTrigger value="properties">Properties</TabTrigger>
         <TabTrigger value="dashboard">Dashboard</TabTrigger>
@@ -79,15 +106,30 @@ export function TabPanels({
         <TabTrigger value="recommendations">Recommendations</TabTrigger>
       </Tabs.List>
 
+      <Tabs.Content value="projects">
+        <ProjectsPanel
+          activeWorkspaceID={activeWorkspaceID}
+          bundles={bundles}
+          onCreateWorkspace={onCreateWorkspace}
+          onDeleteBundle={onDeleteBundle}
+          onDeleteWorkspace={onDeleteWorkspace}
+          onSelectBundle={onSelectBundle}
+          onSelectWorkspace={onSelectWorkspace}
+          selectedBundle={activeWorkspace?.activeBundle || ""}
+          workspaces={workspaces}
+        />
+      </Tabs.Content>
+
       <Tabs.Content value="project">
         <AnalyzeForm
           busy={busy}
           busyDetail={busyDetail}
+          currentConnectionLabel={profile.label}
           onCancel={onCancelAnalyze}
           onCreateWorkspace={onCreateWorkspace}
+          onOpenConnections={onOpenConnections}
           onSubmit={onSubmitAnalyze}
           onWorkspaceChange={onWorkspaceChange}
-          profiles={profiles}
           repoInputRef={repoInputRef}
           run={run}
           workspace={activeWorkspace}
@@ -111,9 +153,11 @@ export function TabPanels({
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-zinc-100">{item.label}</p>
-                    <p className="mt-1 truncate text-xs text-zinc-500">{item.provider ? `${item.provider.name} · ${item.provider.model}` : "Deterministic only"}</p>
+                    <p className="mt-1 truncate text-xs text-zinc-500">
+                      {item.provider.name} · {item.provider.model}
+                    </p>
                   </div>
-                  <span className="text-xs text-zinc-600">{item.id === profile.id ? "Active" : ""}</span>
+                  <span className="text-xs text-zinc-600">{item.id === activeWorkspace?.selectedProfile ? "In use" : ""}</span>
                 </button>
               ))}
             </div>
@@ -268,7 +312,7 @@ function SummaryView({ bundle, onInspect }: { bundle: WorkbenchBundle | null; on
               onInspect({
                 eyebrow: "Directory",
                 title: item,
-                description: "Marked as an important directory by the deterministic analyzer.",
+                description: "Marked as an important directory by the repository analyzer.",
                 notes: [bundle.summary.analyzed_path || "Local checkout root unavailable."],
                 properties: [{ label: "Path", value: item }],
               }),
@@ -303,7 +347,7 @@ function ArchitectureView({ bundle, onInspect }: { bundle: WorkbenchBundle | nul
             onInspect({
               eyebrow: "Module",
               title: item.path,
-              description: "Structured module record from the deterministic analyzer.",
+              description: "Structured module record from the repository analyzer.",
               notes: [bundle.data.ai.hotspot_explanations.find((entry) => entry.path.startsWith(item.path))?.explanation || "No hotspot note recorded."],
               properties: [
                 { label: "Files", value: String(item.file_count) },

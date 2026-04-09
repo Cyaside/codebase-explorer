@@ -4,7 +4,7 @@ import { Command, FolderOpenDot, RefreshCw } from "lucide-react";
 import { CommandPalette, type CommandPaletteAction } from "@/components/CommandPalette";
 import { Sidebar } from "@/components/Sidebar";
 import { TabPanels } from "@/components/TabPanels";
-import { buildProviderPayload, cancelAnalyzeRun, fetchAnalyzeRun, fetchBundle, fetchStatus, mergeBundleSummary, startAnalyzeRun } from "@/lib/api";
+import { buildProviderPayload, cancelAnalyzeRun, deleteBundle, fetchAnalyzeRun, fetchBundle, fetchStatus, mergeBundleSummary, startAnalyzeRun } from "@/lib/api";
 import { useWorkbenchShortcuts } from "@/hooks/useWorkbenchShortcuts";
 import { createWorkspace, defaultProfiles, loadProfiles, loadUIState, loadWorkspaces, persistProfiles, persistUIState, persistWorkspaces } from "@/lib/storage";
 import { openAnalyzeRunStream } from "@/lib/stream";
@@ -23,7 +23,18 @@ import { validateProfile } from "@/lib/validation";
 const initialUIState = loadUIState();
 const initialProfiles = loadProfiles();
 const initialWorkspaces = loadWorkspaces();
-const workbenchTabs: TabKey[] = ["project", "connections", "properties", "dashboard", "summary", "architecture", "flowchart", "issues", "recommendations"];
+const workbenchTabs: TabKey[] = [
+  "projects",
+  "project",
+  "connections",
+  "properties",
+  "dashboard",
+  "summary",
+  "architecture",
+  "flowchart",
+  "issues",
+  "recommendations",
+];
 
 export function App() {
   const [status, setStatus] = useState<WorkbenchStatusResponse | null>(null);
@@ -32,7 +43,7 @@ export function App() {
   const [profiles, setProfiles] = useState(initialProfiles);
   const [workspaces, setWorkspaces] = useState(initialWorkspaces);
   const [activeWorkspaceID, setActiveWorkspaceID] = useState(initialUIState.activeWorkspace || initialWorkspaces[0]?.id || "");
-  const [activeTab, setActiveTab] = useState<TabKey>(initialUIState.activeTab || "dashboard");
+  const [activeTab, setActiveTab] = useState<TabKey>(initialUIState.activeTab || "projects");
   const [profileSecrets, setProfileSecrets] = useState<Record<string, string>>({});
   const [activeRun, setActiveRun] = useState<AnalyzeRun | null>(null);
   const [busyDetail, setBusyDetail] = useState("");
@@ -44,11 +55,11 @@ export function App() {
   const repoInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceID) || null;
-  const activeProfileID = activeWorkspace?.selectedProfile || initialProfiles[0]?.id || "deterministic";
+  const activeProfileID = activeWorkspace?.selectedProfile || profiles[0]?.id || "";
   const profile = profiles.find((item) => item.id === activeProfileID) || profiles[0] || defaultProfiles()[0];
   const providerOptions = status?.supported_providers || [];
-  const apiKey = profileSecrets[profile.id] || "";
-  const validationErrors = validateProfile(profile, apiKey, providerOptions);
+  const apiKey = profile ? profileSecrets[profile.id] || "" : "";
+  const validationErrors = profile ? validateProfile(profile, apiKey, providerOptions) : [];
   const workspaceBundles = activeWorkspace ? bundles.filter((bundle) => matchesWorkspace(bundle.analyzed_path, activeWorkspace.repoPath)) : [];
   const selectedBundleName = activeWorkspace?.activeBundle || workspaceBundles[0]?.name || "";
   const currentBundle = selectedBundleName ? bundleCache[selectedBundleName] || null : null;
@@ -80,6 +91,17 @@ export function App() {
   }, [activeWorkspace, workspaces]);
 
   useEffect(() => {
+    if (!activeWorkspace || profiles.some((item) => item.id === activeWorkspace.selectedProfile)) {
+      return;
+    }
+
+    updateWorkspace(activeWorkspace.id, {
+      selectedProfile: profiles[0]?.id || "",
+      updatedAt: new Date().toISOString(),
+    });
+  }, [activeWorkspace?.id, activeWorkspace?.selectedProfile, profiles]);
+
+  useEffect(() => {
     if (!toastMessage) {
       return;
     }
@@ -95,7 +117,7 @@ export function App() {
 
     const nextBundleName = activeWorkspace.activeBundle || workspaceBundles[0]?.name;
     if (nextBundleName && !bundleCache[nextBundleName]) {
-      void loadBundle(nextBundleName);
+      void loadBundle(nextBundleName, activeWorkspace.id);
     }
   }, [activeWorkspace?.activeBundle, activeWorkspace?.id, workspaceBundles.length]);
 
@@ -210,7 +232,9 @@ export function App() {
       void loadBundle(bundleName);
     },
     onSelectTab: setActiveTab,
-    onSelectWorkspace: setActiveWorkspaceID,
+    onSelectWorkspace: (workspaceID) => {
+      void selectWorkspace(workspaceID);
+    },
     tabs: workbenchTabs,
     workspaces,
     busy,
@@ -236,14 +260,14 @@ export function App() {
           : scopedBundles[0]?.name || "");
 
       if (nextBundleName) {
-        await loadBundle(nextBundleName);
+        await loadBundle(nextBundleName, activeWorkspace?.id);
       }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load workbench status.");
     }
   }
 
-  async function loadBundle(bundleName: string) {
+  async function loadBundle(bundleName: string, workspaceID = activeWorkspace?.id || activeWorkspaceID) {
     try {
       setErrorMessage("");
       if (!bundleCache[bundleName]) {
@@ -254,8 +278,8 @@ export function App() {
         }));
       }
 
-      if (activeWorkspace) {
-        updateWorkspace(activeWorkspace.id, {
+      if (workspaceID) {
+        updateWorkspace(workspaceID, {
           activeBundle: bundleName,
           updatedAt: new Date().toISOString(),
         });
@@ -273,12 +297,36 @@ export function App() {
     const currentIndex = workspaceBundles.findIndex((bundle) => bundle.name === selectedBundleName);
     const startIndex = currentIndex >= 0 ? currentIndex : 0;
     const nextIndex = (startIndex + direction + workspaceBundles.length) % workspaceBundles.length;
-    await loadBundle(workspaceBundles[nextIndex].name);
+    await loadBundle(workspaceBundles[nextIndex].name, activeWorkspace?.id);
+  }
+
+  async function selectWorkspace(workspaceID: string, sourceWorkspaces = workspaces, sourceBundles = bundles) {
+    setActiveWorkspaceID(workspaceID);
+
+    const workspace = sourceWorkspaces.find((item) => item.id === workspaceID);
+    if (!workspace) {
+      return;
+    }
+
+    const nextWorkspaceBundles = sourceBundles.filter((bundle) => matchesWorkspace(bundle.analyzed_path, workspace.repoPath));
+    const nextBundleName =
+      workspace.activeBundle && nextWorkspaceBundles.some((bundle) => bundle.name === workspace.activeBundle)
+        ? workspace.activeBundle
+        : nextWorkspaceBundles[0]?.name || "";
+
+    if (nextBundleName) {
+      await loadBundle(nextBundleName, workspaceID);
+    } else if (workspace.activeBundle) {
+      updateWorkspace(workspaceID, {
+        activeBundle: "",
+        updatedAt: new Date().toISOString(),
+      });
+    }
   }
 
   function handleCreateWorkspace() {
     const nextWorkspace = createWorkspace({
-      selectedProfile: profiles[0]?.id || "deterministic",
+      selectedProfile: profiles[0]?.id || "",
     });
 
     setWorkspaces((current) => [nextWorkspace, ...current]);
@@ -351,7 +399,7 @@ export function App() {
     const clone: ConnectionProfile = {
       id: cloneID,
       label: `${profile.label} Copy`,
-      provider: profile.provider ? { ...profile.provider } : null,
+      provider: { ...profile.provider },
     };
 
     setProfiles((current) => [...current, clone]);
@@ -369,12 +417,16 @@ export function App() {
   }
 
   function handleDeleteProfile() {
+    if (profiles.length <= 1) {
+      setErrorMessage("Keep at least one connection profile available.");
+      return;
+    }
     if (profile.locked) {
       setErrorMessage("Preset profiles cannot be deleted.");
       return;
     }
 
-    const fallbackProfileID = profiles.find((item) => item.id !== profile.id)?.id || "deterministic";
+    const fallbackProfileID = profiles.find((item) => item.id !== profile.id)?.id || profiles[0]?.id || "";
     setProfiles((current) => current.filter((item) => item.id !== profile.id));
     setProfileSecrets((current) => {
       const next = { ...current };
@@ -411,7 +463,7 @@ export function App() {
     try {
       const response = await startAnalyzeRun({
         repo_path: repoPath,
-        deterministic_only: !profile.provider,
+        deterministic_only: false,
         support_files: activeWorkspace.supportFiles,
         extra_ignore_patterns: activeWorkspace.ignorePatterns,
         provider: buildProviderPayload(profile, apiKey),
@@ -435,6 +487,80 @@ export function App() {
     }
   }
 
+  async function handleDeleteBundle(bundleName: string) {
+    const nextBundles = bundles.filter((bundle) => bundle.name !== bundleName);
+
+    try {
+      setErrorMessage("");
+      await deleteBundle(bundleName);
+
+      setBundleCache((current) => {
+        const next = { ...current };
+        delete next[bundleName];
+        return next;
+      });
+      setBundles(nextBundles);
+      setWorkspaces((current) =>
+        current.map((workspace) => {
+          if (workspace.activeBundle !== bundleName) {
+            return workspace;
+          }
+
+          const workspaceScopedBundles = nextBundles.filter((bundle) => matchesWorkspace(bundle.analyzed_path, workspace.repoPath));
+          return {
+            ...workspace,
+            activeBundle: workspaceScopedBundles[0]?.name || "",
+            updatedAt: new Date().toISOString(),
+          };
+        }),
+      );
+      setToastMessage(`Deleted bundle "${bundleName}".`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to delete bundle.");
+    }
+  }
+
+  async function handleDeleteWorkspace(workspaceID: string) {
+    const workspace = workspaces.find((item) => item.id === workspaceID);
+    if (!workspace) {
+      return;
+    }
+
+    const relatedBundles = bundles.filter((bundle) => matchesWorkspace(bundle.analyzed_path, workspace.repoPath));
+    try {
+      setErrorMessage("");
+      for (const bundle of relatedBundles) {
+        await deleteBundle(bundle.name);
+      }
+
+      const nextBundles = bundles.filter((bundle) => !matchesWorkspace(bundle.analyzed_path, workspace.repoPath));
+      const nextWorkspaces = workspaces.filter((item) => item.id !== workspaceID);
+
+      setBundleCache((current) => {
+        const next = { ...current };
+        for (const bundle of relatedBundles) {
+          delete next[bundle.name];
+        }
+        return next;
+      });
+      setBundles(nextBundles);
+      setWorkspaces(nextWorkspaces);
+
+      if (activeWorkspaceID === workspaceID) {
+        const nextWorkspace = nextWorkspaces[0] || null;
+        setActiveWorkspaceID(nextWorkspace?.id || "");
+        setActiveTab("projects");
+        if (nextWorkspace) {
+          await selectWorkspace(nextWorkspace.id, nextWorkspaces, nextBundles);
+        }
+      }
+
+      setToastMessage(`Deleted project "${workspace.label}" and its bundles.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to delete project.");
+    }
+  }
+
   const readmeHref = currentBundle ? bundleLink(currentBundle.summary.name, "README.md") : "";
 
   return (
@@ -445,22 +571,11 @@ export function App() {
         <Sidebar
           activeTab={activeTab}
           activeWorkspaceID={activeWorkspaceID}
-          bundles={bundles}
           onCreateWorkspace={handleCreateWorkspace}
-          onSelectBundle={(bundleName) => {
-            void loadBundle(bundleName);
-          }}
-          onSelectProfile={(profileID) => {
-            if (activeWorkspace) {
-              updateWorkspace(activeWorkspace.id, { selectedProfile: profileID, updatedAt: new Date().toISOString() });
-            }
-          }}
           onSelectTab={setActiveTab}
-          onSelectWorkspace={setActiveWorkspaceID}
-          profiles={profiles}
-          selectedBundle={selectedBundleName}
-          selectedProfile={profile.id}
-          workspaceBundles={workspaceBundles}
+          onSelectWorkspace={(workspaceID) => {
+            void selectWorkspace(workspaceID);
+          }}
           workspaces={workspaces}
         />
 
@@ -510,8 +625,10 @@ export function App() {
             <TabPanels
               activeTab={activeTab}
               activeWorkspace={activeWorkspace}
+              activeWorkspaceID={activeWorkspaceID}
               apiKey={apiKey}
               bundle={currentBundle}
+              bundles={bundles}
               busy={busy}
               busyDetail={busyDetail}
               inspector={inspector}
@@ -523,7 +640,13 @@ export function App() {
               }
               onCancelAnalyze={handleCancelAnalyze}
               onCreateWorkspace={handleCreateWorkspace}
+              onDeleteBundle={(bundleName) => {
+                void handleDeleteBundle(bundleName);
+              }}
               onDeleteProfile={handleDeleteProfile}
+              onDeleteWorkspace={(workspaceID) => {
+                void handleDeleteWorkspace(workspaceID);
+              }}
               onDuplicateProfile={handleDuplicateProfile}
               onInspect={(value) => {
                 setInspector(value);
@@ -531,14 +654,21 @@ export function App() {
                   setActiveTab("properties");
                 }
               }}
+              onOpenConnections={() => setActiveTab("connections")}
               onProfileChange={(nextProfile) => {
                 setProfiles((current) => current.map((item) => (item.id === nextProfile.id ? nextProfile : item)));
               }}
               onSaveProfile={handleSaveProfile}
+              onSelectBundle={(bundleName, workspaceID) => {
+                void loadBundle(bundleName, workspaceID);
+              }}
               onSelectProfile={(profileID) => {
                 if (activeWorkspace) {
                   updateWorkspace(activeWorkspace.id, { selectedProfile: profileID, updatedAt: new Date().toISOString() });
                 }
+              }}
+              onSelectWorkspace={(workspaceID) => {
+                void selectWorkspace(workspaceID);
               }}
               onSubmitAnalyze={handleAnalyze}
               onTabChange={setActiveTab}
@@ -551,6 +681,7 @@ export function App() {
               repoInputRef={repoInputRef}
               run={activeRun}
               validationErrors={validationErrors}
+              workspaces={workspaces}
             />
           </div>
         </main>
@@ -668,7 +799,7 @@ function buildDefaultInspector(workspace: SavedWorkspace | null, bundle: Workben
       eyebrow: tabTitle(activeTab),
       title: bundle.summary.project_name || bundle.summary.name,
       description: bundle.data.project.summary || bundle.data.ai.project_summary || "No project summary available.",
-      notes: [bundle.data.ai.note || "Deterministic-first bundle with optional AI synthesis."],
+      notes: [bundle.data.ai.note || "Repository bundle with optional AI synthesis."],
       properties: [
         { label: "Workspace", value: workspace?.label || "Unknown" },
         { label: "Bundle", value: bundle.summary.name },
@@ -690,7 +821,7 @@ function buildDefaultInspector(workspace: SavedWorkspace | null, bundle: Workben
     properties: [
       { label: "Support files", value: String(workspace.supportFiles.length) },
       { label: "Ignore patterns", value: String(workspace.ignorePatterns.length) },
-      { label: "Connection", value: workspace.selectedProfile || "deterministic" },
+      { label: "Connection", value: workspace.selectedProfile || "unassigned" },
     ],
   };
 }
@@ -699,6 +830,7 @@ function matchesWorkspace(bundlePath: string, workspacePath: string) {
   if (!workspacePath.trim()) {
     return false;
   }
+
   return normalizeLocalPath(bundlePath) === normalizeLocalPath(workspacePath);
 }
 
@@ -708,6 +840,8 @@ function sortWorkspacesByUpdatedAt(left: SavedWorkspace, right: SavedWorkspace) 
 
 function tabTitle(tab: TabKey) {
   switch (tab) {
+    case "projects":
+      return "Projects";
     case "dashboard":
       return "Dashboard";
     case "project":

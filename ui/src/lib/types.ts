@@ -1,4 +1,5 @@
 export type TabKey =
+  | "projects"
   | "project"
   | "connections"
   | "properties"
@@ -18,7 +19,7 @@ export interface ProviderProfile {
 export interface ConnectionProfile {
   id: string;
   label: string;
-  provider: ProviderProfile | null;
+  provider: ProviderProfile;
   locked?: boolean;
 }
 
