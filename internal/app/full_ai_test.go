@@ -30,11 +30,14 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 		t.Fatalf("analyze sample repo with full-ai scaffold: %v", err)
 	}
 
-	if !result.FullAI.Enabled || result.FullAI.Status != "collected" {
-		t.Fatalf("expected collected full-ai summary, got %#v", result.FullAI)
+	if !result.FullAI.Enabled || result.FullAI.Status != "prepared" {
+		t.Fatalf("expected prepared full-ai summary, got %#v", result.FullAI)
 	}
 	if result.FullAI.CollectedItems == 0 {
 		t.Fatalf("expected collected evidence items in full-ai summary, got %#v", result.FullAI)
+	}
+	if result.FullAI.PreparedFunctions == 0 {
+		t.Fatalf("expected prepared full-ai function jobs in summary, got %#v", result.FullAI)
 	}
 
 	planContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "full-ai-plan.json"))
@@ -72,5 +75,19 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 	}
 	if evidence.CollectedItems == 0 {
 		t.Fatalf("expected collected evidence items, got %#v", evidence)
+	}
+
+	functionContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "full-ai-functions.json"))
+	if err != nil {
+		t.Fatalf("read full-ai functions: %v", err)
+	}
+	var functionSet struct {
+		SchemaVersion string `json:"schema_version"`
+	}
+	if err := json.Unmarshal(functionContents, &functionSet); err != nil {
+		t.Fatalf("unmarshal full-ai functions: %v", err)
+	}
+	if functionSet.SchemaVersion != fullai.FunctionsSchemaVersion {
+		t.Fatalf("expected full-ai functions schema version %q, got %#v", fullai.FunctionsSchemaVersion, functionSet)
 	}
 }

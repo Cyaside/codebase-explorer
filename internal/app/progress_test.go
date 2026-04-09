@@ -129,6 +129,12 @@ func TestAnalyzeEmitsProgressForFullAIPlanning(t *testing.T) {
 	if !hasProgressEvent(events, "full-ai-evidence", "collected") {
 		t.Fatalf("expected collected full-ai evidence event, got %#v", events)
 	}
+	if !hasProgressEvent(events, "full-ai-functions", "running") {
+		t.Fatalf("expected running full-ai function preparation event, got %#v", events)
+	}
+	if !hasProgressEvent(events, "full-ai-functions", "prepared") {
+		t.Fatalf("expected prepared full-ai function event, got %#v", events)
+	}
 }
 
 func hasProgressEvent(events []AnalyzeProgressEvent, stage string, status string) bool {

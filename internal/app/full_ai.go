@@ -65,6 +65,31 @@ func (s Service) collectFullAIEvidence(request AnalyzeRequest, scanResult repo.S
 	return evidence, summary
 }
 
+func (s Service) prepareFullAIFunctions(request AnalyzeRequest, scanResult repo.ScanResult, analysis analyzer.Result, changeResult changes.Result, supportFiles []string, plan fullai.Plan, evidence fullai.Evidence, summary fullai.Summary) (fullai.Functions, fullai.Summary) {
+	options := request.FullAI.Normalize()
+	if !options.Mode.Enabled() {
+		return fullai.DisabledFunctions(analysis.GeneratedAt, options, "full-ai mode not requested"), summary
+	}
+
+	emitAnalyzeProgress(request, "full-ai-functions", "running", fmt.Sprintf("preparing function jobs from %d evidence item(s)", evidence.CollectedItems))
+	functions := s.fullAIFunctions.Prepare(fullai.Input{
+		RootPath:     scanResult.RootPath,
+		ScanResult:   scanResult,
+		Analysis:     analysis,
+		Changes:      changeResult,
+		SupportFiles: supportFiles,
+	}, plan, evidence)
+
+	summary.Status = "prepared"
+	summary.PreparedFunctions = len(functions.Jobs)
+	if strings.TrimSpace(functions.Note) != "" {
+		summary.Note = appendFullAINote(summary.Note, functions.Note)
+	}
+
+	emitAnalyzeProgress(request, "full-ai-functions", "prepared", fmt.Sprintf("prepared %d function job(s)", len(functions.Jobs)))
+	return functions, summary
+}
+
 func appendFullAINote(existing string, note string) string {
 	trimmedExisting := strings.TrimSpace(existing)
 	trimmedNote := strings.TrimSpace(note)

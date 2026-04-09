@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	PlanSchemaVersion     = "full-ai-plan.v1"
-	EvidenceSchemaVersion = "full-ai-evidence.v1"
-	SummarySchemaVersion  = "full-ai-summary.v1"
+	PlanSchemaVersion      = "full-ai-plan.v1"
+	EvidenceSchemaVersion  = "full-ai-evidence.v1"
+	FunctionsSchemaVersion = "full-ai-functions.v1"
+	SummarySchemaVersion   = "full-ai-summary.v1"
 
 	DefaultReadBudget  = 24
 	DefaultTokenBudget = 32000
@@ -55,17 +56,18 @@ type Plan struct {
 }
 
 type Summary struct {
-	SchemaVersion    string `json:"schema_version"`
-	Enabled          bool   `json:"enabled"`
-	Mode             string `json:"mode"`
-	Status           string `json:"status"`
-	ReadBudget       int    `json:"read_budget"`
-	TokenBudget      int    `json:"token_budget"`
-	PlannedTargets   int    `json:"planned_targets"`
-	PlannedFunctions int    `json:"planned_functions"`
-	CollectedItems   int    `json:"collected_items"`
-	FailedItems      int    `json:"failed_items"`
-	Note             string `json:"note,omitempty"`
+	SchemaVersion     string `json:"schema_version"`
+	Enabled           bool   `json:"enabled"`
+	Mode              string `json:"mode"`
+	Status            string `json:"status"`
+	ReadBudget        int    `json:"read_budget"`
+	TokenBudget       int    `json:"token_budget"`
+	PlannedTargets    int    `json:"planned_targets"`
+	PlannedFunctions  int    `json:"planned_functions"`
+	CollectedItems    int    `json:"collected_items"`
+	FailedItems       int    `json:"failed_items"`
+	PreparedFunctions int    `json:"prepared_functions"`
+	Note              string `json:"note,omitempty"`
 }
 
 type Evidence struct {
@@ -93,6 +95,25 @@ type EvidenceItem struct {
 	LineCount    int    `json:"line_count"`
 	Snippet      string `json:"snippet,omitempty"`
 	Truncated    bool   `json:"truncated"`
+}
+
+type Functions struct {
+	SchemaVersion string        `json:"schema_version"`
+	GeneratedAt   time.Time     `json:"generated_at"`
+	Mode          string        `json:"mode"`
+	Jobs          []FunctionJob `json:"jobs"`
+	Note          string        `json:"note,omitempty"`
+}
+
+type FunctionJob struct {
+	Name            string   `json:"name"`
+	Objective       string   `json:"objective"`
+	Status          string   `json:"status"`
+	InstructionPath string   `json:"instruction_path"`
+	EvidencePaths   []string `json:"evidence_paths"`
+	EvidenceCount   int      `json:"evidence_count"`
+	Focus           []string `json:"focus"`
+	Note            string   `json:"note,omitempty"`
 }
 
 type Target struct {
@@ -186,6 +207,28 @@ func DisabledEvidence(generatedAt time.Time, rootPath string, options Options, n
 	}
 }
 
+func DisabledFunctions(generatedAt time.Time, options Options, note string) Functions {
+	normalized := options.Normalize()
+	jobs := make([]FunctionJob, 0, len(defaultFunctionTasks()))
+	for _, task := range defaultFunctionTasks() {
+		jobs = append(jobs, FunctionJob{
+			Name:            task.Name,
+			Objective:       task.Objective,
+			Status:          "disabled",
+			InstructionPath: instructionPath(task.Name),
+			Note:            strings.TrimSpace(note),
+		})
+	}
+
+	return Functions{
+		SchemaVersion: FunctionsSchemaVersion,
+		GeneratedAt:   generatedAt,
+		Mode:          string(normalized.Mode),
+		Jobs:          jobs,
+		Note:          strings.TrimSpace(note),
+	}
+}
+
 func supportFileTarget(path string) Target {
 	baseName := filepath.Base(strings.TrimSpace(path))
 	reason := "support file supplied for issue and change-aware exploration"
@@ -219,4 +262,8 @@ func defaultFunctionTasks() []FunctionTask {
 		{Name: "recommendations", Objective: "produce an onboarding and investigation path", Priority: 75, Status: "planned"},
 		{Name: "dashboard", Objective: "assemble a dense reusable overview surface", Priority: 70, Status: "planned"},
 	}
+}
+
+func instructionPath(name string) string {
+	return filepath.ToSlash(filepath.Join(".agents", "ai", "functions", name+".md"))
 }

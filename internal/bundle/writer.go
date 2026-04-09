@@ -30,6 +30,7 @@ type WriteRequest struct {
 	AIResult          provider.Result
 	FullAIPlan        fullai.Plan
 	FullAIEvidence    fullai.Evidence
+	FullAIFunctions   fullai.Functions
 	FullAISummary     fullai.Summary
 }
 
@@ -139,23 +140,27 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-evidence.json"), request.FullAIEvidence); err != nil {
 		return WriteResult{}, err
 	}
+	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-functions.json"), request.FullAIFunctions); err != nil {
+		return WriteResult{}, err
+	}
 	if err := writeJSON(filepath.Join(bundlePath, "changes", "issue-correlation.json"), request.Changes); err != nil {
 		return WriteResult{}, err
 	}
 	contractMeta := map[string]any{
-		"bundle_schema_version":           request.Analysis.SchemaVersion,
-		"analysis_schema_version":         request.Analysis.SchemaVersion,
-		"metrics_schema_version":          request.Analysis.SchemaVersion,
-		"files_schema_version":            request.Analysis.SchemaVersion,
-		"modules_schema_version":          request.Analysis.SchemaVersion,
-		"changes_schema_version":          request.Changes.SchemaVersion,
-		"ai_context_schema_version":       request.AIContext.SchemaVersion,
-		"ai_result_schema_version":        request.AIResult.SchemaVersion,
-		"full_ai_plan_schema_version":     request.FullAIPlan.SchemaVersion,
-		"full_ai_evidence_schema_version": request.FullAIEvidence.SchemaVersion,
-		"full_ai_meta_schema_version":     request.FullAISummary.SchemaVersion,
-		"full_ai_mode":                    request.FullAISummary.Mode,
-		"tool_version":                    w.version,
+		"bundle_schema_version":            request.Analysis.SchemaVersion,
+		"analysis_schema_version":          request.Analysis.SchemaVersion,
+		"metrics_schema_version":           request.Analysis.SchemaVersion,
+		"files_schema_version":             request.Analysis.SchemaVersion,
+		"modules_schema_version":           request.Analysis.SchemaVersion,
+		"changes_schema_version":           request.Changes.SchemaVersion,
+		"ai_context_schema_version":        request.AIContext.SchemaVersion,
+		"ai_result_schema_version":         request.AIResult.SchemaVersion,
+		"full_ai_plan_schema_version":      request.FullAIPlan.SchemaVersion,
+		"full_ai_evidence_schema_version":  request.FullAIEvidence.SchemaVersion,
+		"full_ai_functions_schema_version": request.FullAIFunctions.SchemaVersion,
+		"full_ai_meta_schema_version":      request.FullAISummary.SchemaVersion,
+		"full_ai_mode":                     request.FullAISummary.Mode,
+		"tool_version":                     w.version,
 	}
 	if err := writeJSON(filepath.Join(bundlePath, "data", "contract.json"), contractMeta); err != nil {
 		return WriteResult{}, err
