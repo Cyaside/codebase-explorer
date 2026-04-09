@@ -30,6 +30,28 @@ func TestParseAnalyzeRejectsMissingSupportValue(t *testing.T) {
 	}
 }
 
+func TestParseAnalyzeAcceptsFullAIFlags(t *testing.T) {
+	t.Parallel()
+
+	command, err := parse([]string{
+		"analyze",
+		"./repo",
+		"--full-ai",
+		"--ai-read-budget", "32",
+		"--ai-token-budget", "48000",
+	})
+	if err != nil {
+		t.Fatalf("parse analyze command with full-ai flags: %v", err)
+	}
+
+	if command.analyzeRequest.FullAI.Mode != "full-ai" {
+		t.Fatalf("expected full-ai mode, got %#v", command.analyzeRequest.FullAI)
+	}
+	if command.analyzeRequest.FullAI.ReadBudget != 32 || command.analyzeRequest.FullAI.TokenBudget != 48000 {
+		t.Fatalf("expected parsed full-ai budgets, got %#v", command.analyzeRequest.FullAI)
+	}
+}
+
 func TestParseCacheClearCommand(t *testing.T) {
 	t.Parallel()
 

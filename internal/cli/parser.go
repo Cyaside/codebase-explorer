@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Cyaside/codebase-explorer/internal/app"
+	"github.com/Cyaside/codebase-explorer/internal/fullai"
 )
 
 type Service interface {
@@ -168,6 +169,30 @@ func parseAnalyze(args []string) (parsedCommand, error) {
 		switch {
 		case current == "--deterministic-only":
 			request.DeterministicOnly = true
+		case current == "--full-ai":
+			request.FullAI.Mode = fullai.ModeFull
+		case current == "--ai-read-budget":
+			index++
+			if index >= len(args) {
+				return parsedCommand{}, fmt.Errorf("--ai-read-budget requires a value")
+			}
+			var value int
+			if _, err := fmt.Sscanf(args[index], "%d", &value); err != nil || value <= 0 {
+				return parsedCommand{}, fmt.Errorf("--ai-read-budget requires a positive integer")
+			}
+			request.FullAI.Mode = fullai.ModeFull
+			request.FullAI.ReadBudget = value
+		case current == "--ai-token-budget":
+			index++
+			if index >= len(args) {
+				return parsedCommand{}, fmt.Errorf("--ai-token-budget requires a value")
+			}
+			var value int
+			if _, err := fmt.Sscanf(args[index], "%d", &value); err != nil || value <= 0 {
+				return parsedCommand{}, fmt.Errorf("--ai-token-budget requires a positive integer")
+			}
+			request.FullAI.Mode = fullai.ModeFull
+			request.FullAI.TokenBudget = value
 		case current == "--output":
 			index++
 			if index >= len(args) {

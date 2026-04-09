@@ -53,6 +53,12 @@ func TestAnalyzeWritesDeterministicBundle(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(result.OutputPath, "data", "contract.json")); err != nil {
 		t.Fatalf("expected contract.json to be written: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(result.OutputPath, "data", "full-ai-plan.json")); err != nil {
+		t.Fatalf("expected full-ai plan contract to be written: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(result.OutputPath, "data", "full-ai-meta.json")); err != nil {
+		t.Fatalf("expected full-ai summary contract to be written: %v", err)
+	}
 	if _, err := os.Stat(filepath.Join(result.OutputPath, "architecture", "module-graph.mmd")); err != nil {
 		t.Fatalf("expected architecture mermaid graph to be written: %v", err)
 	}

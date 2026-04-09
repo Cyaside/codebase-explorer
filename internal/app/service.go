@@ -11,6 +11,7 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/bundle"
 	"github.com/Cyaside/codebase-explorer/internal/cache"
 	"github.com/Cyaside/codebase-explorer/internal/config"
+	"github.com/Cyaside/codebase-explorer/internal/fullai"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 )
@@ -20,6 +21,7 @@ type Service struct {
 	scanner   repo.Scanner
 	analyzer  analyzer.Service
 	cache     cache.Store
+	fullAI    fullai.Planner
 	providers provider.Registry
 	writer    bundle.Writer
 }
@@ -43,6 +45,7 @@ func New(settings config.Settings) Service {
 		scanner:   repo.NewScanner(),
 		analyzer:  analyzer.NewService(settings.AppVersion),
 		cache:     cache.NewStore(cacheRoot, cacheEnabled),
+		fullAI:    fullai.NewPlanner(),
 		providers: provider.NewRegistry(),
 		writer:    bundle.NewWriter(settings.AppVersion, settings.OutputKeepLatest),
 	}
@@ -71,6 +74,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	analysis := state.Analysis
 	changeResult := state.Changes
 	warnings := buildWarnings(analysis, len(supportFiles))
+	fullAIPlan, fullAISummary := s.buildFullAIPlan(request, analysis, changeResult, supportFiles)
 	aiContext := buildCondensedContext(analysis)
 	emitAnalyzeProgress(request, "ai-context", "ready", summarizeAIContext(aiContext))
 	aiResult, providerCacheStatus, err := s.buildAIResult(ctx, request, analysis, request.DeterministicOnly, aiContext)
@@ -96,8 +100,10 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 			DeterministicStatus: state.Status,
 			ProviderStatus:      providerCacheStatus,
 		},
-		AIContext: aiContext,
-		AIResult:  aiResult,
+		AIContext:     aiContext,
+		AIResult:      aiResult,
+		FullAIPlan:    fullAIPlan,
+		FullAISummary: fullAISummary,
 	})
 	if err != nil {
 		return AnalyzeResult{}, fmt.Errorf("write bundle: %w", err)
@@ -133,7 +139,8 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 			MentionedAreas:   len(changeResult.FrequentlyMentionedAreas),
 			Note:             changeResult.Note,
 		},
-		AI: buildAISummary(aiContext, aiResult),
+		AI:     buildAISummary(aiContext, aiResult),
+		FullAI: fullAISummary,
 		Output: AnalyzeOutputSummary{
 			RetentionLimit: writeResult.RetentionLimit,
 			PrunedBundles:  writeResult.PrunedBundles,

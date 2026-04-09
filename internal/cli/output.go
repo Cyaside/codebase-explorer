@@ -10,7 +10,7 @@ import (
 
 func printUsage(output io.Writer) {
 	fmt.Fprintln(output, "Usage:")
-	fmt.Fprintln(output, "  codearch analyze <repo-path> [support-file ...] [--support <file>] [--issues <file>] [--changelog <file>] [--output <dir>] [--deterministic-only] [--ignore <pattern>]")
+	fmt.Fprintln(output, "  codearch analyze <repo-path> [support-file ...] [--support <file>] [--issues <file>] [--changelog <file>] [--output <dir>] [--deterministic-only] [--full-ai] [--ai-read-budget <n>] [--ai-token-budget <n>] [--ignore <pattern>]")
 	fmt.Fprintln(output, "  codearch start [--addr <host:port>] [--no-browser]")
 	fmt.Fprintln(output, "  codearch serve [--addr <host:port>] [--no-browser]")
 	fmt.Fprintln(output, "  codearch open [bundle-path] [--no-browser]")
@@ -46,6 +46,15 @@ func printAnalyzeResult(output io.Writer, result app.AnalyzeResult) {
 	}
 	if result.AI.Note != "" {
 		fmt.Fprintf(output, "AI note: %s\n", result.AI.Note)
+	}
+	if result.FullAI.Mode == "full-ai" || result.FullAI.Enabled {
+		fmt.Fprintf(output, "Full-AI mode: %s (%s)\n", result.FullAI.Mode, result.FullAI.Status)
+	}
+	if result.FullAI.Enabled {
+		fmt.Fprintf(output, "Full-AI plan: %d target(s), %d function task(s)\n", result.FullAI.PlannedTargets, result.FullAI.PlannedFunctions)
+	}
+	if result.FullAI.Mode == "full-ai" && result.FullAI.Note != "" {
+		fmt.Fprintf(output, "Full-AI note: %s\n", result.FullAI.Note)
 	}
 	if result.Changes.SupportFileCount > 0 {
 		fmt.Fprintf(output, "Support files: %d input(s), %d parsed item(s)\n", result.Changes.SupportFileCount, result.Changes.ParsedItemCount)

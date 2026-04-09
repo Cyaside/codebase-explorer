@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Cyaside/codebase-explorer/internal/config"
+	"github.com/Cyaside/codebase-explorer/internal/fullai"
 )
 
 func TestAnalyzeEmitsProgressForDeterministicOnly(t *testing.T) {
@@ -92,6 +93,35 @@ func TestAnalyzeEmitsProgressForSuccessfulSynthesis(t *testing.T) {
 	}
 	if !hasProgressEvent(events, "ai-synthesis", "succeeded") {
 		t.Fatalf("expected successful synthesis event, got %#v", events)
+	}
+}
+
+func TestAnalyzeEmitsProgressForFullAIPlanning(t *testing.T) {
+	t.Parallel()
+
+	service := New(config.Settings{
+		DefaultOutputRoot: t.TempDir(),
+		AppVersion:        "test",
+		ConfigSource:      "test",
+	})
+
+	var events []AnalyzeProgressEvent
+	_, err := service.Analyze(t.Context(), AnalyzeRequest{
+		RepoPath: filepath.Join("..", "..", "testdata", "sample-repo"),
+		FullAI:   fullai.Options{Mode: fullai.ModeFull},
+		Progress: func(event AnalyzeProgressEvent) {
+			events = append(events, event)
+		},
+	})
+	if err != nil {
+		t.Fatalf("analyze sample repo with full-ai scaffold: %v", err)
+	}
+
+	if !hasProgressEvent(events, "full-ai-plan", "running") {
+		t.Fatalf("expected running full-ai planning event, got %#v", events)
+	}
+	if !hasProgressEvent(events, "full-ai-plan", "planned") {
+		t.Fatalf("expected planned full-ai planning event, got %#v", events)
 	}
 }
 

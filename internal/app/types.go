@@ -1,11 +1,15 @@
 package app
 
-import "github.com/Cyaside/codebase-explorer/internal/provider"
+import (
+	"github.com/Cyaside/codebase-explorer/internal/fullai"
+	"github.com/Cyaside/codebase-explorer/internal/provider"
+)
 
 type AnalyzeRequest struct {
 	RepoPath             string
 	OutputRoot           string
 	DeterministicOnly    bool
+	FullAI               fullai.Options
 	ExtraIgnorePatterns  []string
 	OptionalSupportFiles []string
 	ProviderOverride     *provider.Config
@@ -24,6 +28,7 @@ type AnalyzeResult struct {
 	Cache           AnalyzeCacheSummary
 	Changes         AnalyzeChangesSummary
 	AI              AnalyzeAISummary
+	FullAI          fullai.Summary
 	Output          AnalyzeOutputSummary
 }
 

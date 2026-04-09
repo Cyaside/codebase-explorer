@@ -11,6 +11,7 @@ import (
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/changes"
+	"github.com/Cyaside/codebase-explorer/internal/fullai"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 	"github.com/Cyaside/codebase-explorer/internal/report"
@@ -27,6 +28,8 @@ type WriteRequest struct {
 	Cache             CacheMeta
 	AIContext         provider.CondensedContext
 	AIResult          provider.Result
+	FullAIPlan        fullai.Plan
+	FullAISummary     fullai.Summary
 }
 
 type WriteResult struct {
@@ -126,19 +129,28 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	if err := writeJSON(filepath.Join(bundlePath, "data", "ai-result.json"), request.AIResult); err != nil {
 		return WriteResult{}, err
 	}
+	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-plan.json"), request.FullAIPlan); err != nil {
+		return WriteResult{}, err
+	}
+	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-meta.json"), request.FullAISummary); err != nil {
+		return WriteResult{}, err
+	}
 	if err := writeJSON(filepath.Join(bundlePath, "changes", "issue-correlation.json"), request.Changes); err != nil {
 		return WriteResult{}, err
 	}
 	contractMeta := map[string]any{
-		"bundle_schema_version":     request.Analysis.SchemaVersion,
-		"analysis_schema_version":   request.Analysis.SchemaVersion,
-		"metrics_schema_version":    request.Analysis.SchemaVersion,
-		"files_schema_version":      request.Analysis.SchemaVersion,
-		"modules_schema_version":    request.Analysis.SchemaVersion,
-		"changes_schema_version":    request.Changes.SchemaVersion,
-		"ai_context_schema_version": request.AIContext.SchemaVersion,
-		"ai_result_schema_version":  request.AIResult.SchemaVersion,
-		"tool_version":              w.version,
+		"bundle_schema_version":       request.Analysis.SchemaVersion,
+		"analysis_schema_version":     request.Analysis.SchemaVersion,
+		"metrics_schema_version":      request.Analysis.SchemaVersion,
+		"files_schema_version":        request.Analysis.SchemaVersion,
+		"modules_schema_version":      request.Analysis.SchemaVersion,
+		"changes_schema_version":      request.Changes.SchemaVersion,
+		"ai_context_schema_version":   request.AIContext.SchemaVersion,
+		"ai_result_schema_version":    request.AIResult.SchemaVersion,
+		"full_ai_plan_schema_version": request.FullAIPlan.SchemaVersion,
+		"full_ai_meta_schema_version": request.FullAISummary.SchemaVersion,
+		"full_ai_mode":                request.FullAISummary.Mode,
+		"tool_version":                w.version,
 	}
 	if err := writeJSON(filepath.Join(bundlePath, "data", "contract.json"), contractMeta); err != nil {
 		return WriteResult{}, err
@@ -150,6 +162,7 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		"deterministic_status":   request.Cache.DeterministicStatus,
 		"provider_status":        request.Cache.ProviderStatus,
 		"deterministic_only":     request.DeterministicOnly,
+		"full_ai_mode":           request.FullAISummary.Mode,
 		"generated_at":           request.Analysis.GeneratedAt,
 		"output_retention_limit": w.keepLatest,
 	}
