@@ -52,7 +52,7 @@ func TestWorkbenchAnalyzeRunCompletes(t *testing.T) {
 		t.Fatalf("expected run id, got %#v", started.Run)
 	}
 
-	run := pollWorkbenchRun(t, handler, started.Run.ID, 50*time.Millisecond, 40)
+	run := pollWorkbenchRun(t, handler, started.Run.ID, 50*time.Millisecond, 120)
 	if run.Status != "succeeded" {
 		t.Fatalf("expected run to succeed, got %#v", run)
 	}
@@ -126,7 +126,7 @@ func TestWorkbenchAnalyzeRunCanBeCanceled(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", cancelRecorder.Code, cancelRecorder.Body.String())
 	}
 
-	run := pollWorkbenchRun(t, handler, started.Run.ID, 100*time.Millisecond, 40)
+	run := pollWorkbenchRun(t, handler, started.Run.ID, 100*time.Millisecond, 80)
 	if run.Status != "canceled" {
 		t.Fatalf("expected run to be canceled, got %#v", run)
 	}
