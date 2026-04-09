@@ -83,6 +83,7 @@ func (runtime *workbenchRuntime) executeAnalyze(runID string, payload workbenchA
 	result, err := runtime.service.Analyze(ctx, AnalyzeRequest{
 		RepoPath:             payload.RepoPath,
 		DeterministicOnly:    payload.DeterministicOnly,
+		FullAI:               payload.fullAIOptions(),
 		ExtraIgnorePatterns:  payload.ExtraIgnorePatterns,
 		OptionalSupportFiles: payload.SupportFiles,
 		ProviderOverride:     payload.Provider,

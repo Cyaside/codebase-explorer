@@ -218,6 +218,50 @@ func TestWorkbenchAnalyzeUsesProviderOverride(t *testing.T) {
 	}
 }
 
+func TestWorkbenchAnalyzeAcceptsFullAIMode(t *testing.T) {
+	t.Parallel()
+
+	service := New(config.Settings{
+		DefaultOutputRoot: t.TempDir(),
+		AppVersion:        "test",
+		ConfigSource:      "test",
+	})
+
+	handler, err := service.workbenchHandler(service.settings.DefaultOutputRoot)
+	if err != nil {
+		t.Fatalf("build workbench handler: %v", err)
+	}
+
+	requestBody := map[string]any{
+		"repo_path":       filepath.Join("..", "..", "testdata", "sample-repo"),
+		"ai_mode":         "full-ai",
+		"ai_read_budget":  5,
+		"ai_token_budget": 24000,
+	}
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/analyze", bytes.NewReader(body))
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+
+	var response struct {
+		Result AnalyzeResult `json:"result"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode analyze response: %v", err)
+	}
+	if !response.Result.FullAI.Enabled || response.Result.FullAI.Status != "planned" {
+		t.Fatalf("expected workbench analyze to carry planned full-ai summary, got %#v", response.Result.FullAI)
+	}
+}
+
 func TestWorkbenchBundleDeleteRemovesBundleDirectory(t *testing.T) {
 	t.Parallel()
 

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Cyaside/codebase-explorer/internal/fullai"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/ui"
 )
@@ -41,6 +42,9 @@ type workbenchProviderConfig struct {
 type workbenchAnalyzePayload struct {
 	RepoPath            string           `json:"repo_path"`
 	DeterministicOnly   bool             `json:"deterministic_only"`
+	AIMode              string           `json:"ai_mode"`
+	AIReadBudget        int              `json:"ai_read_budget"`
+	AITokenBudget       int              `json:"ai_token_budget"`
 	ExtraIgnorePatterns []string         `json:"extra_ignore_patterns"`
 	SupportFiles        []string         `json:"support_files"`
 	Provider            *provider.Config `json:"provider"`
@@ -181,6 +185,7 @@ func (s Service) handleWorkbenchAnalyze(w http.ResponseWriter, r *http.Request) 
 	result, err := s.Analyze(r.Context(), AnalyzeRequest{
 		RepoPath:             payload.RepoPath,
 		DeterministicOnly:    payload.DeterministicOnly,
+		FullAI:               payload.fullAIOptions(),
 		ExtraIgnorePatterns:  payload.ExtraIgnorePatterns,
 		OptionalSupportFiles: payload.SupportFiles,
 		ProviderOverride:     payload.Provider,
@@ -342,6 +347,18 @@ func decodeWorkbenchAnalyzePayload(r *http.Request) (workbenchAnalyzePayload, er
 	}
 
 	return payload, nil
+}
+
+func (payload workbenchAnalyzePayload) fullAIOptions() fullai.Options {
+	options := fullai.Options{
+		Mode:        fullai.NormalizeMode(payload.AIMode),
+		ReadBudget:  payload.AIReadBudget,
+		TokenBudget: payload.AITokenBudget,
+	}
+	if !options.Mode.Enabled() && (payload.AIReadBudget > 0 || payload.AITokenBudget > 0) {
+		options.Mode = fullai.ModeFull
+	}
+	return options.Normalize()
 }
 
 func (s Service) buildWorkbenchAnalyzeResponse(result AnalyzeResult) (workbenchAnalyzeResponse, error) {
