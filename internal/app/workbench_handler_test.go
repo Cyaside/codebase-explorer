@@ -217,3 +217,39 @@ func TestWorkbenchAnalyzeUsesProviderOverride(t *testing.T) {
 		t.Fatalf("expected bundle summary to be present, got %#v", response.Bundle)
 	}
 }
+
+func TestWorkbenchBundleDeleteRemovesBundleDirectory(t *testing.T) {
+	t.Parallel()
+
+	service := New(config.Settings{
+		DefaultOutputRoot: t.TempDir(),
+		AppVersion:        "test",
+		ConfigSource:      "test",
+	})
+
+	result, err := service.Analyze(t.Context(), AnalyzeRequest{
+		RepoPath:          filepath.Join("..", "..", "testdata", "sample-repo"),
+		DeterministicOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("seed bundle: %v", err)
+	}
+
+	bundleName := filepath.Base(result.OutputPath)
+	handler, err := service.workbenchHandler(service.settings.DefaultOutputRoot)
+	if err != nil {
+		t.Fatalf("build workbench handler: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodDelete, "/api/bundles/"+bundleName, nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected delete status 200, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+
+	if _, err := os.Stat(result.OutputPath); !os.IsNotExist(err) {
+		t.Fatalf("expected bundle to be deleted, got stat err %v", err)
+	}
+}

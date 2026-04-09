@@ -281,7 +281,7 @@ func (s Service) handleWorkbenchBundles(w http.ResponseWriter, r *http.Request, 
 }
 
 func (s Service) handleWorkbenchBundle(w http.ResponseWriter, r *http.Request, outputRoot string) {
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodGet && r.Method != http.MethodDelete {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -289,6 +289,17 @@ func (s Service) handleWorkbenchBundle(w http.ResponseWriter, r *http.Request, o
 	bundleName := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/bundles/"), "/")
 	if bundleName == "" || strings.Contains(bundleName, "/") || strings.Contains(bundleName, "\\") {
 		http.NotFound(w, r)
+		return
+	}
+
+	if r.Method == http.MethodDelete {
+		if err := deleteWorkbenchBundle(outputRoot, bundleName); err != nil {
+			writeWorkbenchError(w, http.StatusNotFound, err)
+			return
+		}
+		writeWorkbenchJSON(w, http.StatusOK, map[string]string{
+			"deleted": bundleName,
+		})
 		return
 	}
 

@@ -101,6 +101,42 @@ func loadWorkbenchBundle(outputRoot, bundleName string) (workbenchBundle, error)
 	}, nil
 }
 
+func deleteWorkbenchBundle(outputRoot, bundleName string) error {
+	bundleName = strings.TrimSpace(bundleName)
+	if bundleName == "" || bundleName == "." || bundleName == ".." || filepath.Base(bundleName) != bundleName {
+		return fmt.Errorf("bundle %q is not valid", bundleName)
+	}
+
+	outputAbsolute, err := filepath.Abs(outputRoot)
+	if err != nil {
+		return fmt.Errorf("resolve output root %q: %w", outputRoot, err)
+	}
+
+	bundlePath := filepath.Join(outputAbsolute, bundleName)
+	absolutePath, err := filepath.Abs(bundlePath)
+	if err != nil {
+		return fmt.Errorf("resolve bundle path %q: %w", bundleName, err)
+	}
+
+	relativePath, err := filepath.Rel(outputAbsolute, absolutePath)
+	if err != nil {
+		return fmt.Errorf("resolve bundle location %q: %w", bundleName, err)
+	}
+	if strings.HasPrefix(relativePath, "..") || strings.Contains(relativePath, string(filepath.Separator)) {
+		return fmt.Errorf("bundle %q is outside the workbench output root", bundleName)
+	}
+
+	if err := validateBundlePath(absolutePath); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(absolutePath); err != nil {
+		return fmt.Errorf("remove bundle %q: %w", absolutePath, err)
+	}
+
+	return nil
+}
+
 func listBundleLocations(outputRoot string) ([]workbenchBundleLocation, error) {
 	entries, err := os.ReadDir(outputRoot)
 	if err != nil {
