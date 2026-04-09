@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import "@xyflow/react/dist/style.css";
 import "@/styles.css";
 
 const rootElement = document.getElementById("root");
@@ -39,11 +40,11 @@ function renderBootError(error: unknown, fallbackMessage: string) {
   const stack = error instanceof Error && error.stack ? error.stack : "";
 
   root.render(
-    <div className="min-h-screen bg-background px-6 py-10 text-foreground">
-      <div className="mx-auto max-w-3xl rounded-3xl border border-danger/40 bg-card/95 p-6 shadow-sm">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-danger">Workbench Boot Error</p>
+    <div className="min-h-screen bg-black px-6 py-10 text-zinc-100">
+      <div className="mx-auto max-w-3xl rounded-3xl border border-red-950 bg-zinc-950 p-6 shadow-sm">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-red-300">Workbench Boot Error</p>
         <h1 className="mt-3 text-2xl font-bold">The UI crashed before it could render.</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">{message || fallbackMessage}</p>
+        <p className="mt-3 text-sm leading-6 text-zinc-400">{message || fallbackMessage}</p>
         {stack ? <pre className="code-block mt-5 whitespace-pre-wrap">{stack}</pre> : null}
       </div>
     </div>,

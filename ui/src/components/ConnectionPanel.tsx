@@ -1,239 +1,166 @@
-import type { ReactNode } from "react";
-import { CheckCircle2, CopyPlus, KeyRound, Save, ShieldCheck, Trash2, WandSparkles } from "lucide-react";
+import { CopyPlus, KeyRound, Save, Trash2 } from "lucide-react";
 
 import type { ConnectionProfile, SupportedProviderOption } from "@/lib/types";
 
 interface ConnectionPanelProps {
+  apiKey: string;
+  onAPIKeyChange: (value: string) => void;
+  onChange: (profile: ConnectionProfile) => void;
+  onDelete: () => void;
+  onDuplicate: () => void;
+  onSave: () => void;
   profile: ConnectionProfile;
   providerOptions: SupportedProviderOption[];
-  apiKey: string;
   validationErrors: string[];
-  onChange: (profile: ConnectionProfile) => void;
-  onAPIKeyChange: (value: string) => void;
-  onSave: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
 }
 
 export function ConnectionPanel({
+  apiKey,
+  onAPIKeyChange,
+  onChange,
+  onDelete,
+  onDuplicate,
+  onSave,
   profile,
   providerOptions,
-  apiKey,
   validationErrors,
-  onChange,
-  onAPIKeyChange,
-  onSave,
-  onDuplicate,
-  onDelete,
 }: ConnectionPanelProps) {
   const providerName = profile.provider?.name || "";
-  const modeLabel = profile.provider ? profile.provider.name : "Deterministic";
   const providerMeta = providerOptions.find((item) => item.name === providerName);
-  const apiKeyReady = Boolean(apiKey.trim());
-  const modelReady = profile.provider ? !providerMeta?.requires_model || Boolean(profile.provider.model.trim()) : true;
-  const baseURLReady = profile.provider ? !providerMeta?.requires_base_url || Boolean(profile.provider.baseUrl.trim()) : true;
 
   return (
-    <section className="rounded-3xl border border-border bg-card/90 p-5 shadow-sm">
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.28em] text-primary">Connection</p>
-          <h2 className="text-xl font-bold">{profile.label}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Connection metadata is saved locally, but API keys stay only in memory for the current browser session.
-          </p>
-        </div>
-        <span className={profile.provider ? "status-pill status-pill-active" : "status-pill status-pill-neutral"}>{modeLabel}</span>
+    <section className="rail-section">
+      <div>
+        <p className="panel-kicker">Connection</p>
+        <h3 className="mt-3 text-lg font-semibold text-zinc-100">{profile.label}</h3>
       </div>
 
-      <div className="grid gap-4">
-        <div className="grid gap-3 md:grid-cols-3">
-          <SurfaceFact
-            icon={<ShieldCheck className="size-4 text-primary" />}
-            label="Secret"
-            note="Only kept in memory"
-            value={apiKeyReady ? "Loaded" : "Missing"}
+      <div className="space-y-3">
+        <label className="compact-field">
+          <span className="compact-label">Label</span>
+          <input
+            className="compact-input"
+            onChange={(event) => onChange({ ...profile, label: event.target.value })}
+            type="text"
+            value={profile.label}
           />
-          <SurfaceFact
-            icon={<WandSparkles className="size-4 text-primary" />}
-            label="Model"
-            note={providerMeta?.requires_model ? "Required by provider" : "Optional for this mode"}
-            value={modelReady ? "Ready" : "Missing"}
-          />
-          <SurfaceFact
-            icon={<CheckCircle2 className="size-4 text-primary" />}
-            label="Base URL"
-            note={providerMeta?.requires_base_url ? "Required by provider" : "Uses provider default"}
-            value={baseURLReady ? "Ready" : "Missing"}
-          />
-        </div>
+        </label>
 
-        <div className="grid gap-4 xl:grid-cols-2">
-          <label className="field">
-            <span className="field-label">Label</span>
-            <span className="field-description">Use a short operational name. This is what appears in the sidebar and becomes the active connection for the next analyze run.</span>
-            <input
-              className="field-input"
-              onChange={(event) => onChange({ ...profile, label: event.target.value })}
-              type="text"
-              value={profile.label}
-            />
-          </label>
+        <label className="compact-field">
+          <span className="compact-label">Provider mode</span>
+          <select
+            className="compact-input"
+            onChange={(event) =>
+              onChange({
+                ...profile,
+                provider: event.target.value
+                  ? {
+                      name: event.target.value,
+                      model: profile.provider?.model || "",
+                      baseUrl: profile.provider?.baseUrl || "",
+                    }
+                  : null,
+              })
+            }
+            value={providerName}
+          >
+            <option value="">Deterministic</option>
+            {providerOptions.map((option) => (
+              <option key={option.name} value={option.name}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+        </label>
 
-          <label className="field">
-            <span className="field-label">Provider mode</span>
-            <span className="field-description">Keep deterministic mode for the fastest baseline runs. Switch to an AI-backed provider only when you want synthesis on top of the deterministic bundle.</span>
-            <select
-              className="field-input"
-              onChange={(event) =>
-                onChange({
-                  ...profile,
-                  provider: event.target.value
-                    ? {
-                        name: event.target.value,
-                        model: profile.provider?.model || "",
-                        baseUrl: profile.provider?.baseUrl || "",
-                      }
-                    : null,
-                })
-              }
-              value={providerName}
-            >
-              <option value="">Deterministic only</option>
-              {providerOptions.map((option) => (
-                <option key={option.name} value={option.name}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        {profile.provider ? (
+          <>
+            <label className="compact-field">
+              <span className="compact-label">Model</span>
+              <input
+                className="compact-input"
+                onChange={(event) =>
+                  onChange({
+                    ...profile,
+                    provider: {
+                      ...profile.provider!,
+                      model: event.target.value,
+                    },
+                  })
+                }
+                placeholder="mistral-small-latest"
+                type="text"
+                value={profile.provider.model}
+              />
+            </label>
 
-        <div className="grid gap-4 xl:grid-cols-2">
-          <label className="field">
-            <span className="field-label">Model</span>
-            <span className="field-description">Use a maintained production model. Leave blank only if the selected provider truly treats model selection as optional.</span>
-            <input
-              className="field-input"
-              onChange={(event) =>
-                onChange({
-                  ...profile,
-                  provider: profile.provider
-                    ? {
-                        ...profile.provider,
-                        model: event.target.value,
-                      }
-                    : null,
-                })
-              }
-              placeholder="mistral-small-latest"
-              type="text"
-              value={profile.provider?.model || ""}
-            />
-          </label>
+            <label className="compact-field">
+              <span className="compact-label">Base URL</span>
+              <input
+                className="compact-input"
+                onChange={(event) =>
+                  onChange({
+                    ...profile,
+                    provider: {
+                      ...profile.provider!,
+                      baseUrl: event.target.value,
+                    },
+                  })
+                }
+                placeholder="https://api.mistral.ai/v1"
+                type="text"
+                value={profile.provider.baseUrl}
+              />
+            </label>
+          </>
+        ) : null}
 
-          <label className="field">
-            <span className="field-label">Base URL</span>
-            <span className="field-description">For OpenAI-compatible endpoints, use the provider root ending in `/v1`. Deterministic mode ignores this field.</span>
-            <input
-              className="field-input"
-              onChange={(event) =>
-                onChange({
-                  ...profile,
-                  provider: profile.provider
-                    ? {
-                        ...profile.provider,
-                        baseUrl: event.target.value,
-                      }
-                    : null,
-                })
-              }
-              placeholder="https://api.openai.com/v1"
-              type="text"
-              value={profile.provider?.baseUrl || ""}
-            />
-          </label>
-        </div>
-
-        <label className="field">
-          <span className="field-label">API key</span>
-          <span className="field-description">Secrets stay in memory for this browser session and are never written into analysis bundles.</span>
+        <label className="compact-field">
+          <span className="compact-label">API key</span>
           <div className="relative">
-            <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-600" />
             <input
-              className="field-input pl-10"
+              className="compact-input pl-10"
               onChange={(event) => onAPIKeyChange(event.target.value)}
-              placeholder="Kept only in memory until this browser tab closes"
+              placeholder="Session memory only"
               type="password"
               value={apiKey}
             />
           </div>
         </label>
+      </div>
 
-        {profile.provider && (
-          <div className="rounded-2xl border border-border bg-background/70 px-4 py-3 text-sm text-muted-foreground">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Provider contract</p>
-            {providerMeta ? (
-              <ul className="space-y-1">
-                <li>Requires API key: {providerMeta.requires_api_key ? "yes" : "no"}</li>
-                <li>Requires model: {providerMeta.requires_model ? "yes" : "no"}</li>
-                <li>Requires base URL: {providerMeta.requires_base_url ? "yes" : "no"}</li>
-              </ul>
-            ) : (
-              <p>This provider is not currently advertised by the backend.</p>
-            )}
-          </div>
-        )}
-
-        {validationErrors.length ? (
-          <div className="rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger-foreground">
-            <p className="mb-2 font-semibold text-danger">Connection needs attention</p>
-            <ul className="space-y-1 text-danger/90">
-              {validationErrors.map((error) => (
-                <li key={error}>- {error}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        <div className="flex flex-wrap gap-3 border-t border-border pt-4">
-          <button className="action-button" onClick={onSave} type="button">
-            <Save className="size-4" />
-            Save Connection
-          </button>
-          <button className="secondary-button" onClick={onDuplicate} type="button">
-            <CopyPlus className="size-4" />
-            Duplicate
-          </button>
-          <button className="secondary-button danger" disabled={profile.locked} onClick={onDelete} type="button">
-            <Trash2 className="size-4" />
-            Delete
-          </button>
+      {providerMeta ? (
+        <div className="rounded-2xl border border-zinc-900 bg-black/50 px-3 py-3 text-xs leading-6 text-zinc-500">
+          <p className="font-semibold uppercase tracking-[0.18em] text-zinc-500">Contract</p>
+          <p>API key: {providerMeta.requires_api_key ? "required" : "optional"}</p>
+          <p>Model: {providerMeta.requires_model ? "required" : "optional"}</p>
+          <p>Base URL: {providerMeta.requires_base_url ? "required" : "optional"}</p>
         </div>
+      ) : null}
+
+      {validationErrors.length ? (
+        <div className="rounded-2xl border border-red-950 bg-red-950/35 px-3 py-3 text-sm leading-6 text-red-200">
+          {validationErrors.map((error) => (
+            <p key={error}>{error}</p>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        <button className="secondary-control" onClick={onSave} type="button">
+          <Save className="size-4" />
+          Save
+        </button>
+        <button className="secondary-control" onClick={onDuplicate} type="button">
+          <CopyPlus className="size-4" />
+          Duplicate
+        </button>
+        <button className="secondary-control danger" disabled={profile.locked} onClick={onDelete} type="button">
+          <Trash2 className="size-4" />
+          Delete
+        </button>
       </div>
     </section>
-  );
-}
-
-function SurfaceFact({
-  icon,
-  label,
-  note,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  note: string;
-  value: string;
-}) {
-  return (
-    <article className="surface-fact">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
-        {icon}
-      </div>
-      <strong className="mt-3 block text-base font-semibold text-foreground">{value}</strong>
-      <p className="mt-1 text-xs text-muted-foreground">{note}</p>
-    </article>
   );
 }

@@ -1,4 +1,5 @@
 export type TabKey =
+  | "dashboard"
   | "summary"
   | "architecture"
   | "flowchart"
@@ -16,6 +17,18 @@ export interface ConnectionProfile {
   label: string;
   provider: ProviderProfile | null;
   locked?: boolean;
+}
+
+export interface SavedWorkspace {
+  id: string;
+  label: string;
+  repoPath: string;
+  supportFiles: string[];
+  ignorePatterns: string[];
+  selectedProfile: string;
+  activeBundle: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SupportedProviderOption {
@@ -167,12 +180,18 @@ export interface BundleData {
 
 export interface PersistedUIState {
   activeTab: TabKey;
-  selectedBundle: string;
-  selectedProfile: string;
+  activeWorkspace: string;
 }
 
-export interface AnalyzeFormState {
-  repoPath: string;
-  supportFiles: string;
-  ignorePatterns: string;
+export interface InspectorProperty {
+  label: string;
+  value: string;
+}
+
+export interface InspectorState {
+  eyebrow: string;
+  title: string;
+  description: string;
+  properties: InspectorProperty[];
+  notes: string[];
 }

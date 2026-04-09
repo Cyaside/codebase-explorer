@@ -1,10 +1,11 @@
-import type { ConnectionProfile, PersistedUIState, ProviderProfile } from "@/lib/types";
+import type { ConnectionProfile, PersistedUIState, ProviderProfile, SavedWorkspace } from "@/lib/types";
 
-const PROFILE_STORAGE_KEY = "codearch.workbench.profiles.v2";
-const UI_STATE_STORAGE_KEY = "codearch.workbench.state.v1";
+const PROFILE_STORAGE_KEY = "codearch.workbench.profiles.v3";
+const UI_STATE_STORAGE_KEY = "codearch.workbench.state.v2";
+const WORKSPACE_STORAGE_KEY = "codearch.workbench.workspaces.v1";
 
 const presetProfiles: ConnectionProfile[] = [
-  { id: "deterministic", label: "Deterministic only", provider: null, locked: true },
+  { id: "deterministic", label: "Deterministic", provider: null, locked: true },
   { id: "openai", label: "OpenAI", provider: { name: "openai", model: "gpt-4.1-mini", baseUrl: "" } },
   {
     id: "openrouter",
@@ -56,12 +57,53 @@ function sanitizeProfile(value: unknown): ConnectionProfile | null {
   };
 }
 
+function sanitizeStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean)
+    : [];
+}
+
+function sanitizeWorkspace(value: unknown): SavedWorkspace | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const workspace = value as Record<string, unknown>;
+  const id = typeof workspace.id === "string" ? workspace.id.trim() : "";
+  const label = typeof workspace.label === "string" ? workspace.label.trim() : "";
+  const repoPath = typeof workspace.repoPath === "string" ? workspace.repoPath.trim() : "";
+  if (!id || !label) {
+    return null;
+  }
+
+  const now = new Date().toISOString();
+  return {
+    id,
+    label,
+    repoPath,
+    supportFiles: sanitizeStringArray(workspace.supportFiles),
+    ignorePatterns: sanitizeStringArray(workspace.ignorePatterns),
+    selectedProfile: typeof workspace.selectedProfile === "string" ? workspace.selectedProfile.trim() : "deterministic",
+    activeBundle: typeof workspace.activeBundle === "string" ? workspace.activeBundle.trim() : "",
+    createdAt: typeof workspace.createdAt === "string" ? workspace.createdAt : now,
+    updatedAt: typeof workspace.updatedAt === "string" ? workspace.updatedAt : now,
+  };
+}
+
 function cloneProfile(profile: ConnectionProfile): ConnectionProfile {
   return {
     id: profile.id,
     label: profile.label,
     locked: profile.locked,
     provider: profile.provider ? { ...profile.provider } : null,
+  };
+}
+
+function cloneWorkspace(workspace: SavedWorkspace): SavedWorkspace {
+  return {
+    ...workspace,
+    supportFiles: [...workspace.supportFiles],
+    ignorePatterns: [...workspace.ignorePatterns],
   };
 }
 
@@ -116,32 +158,76 @@ export function persistProfiles(profiles: ConnectionProfile[]) {
   window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(persisted));
 }
 
+export function loadWorkspaces() {
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+    if (!raw) {
+      return [] as SavedWorkspace[];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [] as SavedWorkspace[];
+    }
+
+    return parsed
+      .map(sanitizeWorkspace)
+      .filter((workspace): workspace is SavedWorkspace => workspace !== null)
+      .map(cloneWorkspace)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  } catch {
+    return [] as SavedWorkspace[];
+  }
+}
+
+export function persistWorkspaces(workspaces: SavedWorkspace[]) {
+  const persisted = workspaces.map((workspace) => ({
+    ...workspace,
+    supportFiles: [...workspace.supportFiles],
+    ignorePatterns: [...workspace.ignorePatterns],
+  }));
+
+  window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(persisted));
+}
+
 export function loadUIState(): PersistedUIState {
   try {
     const raw = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
     if (!raw) {
       return {
-        activeTab: "summary",
-        selectedBundle: "",
-        selectedProfile: "",
+        activeTab: "dashboard",
+        activeWorkspace: "",
       };
     }
 
     const parsed = JSON.parse(raw) as Partial<PersistedUIState>;
     return {
-      activeTab: parsed.activeTab ?? "summary",
-      selectedBundle: parsed.selectedBundle ?? "",
-      selectedProfile: parsed.selectedProfile ?? "",
+      activeTab: parsed.activeTab ?? "dashboard",
+      activeWorkspace: parsed.activeWorkspace ?? "",
     };
   } catch {
     return {
-      activeTab: "summary",
-      selectedBundle: "",
-      selectedProfile: "",
+      activeTab: "dashboard",
+      activeWorkspace: "",
     };
   }
 }
 
 export function persistUIState(value: PersistedUIState) {
   window.localStorage.setItem(UI_STATE_STORAGE_KEY, JSON.stringify(value));
+}
+
+export function createWorkspace(seed?: Partial<SavedWorkspace>): SavedWorkspace {
+  const timestamp = new Date().toISOString();
+  return {
+    id: `workspace-${Date.now()}`,
+    label: seed?.label?.trim() || "Untitled Project",
+    repoPath: seed?.repoPath?.trim() || "",
+    supportFiles: seed?.supportFiles ? [...seed.supportFiles] : [],
+    ignorePatterns: seed?.ignorePatterns ? [...seed.ignorePatterns] : [],
+    selectedProfile: seed?.selectedProfile || "deterministic",
+    activeBundle: seed?.activeBundle || "",
+    createdAt: seed?.createdAt || timestamp,
+    updatedAt: seed?.updatedAt || timestamp,
+  };
 }

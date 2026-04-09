@@ -1,46 +1,16 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: "Segoe UI Variable", "Aptos", "IBM Plex Sans", sans-serif;
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-danger: var(--danger);
-  --color-danger-foreground: var(--danger-foreground);
-  --color-sidebar: var(--sidebar-background);
+  --font-sans: "Inter", "Segoe UI Variable", "Aptos", sans-serif;
 }
 
 :root {
   color-scheme: dark;
-  --background: oklch(0.14 0.015 255);
-  --foreground: oklch(0.95 0.01 255);
-  --card: oklch(0.19 0.015 255 / 0.92);
-  --card-foreground: oklch(0.96 0.01 255);
-  --muted: oklch(0.24 0.015 255);
-  --muted-foreground: oklch(0.73 0.02 255);
-  --border: oklch(0.3 0.015 255 / 0.65);
-  --border-strong: oklch(0.4 0.018 255 / 0.8);
-  --primary: oklch(0.72 0.1 245);
-  --primary-foreground: oklch(0.97 0.01 255);
-  --accent: oklch(0.23 0.02 255);
-  --accent-foreground: oklch(0.97 0.01 255);
-  --danger: oklch(0.68 0.16 25);
-  --danger-foreground: oklch(0.96 0.02 25);
-  --sidebar-background: oklch(0.12 0.012 255);
 }
 
 @layer base {
   * {
-    @apply border-border;
+    box-sizing: border-box;
   }
 
   html {
@@ -48,11 +18,7 @@
   }
 
   body {
-    @apply bg-background font-sans text-foreground antialiased;
-    background-image:
-      radial-gradient(circle at top left, color-mix(in oklab, var(--primary) 18%, transparent), transparent 26%),
-      radial-gradient(circle at 82% 8%, color-mix(in oklab, var(--danger) 10%, transparent), transparent 22%),
-      linear-gradient(180deg, oklch(0.12 0.013 255) 0%, oklch(0.1 0.012 255) 100%);
+    @apply bg-black font-sans text-zinc-100 antialiased;
   }
 
   button,
@@ -64,71 +30,204 @@
 }
 
 @layer components {
-  .field {
+  .panel-kicker {
+    @apply text-[10px] font-semibold uppercase tracking-[0.28em] text-zinc-600;
+  }
+
+  .panel-block {
+    @apply rounded-[1.65rem] border border-zinc-900 bg-zinc-950 px-5 py-5;
+  }
+
+  .topbar-shell {
+    @apply flex flex-wrap items-start justify-between gap-4 rounded-[1.65rem] border border-zinc-900 bg-black px-5 py-5;
+  }
+
+  .sidebar-shell {
+    @apply flex min-h-screen flex-col gap-5 border-r border-zinc-900 bg-[#060606] px-4 py-4;
+  }
+
+  .sidebar-section {
+    @apply space-y-3;
+  }
+
+  .sidebar-primary {
+    @apply inline-flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-950 px-3.5 py-3 text-sm font-medium text-zinc-100 transition hover:border-zinc-700 hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-700;
+  }
+
+  .sidebar-item {
+    @apply inline-flex w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left text-sm text-zinc-400 transition hover:border-zinc-900 hover:bg-zinc-950 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-700;
+  }
+
+  .sidebar-item-active {
+    @apply border-zinc-800 bg-zinc-900 text-zinc-50;
+  }
+
+  .sidebar-project {
+    @apply block w-full rounded-2xl border border-transparent px-3 py-3 text-left transition hover:border-zinc-900 hover:bg-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-700;
+  }
+
+  .sidebar-project-active {
+    @apply border-zinc-800 bg-zinc-900;
+  }
+
+  .sidebar-empty {
+    @apply rounded-2xl border border-dashed border-zinc-900 px-3 py-4 text-sm text-zinc-500;
+  }
+
+  .primary-control {
+    @apply inline-flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-50 px-4 py-3 text-sm font-semibold text-black transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-wait disabled:opacity-55;
+  }
+
+  .secondary-control {
+    @apply inline-flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm font-medium text-zinc-100 transition hover:border-zinc-700 hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-700 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .secondary-control.danger {
+    @apply border-red-950 text-red-200 hover:bg-red-950/30;
+  }
+
+  .compact-field {
     @apply grid gap-2;
   }
 
-  .field-label {
-    @apply text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+  .compact-label {
+    @apply text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-600;
   }
 
-  .field-description {
-    @apply text-sm text-muted-foreground;
+  .compact-input {
+    @apply w-full rounded-2xl border border-zinc-900 bg-black px-3 py-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-zinc-700 focus:ring-2 focus:ring-zinc-800;
   }
 
-  .field-input {
-    @apply w-full rounded-2xl border border-border bg-background/70 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/50 focus:ring-2 focus:ring-primary/30;
+  .compact-area {
+    @apply min-h-28 resize-y rounded-2xl border border-zinc-900 bg-black px-3 py-3 text-sm leading-6 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-zinc-700 focus:ring-2 focus:ring-zinc-800;
   }
 
-  .field-textarea {
-    @apply min-h-28 resize-y rounded-2xl border border-border bg-background/70 px-3 py-3 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/50 focus:ring-2 focus:ring-primary/30;
+  .run-pill {
+    @apply inline-flex items-center rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-400;
   }
 
-  .action-button {
-    @apply inline-flex items-center gap-2 rounded-2xl border border-primary/40 bg-primary/15 px-4 py-3 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-primary/60 hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-wait disabled:opacity-60;
+  .run-pill-busy {
+    @apply border-blue-950 bg-blue-950/40 text-blue-200;
   }
 
-  .secondary-button {
-    @apply inline-flex items-center gap-2 rounded-2xl border border-border bg-background/60 px-4 py-3 text-sm font-medium text-foreground transition hover:-translate-y-0.5 hover:border-border-strong hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50;
+  .hint-chip {
+    @apply inline-flex items-center rounded-full border border-zinc-900 bg-black px-2.5 py-1 text-[11px] text-zinc-500;
   }
 
-  .secondary-button.danger {
-    @apply border-danger/30 text-danger hover:border-danger/45 hover:bg-danger/10;
+  .tab-strip {
+    @apply grid gap-2 rounded-[1.35rem] border border-zinc-900 bg-black p-2 md:grid-cols-6;
   }
 
-  .status-pill {
-    @apply inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em];
+  .tab-trigger {
+    @apply rounded-2xl px-3 py-2.5 text-sm font-medium text-zinc-500 transition hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-700 data-[state=active]:bg-zinc-900 data-[state=active]:text-zinc-50;
   }
 
-  .status-pill-neutral {
-    @apply border-border bg-background/70 text-muted-foreground;
+  .panel-row {
+    @apply flex w-full items-start justify-between gap-3 rounded-2xl border border-transparent bg-black/60 px-3 py-3 text-left transition hover:border-zinc-900 hover:bg-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-700;
   }
 
-  .status-pill-active {
-    @apply border-primary/35 bg-primary/15 text-primary-foreground;
+  .panel-row-static {
+    @apply flex items-start justify-between gap-3 rounded-2xl border border-zinc-900 bg-black px-3 py-3;
   }
 
-  .kbd-chip {
-    @apply inline-flex min-w-8 items-center justify-center rounded-lg border border-border bg-card px-2 py-1 font-mono text-[11px] font-semibold text-foreground shadow-sm;
+  .panel-link-row {
+    @apply flex items-center justify-between rounded-2xl border border-zinc-900 bg-black px-3 py-3 text-sm text-zinc-100 transition hover:border-zinc-800 hover:bg-zinc-950;
   }
 
-  .surface-fact {
-    @apply rounded-2xl border border-border bg-background/55 px-3 py-3;
+  .rail-section {
+    @apply rounded-[1.65rem] border border-zinc-900 bg-[#070707] px-4 py-4;
   }
 
-  .focus-shell {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  .error-strip {
+    @apply rounded-2xl border border-red-950 bg-red-950/35 px-4 py-3 text-sm text-red-200;
+  }
+
+  .warning-strip {
+    @apply space-y-1 rounded-2xl border border-amber-950 bg-amber-950/25 px-4 py-3 text-sm text-amber-100;
+  }
+
+  .toast-shell {
+    @apply fixed bottom-5 right-5 z-50 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 shadow-2xl;
   }
 
   .command-item {
-    @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-background/45 px-3 py-3 text-left transition hover:border-border-strong hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+    @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-transparent bg-black px-3 py-3 text-left transition hover:border-zinc-900 hover:bg-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-700;
   }
 
   .command-item-active {
-    @apply border-primary/35 bg-accent;
+    @apply border-zinc-800 bg-zinc-900;
   }
 
   .code-block {
-    @apply overflow-x-auto rounded-2xl border border-border bg-background/80 p-4 font-mono text-xs leading-6 text-muted-foreground;
+    @apply overflow-x-auto rounded-2xl border border-zinc-900 bg-black p-4 font-mono text-xs leading-6 text-zinc-400;
   }
+
+  .graph-shell {
+    @apply h-[42rem] overflow-hidden rounded-[1.65rem] border border-zinc-900 bg-[#050505];
+  }
+
+  .graph-node {
+    @apply min-h-[112px] w-[238px] rounded-[1.35rem] border border-zinc-800 bg-zinc-950 px-4 py-4 shadow-none;
+  }
+
+  .graph-node-selected {
+    @apply border-zinc-600;
+  }
+
+  .graph-node-dot {
+    @apply mt-0.5 inline-flex size-2.5 rounded-full;
+  }
+
+  .graph-node-dot-project {
+    @apply bg-white;
+  }
+
+  .graph-node-dot-module {
+    @apply bg-zinc-400;
+  }
+
+  .graph-node-dot-entry {
+    @apply bg-blue-400;
+  }
+
+  .graph-node-dot-issue {
+    @apply bg-amber-300;
+  }
+
+  .graph-node-dot-reading {
+    @apply bg-emerald-400;
+  }
+
+  .graph-node-handle {
+    opacity: 0;
+  }
+}
+
+.codearch-flow {
+  background: #050505;
+}
+
+.codearch-flow .react-flow__attribution {
+  display: none;
+}
+
+.codearch-flow .react-flow__edge-path {
+  stroke: #303030;
+}
+
+.codearch-flow .react-flow__controls {
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid #18181b;
+  box-shadow: none;
+}
+
+.codearch-flow .react-flow__controls-button {
+  border-bottom: 1px solid #18181b;
+  background: #09090b;
+  color: #d4d4d8;
+}
+
+.codearch-flow .react-flow__controls-button:hover {
+  background: #111113;
 }

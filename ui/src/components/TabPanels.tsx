@@ -1,333 +1,399 @@
 import type { ReactNode } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
-import { BookOpenText, Files, ShieldAlert, Sparkles } from "lucide-react";
+import { BookOpenText, FileCode2, Files, FolderClock, Sparkles } from "lucide-react";
 
-import type { TabKey, WorkbenchBundle } from "@/lib/types";
-import { bundleLink } from "@/lib/utils";
+import { FlowchartCanvas } from "@/components/FlowchartCanvas";
+import { StatsGrid } from "@/components/StatsGrid";
+import type { InspectorState, TabKey, WorkbenchBundle } from "@/lib/types";
+import { bundleLink, formatRelativeTime } from "@/lib/utils";
 
 interface TabPanelsProps {
   activeTab: TabKey;
   bundle: WorkbenchBundle | null;
+  onInspect: (value: InspectorState | null) => void;
   onTabChange: (value: TabKey) => void;
 }
 
-export function TabPanels({ activeTab, bundle, onTabChange }: TabPanelsProps) {
+export function TabPanels({ activeTab, bundle, onInspect, onTabChange }: TabPanelsProps) {
   return (
     <Tabs.Root className="space-y-4" onValueChange={(value) => onTabChange(value as TabKey)} value={activeTab}>
-      <Tabs.List className="grid gap-2 rounded-2xl border border-border bg-card/80 p-2 md:grid-cols-5">
+      <Tabs.List className="tab-strip">
+        <TabTrigger value="dashboard">Dashboard</TabTrigger>
         <TabTrigger value="summary">Summary</TabTrigger>
         <TabTrigger value="architecture">Architecture</TabTrigger>
         <TabTrigger value="flowchart">Flowchart</TabTrigger>
-        <TabTrigger value="issues">Issue Tracking</TabTrigger>
+        <TabTrigger value="issues">Issues</TabTrigger>
         <TabTrigger value="recommendations">Recommendations</TabTrigger>
       </Tabs.List>
 
+      <Tabs.Content value="dashboard">
+        <DashboardView bundle={bundle} onInspect={onInspect} />
+      </Tabs.Content>
+
       <Tabs.Content value="summary">
-        <PanelLayout
-          bundle={bundle}
-          cards={[
-            ["Summary", <p>{bundle?.data.project.summary || bundle?.data.ai.project_summary || "No summary available."}</p>],
-            ["Warnings", <TextList emptyText="No runtime warnings recorded." items={bundle?.data.warnings || []} />],
-            [
-              "Languages",
-              <TextList
-                emptyText="No language data."
-                items={(bundle?.data.languages || []).map((item) => `${item.name} · ${item.file_count} files · ${item.line_count} lines`)}
-              />,
-            ],
-            ["Entry points", <TextList emptyText="No entry points recorded." items={bundle?.data.entry_points || []} />],
-            ["Important directories", <TextList emptyText="No important directories recorded." items={bundle?.data.important_directories || []} />],
-          ]}
-          emptyMessage="Run an analysis or pick a bundle from the sidebar."
-          title="Project snapshot"
-        />
+        <SummaryView bundle={bundle} onInspect={onInspect} />
       </Tabs.Content>
 
       <Tabs.Content value="architecture">
-        <PanelLayout
-          bundle={bundle}
-          cards={[
-            ["Narrative", <p>{bundle?.data.ai.architecture_narrative || "AI architecture narrative is unavailable for this bundle."}</p>],
-            ["Core modules", <TextList emptyText="No core module list recorded." items={bundle?.data.core_modules || []} />],
-            [
-              "Module inventory",
-              <TextList
-                emptyText="No module inventory recorded."
-                items={(bundle?.data.modules || []).slice(0, 12).map((item) => `${item.path} · ${item.file_count} files · ${item.total_lines} lines`)}
-              />,
-            ],
-          ]}
-          emptyMessage="Architecture details will appear after a bundle is selected."
-          title="Architecture"
-        />
+        <ArchitectureView bundle={bundle} onInspect={onInspect} />
       </Tabs.Content>
 
       <Tabs.Content value="flowchart">
-        <PanelLayout
-          bundle={bundle}
-          cards={[
-            [
-              "Module graph",
-              <div className="space-y-3">
-                {bundle ? (
-                  <a
-                    className="focus-shell inline-flex text-sm text-primary transition hover:text-primary-foreground"
-                    href={bundleLink(bundle.summary.name, bundle.data.links.architecture_diagram)}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    Open raw Mermaid file
-                  </a>
-                ) : null}
-                <pre className="code-block">{bundle?.data.mermaid.architecture || "No architecture diagram source."}</pre>
-              </div>,
-            ],
-            [
-              "Dependency graph",
-              <div className="space-y-3">
-                {bundle ? (
-                  <a
-                    className="focus-shell inline-flex text-sm text-primary transition hover:text-primary-foreground"
-                    href={bundleLink(bundle.summary.name, bundle.data.links.dependency_diagram)}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    Open raw Mermaid file
-                  </a>
-                ) : null}
-                <pre className="code-block">{bundle?.data.mermaid.dependencies || "No dependency diagram source."}</pre>
-              </div>,
-            ],
-            [
-              "Top modules",
-              <TextList
-                emptyText="No module topology available."
-                items={(bundle?.data.modules || []).slice(0, 8).map((item) => `${item.path} · ${item.entry_point_count} entry point(s)`)}
-              />,
-            ],
-          ]}
-          emptyMessage="Flowchart views depend on a selected bundle."
-          title="Codebase flowchart"
-        />
+        <div className="space-y-4">
+          <SurfaceHeader
+            eyebrow="Flowchart"
+            title={bundle ? `${bundle.summary.project_name || bundle.summary.name} graph` : "Project graph"}
+            note={
+              bundle
+                ? "Interactive topology rendered directly in the workbench."
+                : "Run an analysis to unlock the project graph."
+            }
+          />
+          <FlowchartCanvas bundle={bundle} onInspect={onInspect} />
+        </div>
       </Tabs.Content>
 
       <Tabs.Content value="issues">
-        <PanelLayout
-          bundle={bundle}
-          cards={[
-            ["Change note", <p>{bundle?.data.changes.note || "No support files were linked to this bundle."}</p>],
-            [
-              "Support files",
-              <TextList
-                emptyText="No support files were recorded."
-                items={(bundle?.data.changes.sources || []).map((item) => `${item.path} · ${item.kind} · ${item.status}`)}
-              />,
-            ],
-            [
-              "Frequently mentioned areas",
-              <TextList
-                emptyText="No repository areas were matched strongly enough."
-                items={(bundle?.data.changes.frequently_mentioned_areas || []).map(
-                  (item) => `${item.path} · ${item.mention_count} mention(s) · ${item.confidence}`,
-                )}
-              />,
-            ],
-            [
-              "Repeated themes",
-              <TextList
-                emptyText="No repeated themes crossed the reporting threshold."
-                items={(bundle?.data.changes.repeated_themes || []).map((item) => `${item.name} · ${item.mention_count} mention(s)`)}
-              />,
-            ],
-          ]}
-          emptyMessage="Issue tracking becomes available when a bundle is selected."
-          title="Issue tracking"
-        />
+        <IssuesView bundle={bundle} onInspect={onInspect} />
       </Tabs.Content>
 
       <Tabs.Content value="recommendations">
-        <PanelLayout
-          bundle={bundle}
-          cards={[
-            [
-              "Reading path",
-              <TextList
-                emptyText="No reading path recommendation available."
-                items={
-                  (bundle?.data.ai.reading_path_explanations || []).length
-                    ? (bundle?.data.ai.reading_path_explanations || []).map((item) => `${item.path} · ${item.rationale}`)
-                    : (bundle?.data.reading_path || []).map((item) => `${item.path} · ${item.reason}`)
-                }
-              />,
-            ],
-            [
-              "Hotspot guidance",
-              <TextList
-                emptyText="AI hotspot notes are unavailable for this bundle."
-                items={(bundle?.data.ai.hotspot_explanations || []).map((item) => `${item.path} · ${item.explanation}`)}
-              />,
-            ],
-            [
-              "Next moves",
-              <TextList
-                emptyText="No follow-up recommendations available."
-                items={
-                  bundle
-                    ? [
-                        `Open raw README · ${bundleLink(bundle.summary.name, "README.md")}`,
-                        `Open viewer snapshot · ${bundleLink(bundle.summary.name, "ui/index.html")}`,
-                        `Review bundle warnings · ${bundle.data.warnings.length} warning(s)`,
-                      ]
-                    : []
-                }
-              />,
-            ],
-          ]}
-          emptyMessage="Recommendations will appear after selecting a bundle."
-          title="Recommendations"
-        />
+        <RecommendationsView bundle={bundle} onInspect={onInspect} />
       </Tabs.Content>
     </Tabs.Root>
   );
 }
 
-function TabTrigger({ children, value }: { children: ReactNode; value: TabKey }) {
-  return (
-    <Tabs.Trigger
-      className="focus-shell rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-      value={value}
-    >
-      {children}
-    </Tabs.Trigger>
-  );
-}
-
-function PanelLayout({
-  bundle,
-  cards,
-  emptyMessage,
-  title,
-}: {
-  bundle: WorkbenchBundle | null;
-  cards: Array<[string, ReactNode]>;
-  emptyMessage: string;
-  title: string;
-}) {
+function DashboardView({ bundle, onInspect }: { bundle: WorkbenchBundle | null; onInspect: (value: InspectorState | null) => void }) {
   if (!bundle) {
-    return <div className="rounded-3xl border border-dashed border-border bg-card/50 p-10 text-sm text-muted-foreground">{emptyMessage}</div>;
+    return <EmptyState body="Open a project and run analysis to populate the dashboard." title="No active project yet" />;
   }
 
   return (
     <div className="space-y-4">
-      <div className="rounded-3xl border border-border bg-card/90 p-5 shadow-sm">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.28em] text-primary">{title}</p>
-            <h3 className="mt-2 text-xl font-bold">{bundle.summary.project_name || bundle.summary.name}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {bundle.summary.project_type || "Repository"} · {bundle.summary.total_files} files · {bundle.summary.total_lines} lines
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <QuickLink href={bundleLink(bundle.summary.name, "README.md")} label="README" />
-            <QuickLink href={bundleLink(bundle.summary.name, "ui/index.html")} label="Viewer" />
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
-          <SignalChip
-            icon={<Sparkles className="size-4 text-primary" />}
-            label="AI"
-            note={bundle.data.ai.provider || "deterministic"}
-            value={bundle.data.ai.status || "disabled"}
-          />
-          <SignalChip
-            icon={<ShieldAlert className="size-4 text-primary" />}
-            label="Warnings"
-            note="Runtime checks"
-            value={String(bundle.data.warnings.length)}
-          />
-          <SignalChip
-            icon={<Files className="size-4 text-primary" />}
-            label="Support files"
-            note="Change awareness inputs"
-            value={String(bundle.data.changes.support_file_count)}
-          />
-          <SignalChip
-            icon={<BookOpenText className="size-4 text-primary" />}
-            label="Reading path"
-            note="Suggested checkpoints"
-            value={String(bundle.data.reading_path.length)}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        {cards.map(([titleText, body]) => (
-          <section className="rounded-3xl border border-border bg-card/90 p-5 shadow-sm" key={titleText}>
-            <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">{titleText}</p>
-            <div className="mt-4 text-sm leading-6 text-foreground">{body}</div>
-          </section>
-        ))}
+      <SurfaceHeader
+        eyebrow="Dashboard"
+        title={bundle.summary.project_name || bundle.summary.name}
+        note={`${bundle.summary.project_type || "Repository"} · ${bundle.summary.total_files} files · ${bundle.summary.total_lines} lines`}
+      />
+      <StatsGrid bundle={bundle} />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)]">
+        <ListPanel
+          icon={<FolderClock className="size-4" />}
+          title="Reading path"
+          rows={bundle.data.reading_path.map((item) => ({
+            id: item.path,
+            label: item.path,
+            meta: item.reason,
+            trailing: "Recommended",
+            onSelect: () =>
+              onInspect({
+                eyebrow: "Reading path",
+                title: item.path,
+                description: item.reason,
+                notes: [bundle.data.ai.reading_path_explanations.find((entry) => entry.path === item.path)?.rationale || "No AI rationale recorded."],
+                properties: [{ label: "Path", value: item.path }],
+              }),
+          }))}
+        />
+        <ListPanel
+          icon={<Sparkles className="size-4" />}
+          title="Hotspot guidance"
+          rows={bundle.data.ai.hotspot_explanations.map((item) => ({
+            id: item.path,
+            label: item.path,
+            meta: item.explanation,
+            trailing: formatRelativeTime(bundle.summary.generated_at),
+            onSelect: () =>
+              onInspect({
+                eyebrow: "Hotspot",
+                title: item.path,
+                description: item.explanation,
+                notes: [bundle.data.ai.note || "AI synthesis is available for this bundle."],
+                properties: [{ label: "Path", value: item.path }],
+              }),
+          }))}
+        />
       </div>
     </div>
   );
 }
 
-function TextList({ emptyText, items }: { emptyText: string; items: string[] }) {
-  if (!items.length) {
-    return <p className="text-sm text-muted-foreground">{emptyText}</p>;
+function SummaryView({ bundle, onInspect }: { bundle: WorkbenchBundle | null; onInspect: (value: InspectorState | null) => void }) {
+  if (!bundle) {
+    return <EmptyState body="Summary becomes available once the workspace has a bundle." title="No summary yet" />;
   }
 
   return (
-    <ul className="space-y-2">
-      {items.map((item, index) => (
-        <li className="rounded-2xl border border-border bg-background/60 px-3 py-3 text-sm text-muted-foreground" key={`${item}-${index}`}>
-          <div className="flex gap-3">
-            <span className="mt-0.5 text-xs font-semibold uppercase tracking-[0.18em] text-primary/75">
-              {String(index + 1).padStart(2, "0")}
-            </span>
-            <span>{item}</span>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+      <TextPanel body={bundle.data.project.summary || bundle.data.ai.project_summary || "No summary available."} eyebrow="Summary" title="Project snapshot" />
+      <div className="grid gap-4">
+        <ListPanel
+          icon={<Files className="size-4" />}
+          title="Languages"
+          rows={bundle.data.languages.map((item) => ({
+            id: item.name,
+            label: item.name,
+            meta: `${item.file_count} files · ${item.line_count} lines`,
+            trailing: "",
+            onSelect: () =>
+              onInspect({
+                eyebrow: "Language",
+                title: item.name,
+                description: "Language footprint in the active project bundle.",
+                notes: [`${item.file_count} files`, `${item.line_count} lines`],
+                properties: [
+                  { label: "Files", value: String(item.file_count) },
+                  { label: "Lines", value: String(item.line_count) },
+                ],
+              }),
+          }))}
+        />
+        <ListPanel
+          icon={<BookOpenText className="size-4" />}
+          title="Important directories"
+          rows={bundle.data.important_directories.map((item) => ({
+            id: item,
+            label: item,
+            meta: "High-signal directory",
+            trailing: "",
+            onSelect: () =>
+              onInspect({
+                eyebrow: "Directory",
+                title: item,
+                description: "Marked as an important directory by the deterministic analyzer.",
+                notes: [bundle.summary.analyzed_path || "Local checkout root unavailable."],
+                properties: [{ label: "Path", value: item }],
+              }),
+          }))}
+        />
+      </div>
+    </div>
   );
 }
 
-function SignalChip({
+function ArchitectureView({ bundle, onInspect }: { bundle: WorkbenchBundle | null; onInspect: (value: InspectorState | null) => void }) {
+  if (!bundle) {
+    return <EmptyState body="Architecture details appear after a successful analysis." title="No architecture view yet" />;
+  }
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.95fr)]">
+      <TextPanel
+        body={bundle.data.ai.architecture_narrative || "AI architecture narrative is unavailable for this bundle."}
+        eyebrow="Architecture"
+        title="System narrative"
+      />
+      <ListPanel
+        icon={<FileCode2 className="size-4" />}
+        title="Module inventory"
+        rows={bundle.data.modules.map((item) => ({
+          id: item.path,
+          label: item.path,
+          meta: `${item.file_count} files · ${item.total_lines} lines`,
+          trailing: `${item.entry_point_count} entry`,
+          onSelect: () =>
+            onInspect({
+              eyebrow: "Module",
+              title: item.path,
+              description: "Structured module record from the deterministic analyzer.",
+              notes: [bundle.data.ai.hotspot_explanations.find((entry) => entry.path.startsWith(item.path))?.explanation || "No hotspot note recorded."],
+              properties: [
+                { label: "Files", value: String(item.file_count) },
+                { label: "Lines", value: String(item.total_lines) },
+                { label: "Entry points", value: String(item.entry_point_count) },
+              ],
+            }),
+        }))}
+      />
+    </div>
+  );
+}
+
+function IssuesView({ bundle, onInspect }: { bundle: WorkbenchBundle | null; onInspect: (value: InspectorState | null) => void }) {
+  if (!bundle) {
+    return <EmptyState body="Link support files to a workspace to unlock issue tracking signals." title="No issue signals yet" />;
+  }
+
+  const mentionRows = bundle.data.changes.frequently_mentioned_areas.map((item) => ({
+    id: item.path,
+    label: item.path,
+    meta: `${item.mention_count} mention(s)`,
+    trailing: item.confidence,
+    onSelect: () =>
+      onInspect({
+        eyebrow: "Issue signal",
+        title: item.path,
+        description: "Frequently mentioned across linked support material.",
+        notes: [bundle.data.changes.note || "No bundle-level issue note recorded."],
+        properties: [
+          { label: "Mentions", value: String(item.mention_count) },
+          { label: "Confidence", value: item.confidence },
+        ],
+      }),
+  }));
+
+  const sourceRows = bundle.data.changes.sources.map((item) => ({
+    id: item.path,
+    label: item.path,
+    meta: item.kind,
+    trailing: item.status,
+    onSelect: () =>
+      onInspect({
+        eyebrow: "Support source",
+        title: item.path,
+        description: "Source file used to enrich change awareness.",
+        notes: [bundle.data.changes.note || "No bundle-level issue note recorded."],
+        properties: [
+          { label: "Kind", value: item.kind },
+          { label: "Status", value: item.status },
+        ],
+      }),
+  }));
+
+  const themeRows = bundle.data.changes.repeated_themes.map((item) => ({
+    id: item.name,
+    label: item.name,
+    meta: "Repeated theme",
+    trailing: `${item.mention_count}`,
+    onSelect: () =>
+      onInspect({
+        eyebrow: "Theme",
+        title: item.name,
+        description: "Repeated theme extracted from linked support files.",
+        notes: [`Mention count: ${item.mention_count}`],
+        properties: [{ label: "Mentions", value: String(item.mention_count) }],
+      }),
+  }));
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)]">
+      <ListPanel icon={<Sparkles className="size-4" />} title="Mentioned areas" rows={mentionRows} />
+      <ListPanel icon={<Files className="size-4" />} title="Support sources" rows={sourceRows} />
+      <ListPanel icon={<BookOpenText className="size-4" />} title="Repeated themes" rows={themeRows} />
+    </div>
+  );
+}
+
+function RecommendationsView({ bundle, onInspect }: { bundle: WorkbenchBundle | null; onInspect: (value: InspectorState | null) => void }) {
+  if (!bundle) {
+    return <EmptyState body="Recommendations appear when the workspace has a current bundle." title="No recommendations yet" />;
+  }
+
+  const nextMoves = [
+    { label: "Open bundle README", href: bundleLink(bundle.summary.name, "README.md") },
+    { label: "Open static viewer", href: bundleLink(bundle.summary.name, "ui/index.html") },
+    { label: "Open architecture artifact", href: bundleLink(bundle.summary.name, bundle.data.links.architecture_diagram) },
+  ];
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+      <ListPanel
+        icon={<BookOpenText className="size-4" />}
+        title="Reading path"
+        rows={bundle.data.reading_path.map((item) => ({
+          id: item.path,
+          label: item.path,
+          meta: item.reason,
+          trailing: "Read",
+          onSelect: () =>
+            onInspect({
+              eyebrow: "Recommendation",
+              title: item.path,
+              description: item.reason,
+              notes: [bundle.data.ai.reading_path_explanations.find((entry) => entry.path === item.path)?.rationale || "No AI rationale recorded."],
+              properties: [{ label: "Path", value: item.path }],
+            }),
+        }))}
+      />
+      <section className="panel-block space-y-4">
+        <div>
+          <p className="panel-kicker">Next moves</p>
+          <h3 className="mt-3 text-lg font-semibold text-zinc-100">Useful follow-up actions</h3>
+        </div>
+        <div className="space-y-2">
+          {nextMoves.map((item) => (
+            <a className="panel-link-row" href={item.href} key={item.label} rel="noreferrer" target="_blank">
+              <span>{item.label}</span>
+              <span className="text-zinc-500">open</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function TabTrigger({ children, value }: { children: ReactNode; value: TabKey }) {
+  return (
+    <Tabs.Trigger className="tab-trigger" value={value}>
+      {children}
+    </Tabs.Trigger>
+  );
+}
+
+function SurfaceHeader({ eyebrow, title, note }: { eyebrow: string; title: string; note: string }) {
+  return (
+    <section className="panel-block">
+      <p className="panel-kicker">{eyebrow}</p>
+      <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50">{title}</h2>
+      <p className="mt-3 text-sm leading-6 text-zinc-400">{note}</p>
+    </section>
+  );
+}
+
+function TextPanel({ body, eyebrow, title }: { body: string; eyebrow: string; title: string }) {
+  return (
+    <section className="panel-block">
+      <p className="panel-kicker">{eyebrow}</p>
+      <h3 className="mt-3 text-lg font-semibold text-zinc-100">{title}</h3>
+      <p className="mt-4 text-sm leading-7 text-zinc-300">{body}</p>
+    </section>
+  );
+}
+
+function ListPanel({
   icon,
-  label,
-  note,
-  value,
+  rows,
+  title,
 }: {
   icon: ReactNode;
-  label: string;
-  note: string;
-  value: string;
+  rows: Array<{ id: string; label: string; meta: string; trailing: string; onSelect: () => void }>;
+  title: string;
 }) {
   return (
-    <article className="rounded-2xl border border-border bg-background/55 px-3 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
-        {icon}
+    <section className="panel-block">
+      <div className="flex items-center gap-3">
+        <span className="text-zinc-500">{icon}</span>
+        <p className="panel-kicker">{title}</p>
       </div>
-      <strong className="mt-3 block text-base font-semibold text-foreground">{value}</strong>
-      <p className="mt-1 text-xs text-muted-foreground">{note}</p>
-    </article>
+      <div className="mt-4 space-y-1.5">
+        {rows.length ? (
+          rows.map((row) => (
+            <button className="panel-row" key={row.id} onClick={row.onSelect} type="button">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-zinc-100">{row.label}</p>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">{row.meta}</p>
+              </div>
+              <span className="shrink-0 text-xs text-zinc-500">{row.trailing}</span>
+            </button>
+          ))
+        ) : (
+          <p className="text-sm text-zinc-500">Nothing to show yet.</p>
+        )}
+      </div>
+    </section>
   );
 }
 
-function QuickLink({ href, label }: { href: string; label: string }) {
+function EmptyState({ body, title }: { body: string; title: string }) {
   return (
-    <a
-      className="focus-shell inline-flex items-center rounded-full border border-border bg-background/60 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground transition hover:border-border-strong hover:bg-background hover:text-foreground"
-      href={href}
-      rel="noreferrer"
-      target="_blank"
-    >
-      {label}
-    </a>
+    <section className="panel-block flex min-h-[18rem] items-center justify-center">
+      <div className="max-w-md text-center">
+        <p className="panel-kicker">Empty state</p>
+        <h3 className="mt-3 text-lg font-semibold text-zinc-100">{title}</h3>
+        <p className="mt-3 text-sm leading-6 text-zinc-500">{body}</p>
+      </div>
+    </section>
   );
 }

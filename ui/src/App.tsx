@@ -1,53 +1,60 @@
-import { useEffect, useRef, useState } from "react";
-import { CircleAlert, Command, FolderOpenDot } from "lucide-react";
+import { startTransition, useEffect, useRef, useState } from "react";
+import { Command, FolderOpenDot, RefreshCw } from "lucide-react";
 
 import { AnalyzeForm } from "@/components/AnalyzeForm";
 import { CommandPalette, type CommandPaletteAction } from "@/components/CommandPalette";
-import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { Sidebar } from "@/components/Sidebar";
-import { StatsGrid } from "@/components/StatsGrid";
 import { TabPanels } from "@/components/TabPanels";
-import { WorkbenchAlerts } from "@/components/WorkbenchAlerts";
 import { WorkbenchRail } from "@/components/WorkbenchRail";
 import { buildProviderPayload, cancelAnalyzeRun, fetchAnalyzeRun, fetchBundle, fetchStatus, mergeBundleSummary, startAnalyzeRun } from "@/lib/api";
 import { useWorkbenchShortcuts } from "@/hooks/useWorkbenchShortcuts";
-import { defaultProfiles, loadProfiles, loadUIState, persistProfiles, persistUIState } from "@/lib/storage";
+import { createWorkspace, defaultProfiles, loadProfiles, loadUIState, loadWorkspaces, persistProfiles, persistUIState, persistWorkspaces } from "@/lib/storage";
 import { openAnalyzeRunStream } from "@/lib/stream";
-import type { AnalyzeFormState, AnalyzeRun, ConnectionProfile, TabKey, WorkbenchBundle, WorkbenchStatusResponse } from "@/lib/types";
-import { bundleLink, splitLines } from "@/lib/utils";
+import type {
+  AnalyzeRun,
+  ConnectionProfile,
+  InspectorState,
+  SavedWorkspace,
+  TabKey,
+  WorkbenchBundle,
+  WorkbenchStatusResponse,
+} from "@/lib/types";
+import { bundleLink, normalizeLocalPath } from "@/lib/utils";
 import { validateProfile } from "@/lib/validation";
 
 const initialUIState = loadUIState();
 const initialProfiles = loadProfiles();
-const workbenchTabs: TabKey[] = ["summary", "architecture", "flowchart", "issues", "recommendations"];
+const initialWorkspaces = loadWorkspaces();
+const workbenchTabs: TabKey[] = ["dashboard", "summary", "architecture", "flowchart", "issues", "recommendations"];
 
 export function App() {
   const [status, setStatus] = useState<WorkbenchStatusResponse | null>(null);
   const [bundles, setBundles] = useState<WorkbenchStatusResponse["recent_bundles"]>([]);
   const [bundleCache, setBundleCache] = useState<Record<string, WorkbenchBundle>>({});
-  const [selectedBundle, setSelectedBundle] = useState(initialUIState.selectedBundle);
   const [profiles, setProfiles] = useState(initialProfiles);
-  const [selectedProfile, setSelectedProfile] = useState(initialUIState.selectedProfile || initialProfiles[0]?.id || "deterministic");
-  const [activeTab, setActiveTab] = useState<TabKey>(initialUIState.activeTab || "summary");
-  const [form, setForm] = useState<AnalyzeFormState>({
-    repoPath: "",
-    supportFiles: "",
-    ignorePatterns: "",
-  });
+  const [workspaces, setWorkspaces] = useState(initialWorkspaces);
+  const [activeWorkspaceID, setActiveWorkspaceID] = useState(initialUIState.activeWorkspace || initialWorkspaces[0]?.id || "");
+  const [activeTab, setActiveTab] = useState<TabKey>(initialUIState.activeTab || "dashboard");
   const [profileSecrets, setProfileSecrets] = useState<Record<string, string>>({});
   const [activeRun, setActiveRun] = useState<AnalyzeRun | null>(null);
   const [busyDetail, setBusyDetail] = useState("");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [toastMessage, setToastMessage] = useState("");
+  const [inspector, setInspector] = useState<InspectorState | null>(null);
 
-  const profile = profiles.find((item) => item.id === selectedProfile) || profiles[0] || defaultProfiles()[0];
-  const currentBundle = selectedBundle ? bundleCache[selectedBundle] || null : null;
+  const repoInputRef = useRef<HTMLInputElement | null>(null);
+
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceID) || null;
+  const activeProfileID = activeWorkspace?.selectedProfile || initialProfiles[0]?.id || "deterministic";
+  const profile = profiles.find((item) => item.id === activeProfileID) || profiles[0] || defaultProfiles()[0];
   const providerOptions = status?.supported_providers || [];
   const apiKey = profileSecrets[profile.id] || "";
   const validationErrors = validateProfile(profile, apiKey, providerOptions);
+  const workspaceBundles = activeWorkspace ? bundles.filter((bundle) => matchesWorkspace(bundle.analyzed_path, activeWorkspace.repoPath)) : [];
+  const selectedBundleName = activeWorkspace?.activeBundle || workspaceBundles[0]?.name || "";
+  const currentBundle = selectedBundleName ? bundleCache[selectedBundleName] || null : null;
   const busy = !!activeRun && ["queued", "running", "canceling"].includes(activeRun.status);
-  const repoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     void refreshStatus();
@@ -58,24 +65,41 @@ export function App() {
   }, [profiles]);
 
   useEffect(() => {
+    persistWorkspaces(workspaces);
+  }, [workspaces]);
+
+  useEffect(() => {
     persistUIState({
       activeTab,
-      selectedBundle,
-      selectedProfile,
+      activeWorkspace: activeWorkspaceID,
     });
-  }, [activeTab, selectedBundle, selectedProfile]);
+  }, [activeTab, activeWorkspaceID]);
+
+  useEffect(() => {
+    if (!activeWorkspace && workspaces.length) {
+      setActiveWorkspaceID(workspaces[0].id);
+    }
+  }, [activeWorkspace, workspaces]);
 
   useEffect(() => {
     if (!toastMessage) {
       return;
     }
 
-    const timeoutID = window.setTimeout(() => {
-      setToastMessage("");
-    }, 3200);
-
+    const timeoutID = window.setTimeout(() => setToastMessage(""), 3200);
     return () => window.clearTimeout(timeoutID);
   }, [toastMessage]);
+
+  useEffect(() => {
+    if (!activeWorkspace) {
+      return;
+    }
+
+    const nextBundleName = activeWorkspace.activeBundle || workspaceBundles[0]?.name;
+    if (nextBundleName && !bundleCache[nextBundleName]) {
+      void loadBundle(nextBundleName);
+    }
+  }, [activeWorkspace?.activeBundle, activeWorkspace?.id, workspaceBundles.length]);
 
   useEffect(() => {
     if (!activeRun || !["queued", "running", "canceling"].includes(activeRun.status)) {
@@ -103,8 +127,8 @@ export function App() {
         return;
       }
 
-      intervalID = window.setInterval(async () => {
-        await pollOnce();
+      intervalID = window.setInterval(() => {
+        void pollOnce();
       }, 700);
       void pollOnce();
     };
@@ -130,6 +154,10 @@ export function App() {
       }
     };
   }, [activeRun?.id, activeRun?.status]);
+
+  useEffect(() => {
+    setInspector(buildDefaultInspector(activeWorkspace, currentBundle, activeTab));
+  }, [activeWorkspace?.id, currentBundle?.summary.name, activeTab]);
 
   useWorkbenchShortcuts({
     activeTab,
@@ -165,15 +193,14 @@ export function App() {
   });
 
   const commandActions = buildCommandActions({
-    activeProfileLabel: profile.label,
-    bundles,
-    busy,
+    bundles: workspaceBundles.length ? workspaceBundles : bundles.slice(0, 8),
     onAnalyze: () => {
       void handleAnalyze();
     },
     onCancelAnalyze: () => {
       void handleCancelAnalyze();
     },
+    onCreateWorkspace: handleCreateWorkspace,
     onFocusAnalyze: () => {
       repoInputRef.current?.focus();
       repoInputRef.current?.select();
@@ -184,30 +211,35 @@ export function App() {
     onSelectBundle: (bundleName) => {
       void loadBundle(bundleName);
     },
-    onSelectProfile: setSelectedProfile,
     onSelectTab: setActiveTab,
-    profiles,
+    onSelectWorkspace: setActiveWorkspaceID,
+    tabs: workbenchTabs,
+    workspaces,
+    busy,
   });
 
   async function refreshStatus(preferredBundleName?: string) {
     try {
       setErrorMessage("");
       const nextStatus = await fetchStatus();
-      setStatus(nextStatus);
-      setBundles(nextStatus.recent_bundles || []);
 
-      const requestedBundle = preferredBundleName || selectedBundle;
-      const nextSelected =
-        requestedBundle && nextStatus.recent_bundles.some((bundle) => bundle.name === requestedBundle)
-          ? requestedBundle
-          : nextStatus.recent_bundles[0]?.name || "";
+      startTransition(() => {
+        setStatus(nextStatus);
+        setBundles(nextStatus.recent_bundles || []);
+      });
 
-      if (!nextSelected) {
-        setSelectedBundle("");
-        return;
+      const scopedBundles = activeWorkspace
+        ? nextStatus.recent_bundles.filter((bundle) => matchesWorkspace(bundle.analyzed_path, activeWorkspace.repoPath))
+        : nextStatus.recent_bundles;
+      const nextBundleName =
+        preferredBundleName ||
+        (activeWorkspace?.activeBundle && scopedBundles.some((bundle) => bundle.name === activeWorkspace.activeBundle)
+          ? activeWorkspace.activeBundle
+          : scopedBundles[0]?.name || "");
+
+      if (nextBundleName) {
+        await loadBundle(nextBundleName);
       }
-
-      await loadBundle(nextSelected);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load workbench status.");
     }
@@ -223,30 +255,56 @@ export function App() {
           [bundleName]: bundle,
         }));
       }
-      setSelectedBundle(bundleName);
+
+      if (activeWorkspace) {
+        updateWorkspace(activeWorkspace.id, {
+          activeBundle: bundleName,
+          updatedAt: new Date().toISOString(),
+        });
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load bundle.");
     }
   }
 
   async function selectRelativeBundle(direction: -1 | 1) {
-    if (!bundles.length) {
+    if (!workspaceBundles.length) {
       return;
     }
 
-    const currentIndex = bundles.findIndex((bundle) => bundle.name === selectedBundle);
+    const currentIndex = workspaceBundles.findIndex((bundle) => bundle.name === selectedBundleName);
     const startIndex = currentIndex >= 0 ? currentIndex : 0;
-    const nextIndex = (startIndex + direction + bundles.length) % bundles.length;
-    await loadBundle(bundles[nextIndex].name);
+    const nextIndex = (startIndex + direction + workspaceBundles.length) % workspaceBundles.length;
+    await loadBundle(workspaceBundles[nextIndex].name);
+  }
+
+  function handleCreateWorkspace() {
+    const nextWorkspace = createWorkspace({
+      selectedProfile: profiles[0]?.id || "deterministic",
+    });
+
+    setWorkspaces((current) => [nextWorkspace, ...current]);
+    setActiveWorkspaceID(nextWorkspace.id);
+    setActiveTab("dashboard");
+    setToastMessage(`Created workspace "${nextWorkspace.label}".`);
+    window.setTimeout(() => {
+      repoInputRef.current?.focus();
+      repoInputRef.current?.select();
+    }, 10);
+  }
+
+  function updateWorkspace(workspaceID: string, patch: Partial<SavedWorkspace>) {
+    setWorkspaces((current) =>
+      current.map((workspace) => (workspace.id === workspaceID ? { ...workspace, ...patch } : workspace)).sort(sortWorkspacesByUpdatedAt),
+    );
   }
 
   function applyRunSnapshot(run: AnalyzeRun) {
     setActiveRun(run);
-    const latestEvent = run.progress[run.progress.length - 1];
-    setBusyDetail(latestEvent?.detail || run.status);
+    setBusyDetail(run.progress[run.progress.length - 1]?.detail || run.status);
 
-    const response = run.response;
-    if (run.status === "succeeded" && response) {
+    if (run.status === "succeeded" && run.response) {
+      const response = run.response;
       setErrorMessage("");
       setBundleCache((current) => ({
         ...current,
@@ -256,7 +314,15 @@ export function App() {
         },
       }));
       setBundles((current) => mergeBundleSummary(current, response.bundle));
-      setSelectedBundle(response.bundle.name);
+
+      if (activeWorkspace) {
+        updateWorkspace(activeWorkspace.id, {
+          activeBundle: response.bundle.name,
+          label: activeWorkspace.label === "Untitled Project" ? response.bundle.project_name || activeWorkspace.label : activeWorkspace.label,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
       setToastMessage(`Analysis ready for ${response.bundle.project_name || response.result.project_name || "repository"}.`);
       void refreshStatus(response.bundle.name);
       return;
@@ -268,20 +334,8 @@ export function App() {
     }
 
     if (run.status === "canceled") {
-      setErrorMessage("");
       setToastMessage("Analyze run canceled.");
     }
-  }
-
-  function updateCurrentProfile(nextProfile: ConnectionProfile) {
-    setProfiles((current) =>
-      current.map((item) => {
-        if (item.id !== nextProfile.id) {
-          return item;
-        }
-        return nextProfile;
-      }),
-    );
   }
 
   function handleSaveProfile() {
@@ -291,7 +345,7 @@ export function App() {
     }
 
     setErrorMessage("");
-    setToastMessage(`Saved connection "${profile.label}". API key stays only in memory for this browser session.`);
+    setToastMessage(`Saved connection "${profile.label}". API keys remain only in session memory.`);
   }
 
   function handleDuplicateProfile() {
@@ -303,7 +357,12 @@ export function App() {
     };
 
     setProfiles((current) => [...current, clone]);
-    setSelectedProfile(cloneID);
+    if (activeWorkspace) {
+      updateWorkspace(activeWorkspace.id, {
+        selectedProfile: cloneID,
+        updatedAt: new Date().toISOString(),
+      });
+    }
     setProfileSecrets((current) => ({
       ...current,
       [cloneID]: current[profile.id] || "",
@@ -317,19 +376,28 @@ export function App() {
       return;
     }
 
-    const remaining = profiles.filter((item) => item.id !== profile.id);
-    setProfiles(remaining);
-    setSelectedProfile(remaining[0]?.id || "deterministic");
+    const fallbackProfileID = profiles.find((item) => item.id !== profile.id)?.id || "deterministic";
+    setProfiles((current) => current.filter((item) => item.id !== profile.id));
     setProfileSecrets((current) => {
       const next = { ...current };
       delete next[profile.id];
       return next;
     });
+    setWorkspaces((current) =>
+      current.map((workspace) =>
+        workspace.selectedProfile === profile.id ? { ...workspace, selectedProfile: fallbackProfileID, updatedAt: new Date().toISOString() } : workspace,
+      ),
+    );
     setToastMessage(`Deleted "${profile.label}".`);
   }
 
   async function handleAnalyze() {
-    const repoPath = form.repoPath.trim();
+    if (!activeWorkspace) {
+      setErrorMessage("Create or select a workspace first.");
+      return;
+    }
+
+    const repoPath = activeWorkspace.repoPath.trim();
     if (!repoPath) {
       setErrorMessage("Repository path is required.");
       return;
@@ -346,8 +414,8 @@ export function App() {
       const response = await startAnalyzeRun({
         repo_path: repoPath,
         deterministic_only: !profile.provider,
-        support_files: splitLines(form.supportFiles),
-        extra_ignore_patterns: splitLines(form.ignorePatterns),
+        support_files: activeWorkspace.supportFiles,
+        extra_ignore_patterns: activeWorkspace.ignorePatterns,
         provider: buildProviderPayload(profile, apiKey),
       });
       applyRunSnapshot(response.run);
@@ -372,184 +440,213 @@ export function App() {
   const readmeHref = currentBundle ? bundleLink(currentBundle.summary.name, "README.md") : "";
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-black text-zinc-100">
       <CommandPalette actions={commandActions} onClose={() => setCommandPaletteOpen(false)} open={commandPaletteOpen} />
-      <div className="grid min-h-screen lg:grid-cols-[17.5rem_minmax(0,1fr)]">
+
+      <div className="grid min-h-screen xl:grid-cols-[15.5rem_minmax(0,1fr)]">
         <Sidebar
+          activeTab={activeTab}
+          activeWorkspaceID={activeWorkspaceID}
           bundles={bundles}
-          onRefresh={() => {
-            void refreshStatus();
-          }}
+          onCreateWorkspace={handleCreateWorkspace}
           onSelectBundle={(bundleName) => {
             void loadBundle(bundleName);
           }}
-          onSelectProfile={setSelectedProfile}
+          onSelectProfile={(profileID) => {
+            if (activeWorkspace) {
+              updateWorkspace(activeWorkspace.id, { selectedProfile: profileID, updatedAt: new Date().toISOString() });
+            }
+          }}
+          onSelectTab={setActiveTab}
+          onSelectWorkspace={setActiveWorkspaceID}
           profiles={profiles}
-          selectedBundle={selectedBundle}
-          selectedProfile={selectedProfile}
-          status={status}
+          selectedBundle={selectedBundleName}
+          selectedProfile={profile.id}
+          workspaceBundles={workspaceBundles}
+          workspaces={workspaces}
         />
 
-        <main className="space-y-5 px-4 py-5 lg:px-6">
-          <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_21rem]">
-            <div className="space-y-5">
-              <header className="rounded-3xl border border-border bg-card/90 p-5 shadow-sm">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-[0.28em] text-primary">Local-First Repository Orientation</p>
-                    <h1 className="mt-2 text-2xl font-bold">
-                      {currentBundle ? currentBundle.summary.project_name || "Workbench" : "Codebase Explorer Workbench"}
-                    </h1>
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      {currentBundle
-                        ? `${currentBundle.summary.project_type || "Repository"} · ${currentBundle.summary.total_files} files · ${currentBundle.summary.total_lines} lines`
-                        : "Open a local repository, run analysis, and navigate reusable orientation bundles without leaving your machine."}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-3">
-                    <button className="secondary-button" onClick={() => setCommandPaletteOpen(true)} type="button">
-                      <Command className="size-4" />
-                      Command Palette
-                    </button>
-                    <button className="secondary-button" onClick={() => void refreshStatus()} type="button">
-                      <FolderOpenDot className="size-4" />
-                      Reload Dashboard
-                    </button>
-                    <a
-                      aria-disabled={!currentBundle}
-                      className={!currentBundle ? "secondary-button pointer-events-none opacity-50" : "secondary-button"}
-                      href={readmeHref || undefined}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      Open Bundle README
-                    </a>
-                  </div>
+        <main className="px-4 py-4 xl:px-5">
+          <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_20.5rem]">
+            <div className="space-y-4">
+              <header className="topbar-shell">
+                <div>
+                  <p className="panel-kicker">{tabTitle(activeTab)}</p>
+                  <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50">
+                    {activeWorkspace?.label || "Codebase Explorer"}
+                  </h1>
+                  <p className="mt-2 text-sm text-zinc-500">
+                    {activeWorkspace?.repoPath || "Create a project workspace and point it at one local repository."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button className="secondary-control" onClick={() => setCommandPaletteOpen(true)} type="button">
+                    <Command className="size-4" />
+                    Command
+                  </button>
+                  <button className="secondary-control" onClick={() => void refreshStatus()} type="button">
+                    <RefreshCw className="size-4" />
+                    Refresh
+                  </button>
+                  <a
+                    aria-disabled={!currentBundle}
+                    className={!currentBundle ? "secondary-control pointer-events-none opacity-50" : "secondary-control"}
+                    href={readmeHref || undefined}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <FolderOpenDot className="size-4" />
+                    Open README
+                  </a>
                 </div>
               </header>
 
-              <WorkbenchAlerts activeRun={activeRun} bundle={currentBundle} errorMessage={errorMessage} status={status} />
+              {errorMessage ? <div className="error-strip">{errorMessage}</div> : null}
+              {status?.bundle_warnings?.length ? (
+                <div className="warning-strip">
+                  {status.bundle_warnings.map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                </div>
+              ) : null}
 
-              <section className="grid gap-4 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-                <AnalyzeForm
-                  activeProfileLabel={profile.label}
-                  busy={busy}
-                  busyDetail={busyDetail}
-                  form={form}
-                  onCancel={handleCancelAnalyze}
-                  onChange={setForm}
-                  onSubmit={handleAnalyze}
-                  repoInputRef={repoInputRef}
-                  run={activeRun}
-                />
-                <ConnectionPanel
-                  apiKey={apiKey}
-                  onAPIKeyChange={(value) =>
-                    setProfileSecrets((current) => ({
-                      ...current,
-                      [profile.id]: value,
-                    }))
-                  }
-                  onChange={updateCurrentProfile}
-                  onDelete={handleDeleteProfile}
-                  onDuplicate={handleDuplicateProfile}
-                  onSave={handleSaveProfile}
-                  profile={profile}
-                  providerOptions={providerOptions}
-                  validationErrors={validationErrors}
-                />
-              </section>
+              <AnalyzeForm
+                busy={busy}
+                busyDetail={busyDetail}
+                onCancel={handleCancelAnalyze}
+                onCreateWorkspace={handleCreateWorkspace}
+                onSubmit={handleAnalyze}
+                onWorkspaceChange={(workspace) => {
+                  updateWorkspace(workspace.id, workspace);
+                }}
+                profiles={profiles}
+                repoInputRef={repoInputRef}
+                run={activeRun}
+                workspace={activeWorkspace}
+              />
 
-              <StatsGrid bundle={currentBundle} bundles={bundles} connections={profiles.length} status={status} />
-
-              <TabPanels activeTab={activeTab} bundle={currentBundle} onTabChange={setActiveTab} />
+              <TabPanels activeTab={activeTab} bundle={currentBundle} onInspect={setInspector} onTabChange={setActiveTab} />
             </div>
 
-            <WorkbenchRail activeRun={activeRun} bundle={currentBundle} />
+            <WorkbenchRail
+              activeRun={activeRun}
+              apiKey={apiKey}
+              bundle={currentBundle}
+              inspector={inspector}
+              onAPIKeyChange={(value) =>
+                setProfileSecrets((current) => ({
+                  ...current,
+                  [profile.id]: value,
+                }))
+              }
+              onChangeProfile={(nextProfile) => {
+                setProfiles((current) => current.map((item) => (item.id === nextProfile.id ? nextProfile : item)));
+              }}
+              onDeleteProfile={handleDeleteProfile}
+              onDuplicateProfile={handleDuplicateProfile}
+              onSaveProfile={handleSaveProfile}
+              profile={profile}
+              providerOptions={providerOptions}
+              validationErrors={validationErrors}
+              workspace={activeWorkspace}
+            />
           </div>
         </main>
       </div>
 
-      {toastMessage ? (
-        <div className="pointer-events-none fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-lg">
-          <CircleAlert className="size-4 text-primary" />
-          <span>{toastMessage}</span>
-        </div>
-      ) : null}
+      {toastMessage ? <div className="toast-shell">{toastMessage}</div> : null}
     </div>
   );
 }
 
 function buildCommandActions({
-  activeProfileLabel,
   bundles,
-  busy,
   onAnalyze,
   onCancelAnalyze,
+  onCreateWorkspace,
   onFocusAnalyze,
   onRefresh,
   onSelectBundle,
-  onSelectProfile,
   onSelectTab,
-  profiles,
+  onSelectWorkspace,
+  tabs,
+  workspaces,
+  busy,
 }: {
-  activeProfileLabel: string;
   bundles: WorkbenchStatusResponse["recent_bundles"];
-  busy: boolean;
   onAnalyze: () => void;
   onCancelAnalyze: () => void;
+  onCreateWorkspace: () => void;
   onFocusAnalyze: () => void;
   onRefresh: () => void;
   onSelectBundle: (bundleName: string) => void;
-  onSelectProfile: (profileID: string) => void;
   onSelectTab: (tab: TabKey) => void;
-  profiles: ConnectionProfile[];
+  onSelectWorkspace: (workspaceID: string) => void;
+  tabs: TabKey[];
+  workspaces: SavedWorkspace[];
+  busy: boolean;
 }): CommandPaletteAction[] {
   const actions: CommandPaletteAction[] = [
     {
-      id: "focus-analyze",
-      group: "Analyze",
+      id: "new-project",
+      group: "Workspace",
+      label: "Create project workspace",
+      description: "Create a new saved project shell and focus its repository path input.",
+      keywords: ["new", "workspace", "project"],
+      run: onCreateWorkspace,
+    },
+    {
+      id: "focus-project-path",
+      group: "Workspace",
       label: "Focus repository path",
-      description: "Jump directly to the local repository input.",
-      keywords: ["repo", "path", "focus", "analyze"],
+      description: "Jump directly to the active workspace path input.",
+      keywords: ["repo", "path", "focus"],
       shortcut: "A",
       run: onFocusAnalyze,
     },
     {
       id: busy ? "cancel-run" : "run-analyze",
       group: "Analyze",
-      label: busy ? "Cancel active analyze run" : "Run analyze",
-      description: busy
-        ? "Stop the current background analysis when it reaches a safe cancellation point."
-        : `Start a new analyze run using ${activeProfileLabel}.`,
-      keywords: ["analyze", "run", "cancel", activeProfileLabel],
+      label: busy ? "Cancel active analyze run" : "Analyze active project",
+      description: busy ? "Stop the current run when it reaches a safe cancel point." : "Run analysis for the active workspace.",
+      keywords: ["analyze", "cancel", "run"],
       shortcut: busy ? "Esc" : "Ctrl+Enter",
       run: busy ? onCancelAnalyze : onAnalyze,
     },
     {
-      id: "refresh-dashboard",
+      id: "refresh-workbench",
       group: "Workspace",
-      label: "Reload dashboard",
-      description: "Refresh recent bundles, provider metadata, and system status from the local backend.",
+      label: "Refresh workbench data",
+      description: "Refresh status, provider metadata, and available bundles from the local backend.",
       keywords: ["refresh", "reload", "status"],
       shortcut: "R",
       run: onRefresh,
     },
   ];
 
-  for (const tab of workbenchTabs) {
+  for (const tab of tabs) {
     actions.push({
       id: `tab-${tab}`,
       group: "Views",
-      label: `Open ${tabLabel(tab)}`,
-      description: `Switch the active workbench panel to ${tabLabel(tab)}.`,
+      label: `Open ${tabTitle(tab)}`,
+      description: `Switch the active surface to ${tabTitle(tab)}.`,
       keywords: [tab, "view", "tab"],
       run: () => onSelectTab(tab),
     });
   }
 
-  for (const bundle of bundles.slice(0, 8)) {
+  for (const workspace of workspaces) {
+    actions.push({
+      id: `workspace-${workspace.id}`,
+      group: "Projects",
+      label: `Open ${workspace.label}`,
+      description: workspace.repoPath || "Saved workspace without a repository path yet.",
+      keywords: [workspace.label, workspace.repoPath].filter(Boolean),
+      run: () => onSelectWorkspace(workspace.id),
+    });
+  }
+
+  for (const bundle of bundles) {
     actions.push({
       id: `bundle-${bundle.name}`,
       group: "Bundles",
@@ -560,29 +657,68 @@ function buildCommandActions({
     });
   }
 
-  for (const profile of profiles) {
-    actions.push({
-      id: `profile-${profile.id}`,
-      group: "Connections",
-      label: `Use ${profile.label}`,
-      description: profile.provider
-        ? `${profile.provider.name}${profile.provider.model ? ` · ${profile.provider.model}` : ""}`
-        : "Deterministic only",
-      keywords: [profile.label, profile.provider?.name, profile.provider?.model].filter(Boolean) as string[],
-      run: () => onSelectProfile(profile.id),
-    });
-  }
-
   return actions;
 }
 
-function tabLabel(tab: TabKey) {
+function buildDefaultInspector(workspace: SavedWorkspace | null, bundle: WorkbenchBundle | null, activeTab: TabKey): InspectorState | null {
+  if (bundle) {
+    return {
+      eyebrow: tabTitle(activeTab),
+      title: bundle.summary.project_name || bundle.summary.name,
+      description: bundle.data.project.summary || bundle.data.ai.project_summary || "No project summary available.",
+      notes: [bundle.data.ai.note || "Deterministic-first bundle with optional AI synthesis."],
+      properties: [
+        { label: "Workspace", value: workspace?.label || "Unknown" },
+        { label: "Bundle", value: bundle.summary.name },
+        { label: "Files", value: String(bundle.summary.total_files) },
+        { label: "Lines", value: String(bundle.summary.total_lines) },
+      ],
+    };
+  }
+
+  if (!workspace) {
+    return null;
+  }
+
+  return {
+    eyebrow: "Workspace",
+    title: workspace.label,
+    description: workspace.repoPath || "Set a local repository path to begin.",
+    notes: ["One active project per app instance. Saved locally on this machine."],
+    properties: [
+      { label: "Support files", value: String(workspace.supportFiles.length) },
+      { label: "Ignore patterns", value: String(workspace.ignorePatterns.length) },
+      { label: "Connection", value: workspace.selectedProfile || "deterministic" },
+    ],
+  };
+}
+
+function matchesWorkspace(bundlePath: string, workspacePath: string) {
+  if (!workspacePath.trim()) {
+    return false;
+  }
+  return normalizeLocalPath(bundlePath) === normalizeLocalPath(workspacePath);
+}
+
+function sortWorkspacesByUpdatedAt(left: SavedWorkspace, right: SavedWorkspace) {
+  return right.updatedAt.localeCompare(left.updatedAt);
+}
+
+function tabTitle(tab: TabKey) {
   switch (tab) {
+    case "dashboard":
+      return "Dashboard";
+    case "summary":
+      return "Summary";
+    case "architecture":
+      return "Architecture";
     case "flowchart":
       return "Flowchart";
     case "issues":
-      return "Issue Tracking";
+      return "Issues";
+    case "recommendations":
+      return "Recommendations";
     default:
-      return tab.charAt(0).toUpperCase() + tab.slice(1);
+      return "Workspace";
   }
 }

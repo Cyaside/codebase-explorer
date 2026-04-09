@@ -1,34 +1,76 @@
-import type { BundleSummary, WorkbenchStatusResponse, WorkbenchBundle } from "@/lib/types";
+import { Bot, FolderGit2, GitBranch, ShieldAlert } from "lucide-react";
+
+import type { WorkbenchBundle } from "@/lib/types";
 
 interface StatsGridProps {
   bundle: WorkbenchBundle | null;
-  bundles: BundleSummary[];
-  connections: number;
-  status: WorkbenchStatusResponse | null;
 }
 
-export function StatsGrid({ bundle, bundles, connections, status }: StatsGridProps) {
+export function StatsGrid({ bundle }: StatsGridProps) {
   const cards = bundle
     ? [
-        { label: "Project", value: bundle.summary.project_name || "Repository", note: bundle.summary.project_type || "Unknown shape" },
-        { label: "Files", value: String(bundle.summary.total_files), note: bundle.summary.analyzed_path || "Local checkout" },
-        { label: "AI", value: bundle.summary.ai_status || "disabled", note: bundle.data.ai.provider || "No provider" },
-        { label: "Changes", value: String(bundle.data.changes.frequently_mentioned_areas.length), note: `${bundle.summary.support_file_count} support file(s)` },
+        {
+          icon: <FolderGit2 className="size-4" />,
+          label: "Core modules",
+          note: `${bundle.data.modules.length} mapped modules`,
+          value: String(bundle.data.core_modules.length || bundle.data.modules.length),
+        },
+        {
+          icon: <GitBranch className="size-4" />,
+          label: "Reading path",
+          note: "Recommended checkpoints",
+          value: String(bundle.data.reading_path.length),
+        },
+        {
+          icon: <Bot className="size-4" />,
+          label: "AI status",
+          note: bundle.data.ai.provider || "deterministic",
+          value: bundle.data.ai.status || "disabled",
+        },
+        {
+          icon: <ShieldAlert className="size-4" />,
+          label: "Issue signals",
+          note: `${bundle.data.changes.support_file_count} support file(s) linked`,
+          value: String(bundle.data.changes.frequently_mentioned_areas.length),
+        },
       ]
     : [
-        { label: "Projects", value: String(bundles.length), note: "Recent bundles available" },
-        { label: "Connections", value: String(connections), note: "Saved locally without API keys" },
-        { label: "Output root", value: status?.output_root || "out", note: "Local-first storage" },
-        { label: "Mode", value: "Deterministic-first", note: "AI stays optional" },
+        {
+          icon: <FolderGit2 className="size-4" />,
+          label: "Workspace",
+          note: "Open a project to begin",
+          value: "--",
+        },
+        {
+          icon: <GitBranch className="size-4" />,
+          label: "Flowchart",
+          note: "Graph appears after analysis",
+          value: "--",
+        },
+        {
+          icon: <Bot className="size-4" />,
+          label: "AI status",
+          note: "Optional synthesis layer",
+          value: "--",
+        },
+        {
+          icon: <ShieldAlert className="size-4" />,
+          label: "Issues",
+          note: "Support files shape change awareness",
+          value: "--",
+        },
       ];
 
   return (
-    <section className="grid gap-4 xl:grid-cols-4">
+    <section className="grid gap-3 xl:grid-cols-4">
       {cards.map((card) => (
-        <article className="rounded-3xl border border-border bg-card/90 p-4 shadow-sm" key={card.label}>
-          <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">{card.label}</p>
-          <strong className="mt-3 block text-2xl font-bold">{card.value}</strong>
-          <p className="mt-2 text-sm text-muted-foreground">{card.note}</p>
+        <article className="panel-block h-full min-h-[10.5rem]" key={card.label}>
+          <div className="flex items-center justify-between gap-3">
+            <span className="panel-kicker">{card.label}</span>
+            <span className="text-zinc-500">{card.icon}</span>
+          </div>
+          <strong className="mt-8 block text-4xl font-semibold tracking-tight text-zinc-50">{card.value}</strong>
+          <p className="mt-3 text-sm text-zinc-300">{card.note}</p>
         </article>
       ))}
     </section>

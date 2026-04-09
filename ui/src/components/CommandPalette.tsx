@@ -63,15 +63,15 @@ export function CommandPalette({ actions, open, onClose }: CommandPaletteProps) 
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-background/72 backdrop-blur-sm" onClick={onClose} role="presentation">
+    <div className="fixed inset-0 z-[70] bg-black/72 backdrop-blur-sm" onClick={onClose} role="presentation">
       <div className="mx-auto mt-[10vh] w-full max-w-3xl px-4" onClick={(event) => event.stopPropagation()} role="presentation">
-        <section className="rounded-[1.75rem] border border-border bg-card/95 shadow-2xl">
-          <div className="flex items-center gap-3 border-b border-border px-4 py-4">
-            <Command className="size-4 text-primary" />
+        <section className="rounded-[1.75rem] border border-zinc-900 bg-zinc-950 shadow-2xl">
+          <div className="flex items-center gap-3 border-b border-zinc-900 px-4 py-4">
+            <Command className="size-4 text-zinc-400" />
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-600" />
               <input
-                className="field-input pl-10"
+                className="compact-input pl-10"
                 onChange={(event) => {
                   setQuery(event.target.value);
                   setActiveIndex(0);
@@ -100,13 +100,13 @@ export function CommandPalette({ actions, open, onClose }: CommandPaletteProps) 
                     onClose();
                   }
                 }}
-                placeholder="Search commands, tabs, bundles, and connections"
+                placeholder="Search projects, bundles, and commands"
                 ref={inputRef}
                 type="text"
                 value={query}
               />
             </div>
-            <span className="hidden rounded-full border border-border bg-background/70 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground md:inline-flex">
+            <span className="hidden rounded-full border border-zinc-800 bg-black px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 md:inline-flex">
               Cmd/Ctrl+K
             </span>
           </div>
@@ -115,29 +115,20 @@ export function CommandPalette({ actions, open, onClose }: CommandPaletteProps) 
             {filtered.length ? (
               grouped.map(([group, groupActions]) => (
                 <div className="px-2 py-2" key={group}>
-                  <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">{group}</p>
+                  <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-600">{group}</p>
                   <div className="space-y-1">
                     {groupActions.map((action) => {
                       const globalIndex = filtered.findIndex((item) => item.id === action.id);
                       const selected = globalIndex === activeIndex;
                       return (
-                        <button
-                          className={
-                            selected
-                              ? "command-item command-item-active"
-                              : "command-item"
-                          }
-                          key={action.id}
-                          onClick={() => handleAction(action)}
-                          type="button"
-                        >
+                        <button className={selected ? "command-item command-item-active" : "command-item"} key={action.id} onClick={() => handleAction(action)} type="button">
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-foreground">{action.label}</p>
-                            <p className="mt-1 truncate text-sm text-muted-foreground">{action.description}</p>
+                            <p className="truncate text-sm font-semibold text-zinc-100">{action.label}</p>
+                            <p className="mt-1 truncate text-sm text-zinc-500">{action.description}</p>
                           </div>
                           <div className="ml-3 flex shrink-0 items-center gap-2">
-                            {action.shortcut ? <span className="kbd-chip">{action.shortcut}</span> : null}
-                            <CornerDownLeft className="size-4 text-muted-foreground" />
+                            {action.shortcut ? <span className="hint-chip">{action.shortcut}</span> : null}
+                            <CornerDownLeft className="size-4 text-zinc-600" />
                           </div>
                         </button>
                       );
@@ -147,8 +138,8 @@ export function CommandPalette({ actions, open, onClose }: CommandPaletteProps) 
               ))
             ) : (
               <div className="px-4 py-10 text-center">
-                <p className="text-sm font-semibold text-foreground">No matching command</p>
-                <p className="mt-2 text-sm text-muted-foreground">Try a bundle name, a connection label, or an action like “refresh” or “architecture”.</p>
+                <p className="text-sm font-semibold text-zinc-100">No matching command</p>
+                <p className="mt-2 text-sm text-zinc-500">Try a project name, a bundle name, or an action like "refresh" or "flowchart".</p>
               </div>
             )}
           </div>
