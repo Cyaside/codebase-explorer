@@ -31,7 +31,7 @@ Panduan langkah cepat yang lebih lengkap ada di [docs/quickstart.md](docs/quicks
 - `codearch analyze <repo-path>`
   Menjalankan scan, deterministic analysis, support-file correlation opsional, dan AI synthesis opsional.
 - `codearch start [--addr <host:port>] [--no-browser]`
-  Menjalankan local web workbench untuk membuka project, memilih koneksi provider, dan membaca bundle dengan UI dark mode. Ini adalah command yang direkomendasikan untuk pemakaian harian.
+  Menjalankan local web workbench untuk membuka satu project aktif, menyimpan workspace lokal, memilih koneksi provider, dan membaca bundle dengan UI dark control-plane. Ini adalah command yang direkomendasikan untuk pemakaian harian.
 - `codearch serve [--addr <host:port>] [--no-browser]`
   Alias lama untuk `codearch start`.
 - `codearch open [bundle-path] [--no-browser]`
@@ -82,9 +82,10 @@ Support files tetap opsional. Kalau file issue/changelog tidak diberikan atau ti
 ## Workbench
 
 Workbench adalah local webapp ringan yang tetap jalan dari binary Go yang sama, tanpa Electron atau backend berat tambahan. Workbench ini cocok untuk:
-- membuka project path lokal
+- membuka satu project aktif lewat saved workspace lokal
 - menyimpan beberapa connection profile secara lokal di browser
-- menjalankan analisis dan langsung membaca summary, architecture, flowchart, issue tracking, dan recommendations
+- menjalankan analisis dan langsung membaca dashboard, summary, architecture, flowchart, issue tracking, dan recommendations
+- menampilkan flowchart project langsung di tab interaktif, bukan hanya source diagram mentah
 
 Untuk sekarang jalur local-first tetap diprioritaskan, jadi input repository GitHub URL belum di-clone otomatis. Gunakan local checkout path saat menjalankan analisis dari workbench.
 
