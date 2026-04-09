@@ -13,6 +13,7 @@ func TestPlannerBuildsPlanForFullAIMode(t *testing.T) {
 
 	planner := NewPlanner()
 	plan, summary := planner.Plan(Input{
+		RootPath: "sample-repo",
 		Analysis: analyzer.Result{
 			GeneratedAt: time.Date(2026, time.April, 10, 1, 0, 0, 0, time.UTC),
 			ReadingPath: []analyzer.ReadingPathItem{
@@ -58,6 +59,7 @@ func TestPlannerReturnsDisabledSummaryForStandardMode(t *testing.T) {
 
 	planner := NewPlanner()
 	plan, summary := planner.Plan(Input{
+		RootPath: "sample-repo",
 		Analysis: analyzer.Result{
 			GeneratedAt: time.Date(2026, time.April, 10, 1, 0, 0, 0, time.UTC),
 		},

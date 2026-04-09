@@ -8,11 +8,13 @@ import (
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/changes"
+	"github.com/Cyaside/codebase-explorer/internal/repo"
 )
 
 const (
-	PlanSchemaVersion    = "full-ai-plan.v1"
-	SummarySchemaVersion = "full-ai-summary.v1"
+	PlanSchemaVersion     = "full-ai-plan.v1"
+	EvidenceSchemaVersion = "full-ai-evidence.v1"
+	SummarySchemaVersion  = "full-ai-summary.v1"
 
 	DefaultReadBudget  = 24
 	DefaultTokenBudget = 32000
@@ -32,6 +34,8 @@ type Options struct {
 }
 
 type Input struct {
+	RootPath     string
+	ScanResult   repo.ScanResult
 	Analysis     analyzer.Result
 	Changes      changes.Result
 	SupportFiles []string
@@ -59,7 +63,36 @@ type Summary struct {
 	TokenBudget      int    `json:"token_budget"`
 	PlannedTargets   int    `json:"planned_targets"`
 	PlannedFunctions int    `json:"planned_functions"`
+	CollectedItems   int    `json:"collected_items"`
+	FailedItems      int    `json:"failed_items"`
 	Note             string `json:"note,omitempty"`
+}
+
+type Evidence struct {
+	SchemaVersion  string         `json:"schema_version"`
+	GeneratedAt    time.Time      `json:"generated_at"`
+	Mode           string         `json:"mode"`
+	RootPath       string         `json:"root_path"`
+	ReadBudget     int            `json:"read_budget"`
+	CollectedItems int            `json:"collected_items"`
+	FailedItems    int            `json:"failed_items"`
+	Items          []EvidenceItem `json:"items"`
+	Note           string         `json:"note,omitempty"`
+}
+
+type EvidenceItem struct {
+	TargetPath   string `json:"target_path"`
+	ResolvedPath string `json:"resolved_path"`
+	DisplayPath  string `json:"display_path"`
+	Reason       string `json:"reason"`
+	Source       string `json:"source"`
+	Priority     int    `json:"priority"`
+	Resolution   string `json:"resolution"`
+	ReadStatus   string `json:"read_status"`
+	ByteCount    int    `json:"byte_count"`
+	LineCount    int    `json:"line_count"`
+	Snippet      string `json:"snippet,omitempty"`
+	Truncated    bool   `json:"truncated"`
 }
 
 type Target struct {
@@ -137,6 +170,19 @@ func DisabledSummary(options Options, note string) Summary {
 		PlannedTargets:   0,
 		PlannedFunctions: len(defaultFunctionTasks()),
 		Note:             strings.TrimSpace(note),
+	}
+}
+
+func DisabledEvidence(generatedAt time.Time, rootPath string, options Options, note string) Evidence {
+	normalized := options.Normalize()
+	return Evidence{
+		SchemaVersion: EvidenceSchemaVersion,
+		GeneratedAt:   generatedAt,
+		Mode:          string(normalized.Mode),
+		RootPath:      strings.TrimSpace(rootPath),
+		ReadBudget:    normalized.ReadBudget,
+		Items:         nil,
+		Note:          strings.TrimSpace(note),
 	}
 }
 

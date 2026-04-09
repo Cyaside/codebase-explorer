@@ -7,9 +7,10 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/changes"
 	"github.com/Cyaside/codebase-explorer/internal/fullai"
+	"github.com/Cyaside/codebase-explorer/internal/repo"
 )
 
-func (s Service) buildFullAIPlan(request AnalyzeRequest, analysis analyzer.Result, changeResult changes.Result, supportFiles []string) (fullai.Plan, fullai.Summary) {
+func (s Service) buildFullAIPlan(request AnalyzeRequest, scanResult repo.ScanResult, analysis analyzer.Result, changeResult changes.Result, supportFiles []string) (fullai.Plan, fullai.Summary) {
 	options := request.FullAI.Normalize()
 	if !options.Mode.Enabled() {
 		emitAnalyzeProgress(request, "full-ai-plan", "disabled", "full-ai mode not requested")
@@ -18,6 +19,8 @@ func (s Service) buildFullAIPlan(request AnalyzeRequest, analysis analyzer.Resul
 
 	emitAnalyzeProgress(request, "full-ai-plan", "running", fmt.Sprintf("planning deep exploration with read budget %d and token budget %d", options.ReadBudget, options.TokenBudget))
 	plan, summary := s.fullAI.Plan(fullai.Input{
+		RootPath:     scanResult.RootPath,
+		ScanResult:   scanResult,
 		Analysis:     analysis,
 		Changes:      changeResult,
 		SupportFiles: supportFiles,
@@ -34,6 +37,32 @@ func (s Service) buildFullAIPlan(request AnalyzeRequest, analysis analyzer.Resul
 	}
 	emitAnalyzeProgress(request, "full-ai-plan", summary.Status, detail)
 	return plan, summary
+}
+
+func (s Service) collectFullAIEvidence(request AnalyzeRequest, scanResult repo.ScanResult, analysis analyzer.Result, changeResult changes.Result, supportFiles []string, plan fullai.Plan, summary fullai.Summary) (fullai.Evidence, fullai.Summary) {
+	options := request.FullAI.Normalize()
+	if !options.Mode.Enabled() {
+		return fullai.DisabledEvidence(analysis.GeneratedAt, scanResult.RootPath, options, "full-ai mode not requested"), summary
+	}
+
+	emitAnalyzeProgress(request, "full-ai-evidence", "running", fmt.Sprintf("collecting evidence from %d planned target(s)", len(plan.Targets)))
+	evidence := s.fullAIEvidence.Collect(fullai.Input{
+		RootPath:     scanResult.RootPath,
+		ScanResult:   scanResult,
+		Analysis:     analysis,
+		Changes:      changeResult,
+		SupportFiles: supportFiles,
+	}, plan)
+
+	summary.Status = "collected"
+	summary.CollectedItems = evidence.CollectedItems
+	summary.FailedItems = evidence.FailedItems
+	if strings.TrimSpace(evidence.Note) != "" {
+		summary.Note = appendFullAINote(summary.Note, evidence.Note)
+	}
+
+	emitAnalyzeProgress(request, "full-ai-evidence", "collected", fmt.Sprintf("captured %d evidence item(s) with %d read failure(s)", evidence.CollectedItems, evidence.FailedItems))
+	return evidence, summary
 }
 
 func appendFullAINote(existing string, note string) string {

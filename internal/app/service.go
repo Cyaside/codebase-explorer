@@ -17,13 +17,14 @@ import (
 )
 
 type Service struct {
-	settings  config.Settings
-	scanner   repo.Scanner
-	analyzer  analyzer.Service
-	cache     cache.Store
-	fullAI    fullai.Planner
-	providers provider.Registry
-	writer    bundle.Writer
+	settings       config.Settings
+	scanner        repo.Scanner
+	analyzer       analyzer.Service
+	cache          cache.Store
+	fullAI         fullai.Planner
+	fullAIEvidence fullai.Collector
+	providers      provider.Registry
+	writer         bundle.Writer
 }
 
 func New(settings config.Settings) Service {
@@ -41,13 +42,14 @@ func New(settings config.Settings) Service {
 	}
 
 	return Service{
-		settings:  settings,
-		scanner:   repo.NewScanner(),
-		analyzer:  analyzer.NewService(settings.AppVersion),
-		cache:     cache.NewStore(cacheRoot, cacheEnabled),
-		fullAI:    fullai.NewPlanner(),
-		providers: provider.NewRegistry(),
-		writer:    bundle.NewWriter(settings.AppVersion, settings.OutputKeepLatest),
+		settings:       settings,
+		scanner:        repo.NewScanner(),
+		analyzer:       analyzer.NewService(settings.AppVersion),
+		cache:          cache.NewStore(cacheRoot, cacheEnabled),
+		fullAI:         fullai.NewPlanner(),
+		fullAIEvidence: fullai.NewCollector(),
+		providers:      provider.NewRegistry(),
+		writer:         bundle.NewWriter(settings.AppVersion, settings.OutputKeepLatest),
 	}
 }
 
@@ -74,7 +76,8 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	analysis := state.Analysis
 	changeResult := state.Changes
 	warnings := buildWarnings(analysis, len(supportFiles))
-	fullAIPlan, fullAISummary := s.buildFullAIPlan(request, analysis, changeResult, supportFiles)
+	fullAIPlan, fullAISummary := s.buildFullAIPlan(request, scanResult, analysis, changeResult, supportFiles)
+	fullAIEvidence, fullAISummary := s.collectFullAIEvidence(request, scanResult, analysis, changeResult, supportFiles, fullAIPlan, fullAISummary)
 	aiContext := buildCondensedContext(analysis)
 	emitAnalyzeProgress(request, "ai-context", "ready", summarizeAIContext(aiContext))
 	aiResult, providerCacheStatus, err := s.buildAIResult(ctx, request, analysis, request.DeterministicOnly, aiContext)
@@ -100,10 +103,11 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 			DeterministicStatus: state.Status,
 			ProviderStatus:      providerCacheStatus,
 		},
-		AIContext:     aiContext,
-		AIResult:      aiResult,
-		FullAIPlan:    fullAIPlan,
-		FullAISummary: fullAISummary,
+		AIContext:      aiContext,
+		AIResult:       aiResult,
+		FullAIPlan:     fullAIPlan,
+		FullAIEvidence: fullAIEvidence,
+		FullAISummary:  fullAISummary,
 	})
 	if err != nil {
 		return AnalyzeResult{}, fmt.Errorf("write bundle: %w", err)
