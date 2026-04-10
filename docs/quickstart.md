@@ -11,12 +11,14 @@
 1. Jalankan `go run ./cmd/codearch start`
 2. Masukkan local repo path di form workbench
 3. Pilih connection profile:
-   `Deterministic only`, `OpenAI`, `OpenRouter`, `Mistral`, atau custom compatible profile
-4. Jalankan analisis dari UI dan pilih bundle hasilnya dari sidebar
+   `OpenAI`, `OpenRouter`, `Mistral`, atau custom compatible profile
+4. Masukkan API key untuk profile yang dipakai
+5. Jalankan analisis dari UI dan pilih bundle hasilnya dari sidebar
 
 Catatan:
 - connection profile disimpan lokal di browser
 - API key tidak ikut ditulis ke bundle
+- workbench menjalankan full-AI mode saat connection profile valid
 - GitHub URL belum di-clone otomatis; gunakan local checkout path
 
 ## Dengan Support Files
@@ -33,7 +35,7 @@ go run ./cmd/codearch analyze <repo-path> --issues ./issues.json --changelog ./C
 
 ## Dengan Provider AI
 
-1. Set environment:
+1. Set environment untuk provider bawaan:
 
 ```bash
 export CODEARCH_PROVIDER=openai
@@ -45,6 +47,33 @@ export CODEARCH_API_KEY=...
 3. Jalankan `go run ./cmd/codearch analyze <repo-path>`
 
 Alternatifnya, gunakan `go run ./cmd/codearch start` lalu simpan beberapa connection profile di workbench bila kamu ingin berganti API key atau vendor per analisis.
+
+## Full-AI Mode
+
+Full-AI mode membaca instruction pack `.agents/`, mengumpulkan evidence dari file high-signal, lalu menjalankan function outputs untuk summary, architecture, flowchart, issues, recommendations, dashboard, dan hotspot/dependency review.
+
+Contoh CLI dengan Mistral:
+
+```powershell
+$env:CODEARCH_PROVIDER="openai-compatible"
+$env:CODEARCH_BASE_URL="https://api.mistral.ai/v1"
+$env:CODEARCH_MODEL="mistral-small-latest"
+$env:CODEARCH_API_KEY="..."
+go run ./cmd/codearch analyze <repo-path> --full-ai --ai-read-budget 24
+```
+
+Kalau ingin test tanpa memanggil provider:
+
+```bash
+go run ./cmd/codearch analyze <repo-path> --full-ai --deterministic-only
+```
+
+Output full-AI tersimpan di:
+- `data/full-ai-plan.json`
+- `data/full-ai-evidence.json`
+- `data/full-ai-functions.json`
+- `data/full-ai-execution.json`
+- `data/full-ai-meta.json`
 
 ## Export Bundle
 

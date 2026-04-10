@@ -1,20 +1,22 @@
 # Codebase Explorer
 
-Codebase Explorer adalah CLI local-first untuk membantu memahami codebase asing dengan cepat lewat structured analysis bundle.
+Codebase Explorer adalah CLI dan local web workbench untuk membantu memahami codebase asing dengan cepat lewat structured analysis bundle.
 
-Saat ini tool ini fokus pada deterministic repository orientation:
+Tool ini memakai deterministic analysis sebagai baseline dan bisa dinaikkan ke full-AI repository exploration saat provider AI dikonfigurasi:
 - scan repo lokal dengan ignore handling
 - deteksi bahasa utama, entry point, dan module penting
 - ranking hotspot dan dependency risk ringan
 - reading path awal untuk onboarding
 - optional support-file correlation untuk issue export atau changelog lokal
-- output bundle reusable dalam format Markdown, JSON, Mermaid, dan viewer lokal statis
+- optional full-AI mode berbasis instruction pack `.agents/`
+- output bundle reusable dalam format Markdown, JSON, Mermaid, dan viewer/workbench lokal
 
 ## Quickstart
 
 ```bash
 go run ./cmd/codearch doctor
 go run ./cmd/codearch analyze <repo-path> --deterministic-only
+go run ./cmd/codearch analyze <repo-path> --full-ai
 go run ./cmd/codearch start --no-browser
 go run ./cmd/codearch analyze <repo-path> --support ./issues.json --changelog ./CHANGELOG.md
 go run ./cmd/codearch open --no-browser
@@ -29,9 +31,9 @@ Panduan langkah cepat yang lebih lengkap ada di [docs/quickstart.md](docs/quicks
 - `codearch doctor`
   Validasi config, output root, cache root, dan provider setup.
 - `codearch analyze <repo-path>`
-  Menjalankan scan, deterministic analysis, support-file correlation opsional, dan AI synthesis opsional.
+  Menjalankan scan, deterministic analysis, support-file correlation opsional, AI synthesis opsional, dan full-AI exploration bila `--full-ai` aktif.
 - `codearch start [--addr <host:port>] [--no-browser]`
-  Menjalankan local web workbench untuk membuka satu project aktif, menyimpan workspace lokal, memilih koneksi provider, dan membaca bundle dengan UI dark control-plane. Ini adalah command yang direkomendasikan untuk pemakaian harian.
+  Menjalankan local web workbench untuk membuka satu project aktif, menyimpan workspace lokal, memilih koneksi provider, menjalankan full-AI analysis, dan membaca bundle dengan UI dark control-plane. Ini adalah command yang direkomendasikan untuk pemakaian harian.
 - `codearch serve [--addr <host:port>] [--no-browser]`
   Alias lama untuk `codearch start`.
 - `codearch open [bundle-path] [--no-browser]`
@@ -64,6 +66,16 @@ Variabel environment yang didukung:
 
 Environment tetap cocok untuk satu default provider. Kalau butuh beberapa API key sekaligus, gunakan `codearch start` lalu simpan connection profile lokal di browser untuk OpenAI, OpenRouter, Mistral, atau endpoint compatible lain. Profile itu hanya dipakai per run dan tidak ikut ditulis ke bundle output.
 
+Contoh Mistral lewat provider openai-compatible:
+
+```powershell
+$env:CODEARCH_PROVIDER="openai-compatible"
+$env:CODEARCH_BASE_URL="https://api.mistral.ai/v1"
+$env:CODEARCH_MODEL="mistral-small-latest"
+$env:CODEARCH_API_KEY="..."
+go run ./cmd/codearch analyze <repo-path> --full-ai
+```
+
 ## Output Bundle
 
 Hasil analisis ditulis ke folder `out/` dan berisi:
@@ -73,6 +85,7 @@ Hasil analisis ditulis ke folder `out/` dan berisi:
 - `architecture/module-graph.mmd` dan `dependencies/dependency-graph.mmd`
 - `ui/index.html` untuk viewer lokal
 - `data/analysis.json`, `data/metrics.json`, `data/files.json`, `data/modules.json`, dan `data/contract.json`
+- `data/full-ai-plan.json`, `data/full-ai-evidence.json`, `data/full-ai-functions.json`, `data/full-ai-execution.json`, dan `data/full-ai-meta.json`
 - `changes/issue-correlation.json` untuk hasil machine-readable change awareness
 
 `out/` juga sekarang dipruning otomatis agar hanya menyimpan bundle terbaru dalam jumlah terbatas.
@@ -84,8 +97,10 @@ Support files tetap opsional. Kalau file issue/changelog tidak diberikan atau ti
 Workbench adalah local webapp ringan yang tetap jalan dari binary Go yang sama, tanpa Electron atau backend berat tambahan. Workbench ini cocok untuk:
 - membuka satu project aktif lewat saved workspace lokal
 - menyimpan beberapa connection profile secara lokal di browser
-- menjalankan analisis dan langsung membaca dashboard, summary, architecture, flowchart, issue tracking, dan recommendations
+- menjalankan full-AI analysis dari koneksi provider terpilih
+- langsung membaca dashboard, summary, architecture, flowchart, issue tracking, dan recommendations
 - menampilkan flowchart project langsung di tab interaktif, bukan hanya source diagram mentah
+- melihat status full-AI, jumlah evidence yang dibaca, function outputs, dan verified counts
 
 Untuk sekarang jalur local-first tetap diprioritaskan, jadi input repository GitHub URL belum di-clone otomatis. Gunakan local checkout path saat menjalankan analisis dari workbench.
 
@@ -113,4 +128,4 @@ Masalah yang paling umum:
 
 ## Status
 
-Deterministic analyzer, AI synthesis opsional, visual report, change-awareness, cache filesystem, `export`, dan `cache clear` sudah aktif. Produk sekarang sudah nyaman dipakai end-to-end sebagai local-first repository orientation tool.
+Deterministic analyzer, AI synthesis opsional, full-AI exploration, visual workbench, change-awareness, cache filesystem, `export`, dan `cache clear` sudah aktif. Produk sekarang sudah bisa dipakai end-to-end sebagai local-first repository orientation tool dengan optional deep AI pass.
