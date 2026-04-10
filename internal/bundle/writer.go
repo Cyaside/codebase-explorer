@@ -31,6 +31,7 @@ type WriteRequest struct {
 	FullAIPlan        fullai.Plan
 	FullAIEvidence    fullai.Evidence
 	FullAIFunctions   fullai.Functions
+	FullAIExecution   fullai.Execution
 	FullAISummary     fullai.Summary
 }
 
@@ -143,6 +144,9 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-functions.json"), request.FullAIFunctions); err != nil {
 		return WriteResult{}, err
 	}
+	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-execution.json"), request.FullAIExecution); err != nil {
+		return WriteResult{}, err
+	}
 	if err := writeJSON(filepath.Join(bundlePath, "changes", "issue-correlation.json"), request.Changes); err != nil {
 		return WriteResult{}, err
 	}
@@ -158,6 +162,7 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		"full_ai_plan_schema_version":      request.FullAIPlan.SchemaVersion,
 		"full_ai_evidence_schema_version":  request.FullAIEvidence.SchemaVersion,
 		"full_ai_functions_schema_version": request.FullAIFunctions.SchemaVersion,
+		"full_ai_execution_schema_version": request.FullAIExecution.SchemaVersion,
 		"full_ai_meta_schema_version":      request.FullAISummary.SchemaVersion,
 		"full_ai_mode":                     request.FullAISummary.Mode,
 		"tool_version":                     w.version,

@@ -2,8 +2,11 @@ package app
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Cyaside/codebase-explorer/internal/config"
@@ -30,8 +33,8 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 		t.Fatalf("analyze sample repo with full-ai scaffold: %v", err)
 	}
 
-	if !result.FullAI.Enabled || result.FullAI.Status != "prepared" {
-		t.Fatalf("expected prepared full-ai summary, got %#v", result.FullAI)
+	if !result.FullAI.Enabled || result.FullAI.Status != "provider-disabled" {
+		t.Fatalf("expected provider-disabled full-ai summary, got %#v", result.FullAI)
 	}
 	if result.FullAI.CollectedItems == 0 {
 		t.Fatalf("expected collected evidence items in full-ai summary, got %#v", result.FullAI)
@@ -89,5 +92,75 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 	}
 	if functionSet.SchemaVersion != fullai.FunctionsSchemaVersion {
 		t.Fatalf("expected full-ai functions schema version %q, got %#v", fullai.FunctionsSchemaVersion, functionSet)
+	}
+
+	executionContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "full-ai-execution.json"))
+	if err != nil {
+		t.Fatalf("read full-ai execution: %v", err)
+	}
+	var execution struct {
+		SchemaVersion string `json:"schema_version"`
+		Status        string `json:"status"`
+	}
+	if err := json.Unmarshal(executionContents, &execution); err != nil {
+		t.Fatalf("unmarshal full-ai execution: %v", err)
+	}
+	if execution.SchemaVersion != fullai.ExecutionSchemaVersion {
+		t.Fatalf("expected full-ai execution schema version %q, got %#v", fullai.ExecutionSchemaVersion, execution)
+	}
+}
+
+func TestAnalyzeExecutesFullAIFunctionsWithProvider(t *testing.T) {
+	t.Parallel()
+
+	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode provider request: %v", err)
+		}
+
+		content := `{"summary":"Function summary","key_findings":[{"claim":"Evidence-backed claim","confidence":"high"}],"recommendations":["Keep exploring from the entry point"],"uncertainties":[]}`
+		if len(payload.Messages) > 1 && strings.Contains(payload.Messages[1].Content, "Summarize this repository context") {
+			content = `{"project_summary":"AI summary","architecture_narrative":"AI architecture","hotspot_explanations":[],"reading_path_explanations":[]}`
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{"message": map[string]string{"content": content}},
+			},
+		})
+	}))
+	defer providerServer.Close()
+
+	service := New(config.Settings{
+		DefaultOutputRoot: t.TempDir(),
+		AppVersion:        "test",
+		ConfigSource:      "test",
+		Provider: config.ProviderSettings{
+			Name:    "openai-compatible",
+			Model:   "mistral-small-latest",
+			APIKey:  "test-key",
+			BaseURL: providerServer.URL,
+		},
+	})
+
+	result, err := service.Analyze(t.Context(), AnalyzeRequest{
+		RepoPath: filepath.Join("..", "..", "testdata", "sample-repo"),
+		FullAI:   fullai.Options{Mode: fullai.ModeFull, ReadBudget: 3},
+	})
+	if err != nil {
+		t.Fatalf("analyze sample repo with full-ai provider execution: %v", err)
+	}
+
+	if result.FullAI.Status != "executed" {
+		t.Fatalf("expected executed full-ai summary, got %#v", result.FullAI)
+	}
+	if result.FullAI.ExecutedFunctions == 0 || result.FullAI.VerifiedFunctions == 0 {
+		t.Fatalf("expected executed and verified function counts, got %#v", result.FullAI)
 	}
 }

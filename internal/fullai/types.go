@@ -15,6 +15,7 @@ const (
 	PlanSchemaVersion      = "full-ai-plan.v1"
 	EvidenceSchemaVersion  = "full-ai-evidence.v1"
 	FunctionsSchemaVersion = "full-ai-functions.v1"
+	ExecutionSchemaVersion = "full-ai-execution.v1"
 	SummarySchemaVersion   = "full-ai-summary.v1"
 
 	DefaultReadBudget  = 24
@@ -67,6 +68,8 @@ type Summary struct {
 	CollectedItems    int    `json:"collected_items"`
 	FailedItems       int    `json:"failed_items"`
 	PreparedFunctions int    `json:"prepared_functions"`
+	ExecutedFunctions int    `json:"executed_functions"`
+	VerifiedFunctions int    `json:"verified_functions"`
 	Note              string `json:"note,omitempty"`
 }
 
@@ -114,6 +117,65 @@ type FunctionJob struct {
 	EvidenceCount   int      `json:"evidence_count"`
 	Focus           []string `json:"focus"`
 	Note            string   `json:"note,omitempty"`
+}
+
+type Execution struct {
+	SchemaVersion string           `json:"schema_version"`
+	GeneratedAt   time.Time        `json:"generated_at"`
+	Mode          string           `json:"mode"`
+	Provider      string           `json:"provider,omitempty"`
+	Model         string           `json:"model,omitempty"`
+	Status        string           `json:"status"`
+	Results       []FunctionResult `json:"results"`
+	ExecutedCount int              `json:"executed_count"`
+	VerifiedCount int              `json:"verified_count"`
+	FailedCount   int              `json:"failed_count"`
+	Note          string           `json:"note,omitempty"`
+}
+
+type FunctionResult struct {
+	Name            string         `json:"name"`
+	Status          string         `json:"status"`
+	InstructionPath string         `json:"instruction_path"`
+	EvidencePaths   []string       `json:"evidence_paths"`
+	RawOutput       string         `json:"raw_output,omitempty"`
+	Output          FunctionOutput `json:"output"`
+	Verified        bool           `json:"verified"`
+	Error           string         `json:"error,omitempty"`
+}
+
+type FunctionOutput struct {
+	Summary         string        `json:"summary,omitempty"`
+	KeyFindings     []Finding     `json:"key_findings,omitempty"`
+	Recommendations []string      `json:"recommendations,omitempty"`
+	GraphEdges      []GraphEdge   `json:"graph_edges,omitempty"`
+	IssueSignals    []IssueSignal `json:"issue_signals,omitempty"`
+	Uncertainties   []string      `json:"uncertainties,omitempty"`
+}
+
+type Finding struct {
+	Claim         string   `json:"claim"`
+	EvidencePaths []string `json:"evidence_paths,omitempty"`
+	Confidence    string   `json:"confidence,omitempty"`
+}
+
+type GraphEdge struct {
+	From          string   `json:"from"`
+	To            string   `json:"to"`
+	Label         string   `json:"label,omitempty"`
+	EvidencePaths []string `json:"evidence_paths,omitempty"`
+}
+
+type IssueSignal struct {
+	Title         string   `json:"title"`
+	Severity      string   `json:"severity,omitempty"`
+	EvidencePaths []string `json:"evidence_paths,omitempty"`
+}
+
+type FunctionPrompt struct {
+	FunctionName string `json:"function_name"`
+	SystemPrompt string `json:"system_prompt"`
+	UserPrompt   string `json:"user_prompt"`
 }
 
 type Target struct {
@@ -225,6 +287,18 @@ func DisabledFunctions(generatedAt time.Time, options Options, note string) Func
 		GeneratedAt:   generatedAt,
 		Mode:          string(normalized.Mode),
 		Jobs:          jobs,
+		Note:          strings.TrimSpace(note),
+	}
+}
+
+func DisabledExecution(generatedAt time.Time, options Options, note string) Execution {
+	normalized := options.Normalize()
+	return Execution{
+		SchemaVersion: ExecutionSchemaVersion,
+		GeneratedAt:   generatedAt,
+		Mode:          string(normalized.Mode),
+		Status:        "disabled",
+		Results:       nil,
 		Note:          strings.TrimSpace(note),
 	}
 }

@@ -81,6 +81,10 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	fullAIPlan, fullAISummary := s.buildFullAIPlan(request, scanResult, analysis, changeResult, supportFiles)
 	fullAIEvidence, fullAISummary := s.collectFullAIEvidence(request, scanResult, analysis, changeResult, supportFiles, fullAIPlan, fullAISummary)
 	fullAIFunctions, fullAISummary := s.prepareFullAIFunctions(request, scanResult, analysis, changeResult, supportFiles, fullAIPlan, fullAIEvidence, fullAISummary)
+	fullAIExecution, fullAISummary, err := s.executeFullAIFunctions(ctx, request, analysis, fullAIFunctions, fullAIEvidence, fullAISummary)
+	if err != nil {
+		return AnalyzeResult{}, err
+	}
 	aiContext := buildCondensedContext(analysis)
 	emitAnalyzeProgress(request, "ai-context", "ready", summarizeAIContext(aiContext))
 	aiResult, providerCacheStatus, err := s.buildAIResult(ctx, request, analysis, request.DeterministicOnly, aiContext)
@@ -93,6 +97,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	}
 
 	emitAnalyzeProgress(request, "bundle-write", "running", "writing bundle output")
+	combinedProviderStatus := combineProviderStatus(providerCacheStatus, fullAICacheStatus(fullAISummary))
 	writeResult, err := s.writer.Write(bundle.WriteRequest{
 		OutputRoot:        outputRoot,
 		DeterministicOnly: request.DeterministicOnly,
@@ -104,13 +109,14 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 			Enabled:             s.cache.Enabled(),
 			Root:                s.cache.Root(),
 			DeterministicStatus: state.Status,
-			ProviderStatus:      providerCacheStatus,
+			ProviderStatus:      combinedProviderStatus,
 		},
 		AIContext:       aiContext,
 		AIResult:        aiResult,
 		FullAIPlan:      fullAIPlan,
 		FullAIEvidence:  fullAIEvidence,
 		FullAIFunctions: fullAIFunctions,
+		FullAIExecution: fullAIExecution,
 		FullAISummary:   fullAISummary,
 	})
 	if err != nil {
@@ -138,7 +144,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 			Enabled:             s.cache.Enabled(),
 			Root:                s.cache.Root(),
 			DeterministicStatus: state.Status,
-			ProviderStatus:      providerCacheStatus,
+			ProviderStatus:      combinedProviderStatus,
 		},
 		Changes: AnalyzeChangesSummary{
 			Available:        changeResult.Available,

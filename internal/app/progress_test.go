@@ -135,6 +135,9 @@ func TestAnalyzeEmitsProgressForFullAIPlanning(t *testing.T) {
 	if !hasProgressEvent(events, "full-ai-functions", "prepared") {
 		t.Fatalf("expected prepared full-ai function event, got %#v", events)
 	}
+	if !hasProgressEvent(events, "full-ai-execution", "disabled") {
+		t.Fatalf("expected disabled full-ai execution event without provider, got %#v", events)
+	}
 }
 
 func hasProgressEvent(events []AnalyzeProgressEvent, stage string, status string) bool {

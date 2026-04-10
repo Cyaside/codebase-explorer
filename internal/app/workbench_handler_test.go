@@ -257,8 +257,8 @@ func TestWorkbenchAnalyzeAcceptsFullAIMode(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode analyze response: %v", err)
 	}
-	if !response.Result.FullAI.Enabled || response.Result.FullAI.Status != "prepared" {
-		t.Fatalf("expected workbench analyze to carry prepared full-ai summary, got %#v", response.Result.FullAI)
+	if !response.Result.FullAI.Enabled || response.Result.FullAI.Status != "provider-disabled" {
+		t.Fatalf("expected workbench analyze to carry provider-disabled full-ai summary, got %#v", response.Result.FullAI)
 	}
 }
 
