@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
 
 const defaultOpenAIBaseURL = "https://api.openai.com/v1"
+
+const maxPromptCompletionAttempts = 3
 
 type HTTPDoer interface {
 	Do(*http.Request) (*http.Response, error)
@@ -58,42 +62,62 @@ func (c OpenAICompatibleClient) Synthesize(ctx context.Context, request Request)
 }
 
 func (c OpenAICompatibleClient) Complete(ctx context.Context, request PromptRequest) (PromptResult, error) {
+	var lastErr error
+	for attempt := range maxPromptCompletionAttempts {
+		result, retryAfter, err := c.completeOnce(ctx, request)
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		if attempt == maxPromptCompletionAttempts-1 || !retryablePromptError(err) {
+			return PromptResult{}, err
+		}
+		if err := sleepForPromptRetry(ctx, promptRetryDelay(attempt, retryAfter)); err != nil {
+			return PromptResult{}, err
+		}
+	}
+
+	return PromptResult{}, lastErr
+}
+
+func (c OpenAICompatibleClient) completeOnce(ctx context.Context, request PromptRequest) (PromptResult, *time.Duration, error) {
 	payload, err := marshalPromptCompletionRequest(request)
 	if err != nil {
-		return PromptResult{}, err
+		return PromptResult{}, nil, err
 	}
 
 	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, chatCompletionsURL(request.Config), bytes.NewReader(payload))
 	if err != nil {
-		return PromptResult{}, fmt.Errorf("build prompt request: %w", err)
+		return PromptResult{}, nil, fmt.Errorf("build prompt request: %w", err)
 	}
 	httpRequest.Header.Set("Authorization", "Bearer "+strings.TrimSpace(request.Config.APIKey))
 	httpRequest.Header.Set("Content-Type", "application/json")
 	httpRequest.Header.Set("Accept", "application/json")
+	setOpenRouterHeaders(httpRequest, request.Config)
 
 	httpResponse, err := c.httpClient.Do(httpRequest)
 	if err != nil {
-		return PromptResult{}, fmt.Errorf("send prompt request: %w", err)
+		return PromptResult{}, nil, fmt.Errorf("send prompt request: %w", err)
 	}
 	defer httpResponse.Body.Close()
 
 	responseBody, err := io.ReadAll(io.LimitReader(httpResponse.Body, 2<<20))
 	if err != nil {
-		return PromptResult{}, fmt.Errorf("read prompt response: %w", err)
+		return PromptResult{}, nil, fmt.Errorf("read prompt response: %w", err)
 	}
 
 	if httpResponse.StatusCode < http.StatusOK || httpResponse.StatusCode >= http.StatusMultipleChoices {
-		return PromptResult{}, httpStatusError(httpResponse.StatusCode, responseBody)
+		return PromptResult{}, retryAfterDuration(httpResponse.Header.Get("Retry-After")), httpStatusError(httpResponse.StatusCode, responseBody)
 	}
 
 	var response openAICompatibleChatResponse
 	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return PromptResult{}, fmt.Errorf("decode prompt response: %w", err)
+		return PromptResult{}, nil, fmt.Errorf("decode prompt response: %w", err)
 	}
 
 	content, err := response.messageContent()
 	if err != nil {
-		return PromptResult{}, err
+		return PromptResult{}, nil, err
 	}
 
 	return PromptResult{
@@ -103,7 +127,7 @@ func (c OpenAICompatibleClient) Complete(ctx context.Context, request PromptRequ
 		Status:      ResultStatusAvailable,
 		Used:        true,
 		Content:     strings.TrimSpace(content),
-	}, nil
+	}, nil, nil
 }
 
 type openAICompatibleChatRequest struct {
@@ -165,12 +189,85 @@ func chatCompletionsURL(config Config) string {
 	return baseURL + "/chat/completions"
 }
 
-func httpStatusError(statusCode int, body []byte) error {
-	message := strings.TrimSpace(string(body))
+type promptStatusError struct {
+	statusCode int
+	body       []byte
+}
+
+func (e promptStatusError) Error() string {
+	message := strings.TrimSpace(string(e.body))
 	if message == "" {
-		return fmt.Errorf("synthesis request failed with status %d", statusCode)
+		return fmt.Sprintf("synthesis request failed with status %d", e.statusCode)
 	}
-	return fmt.Errorf("synthesis request failed with status %d: %s", statusCode, message)
+	return fmt.Sprintf("synthesis request failed with status %d: %s", e.statusCode, message)
+}
+
+func httpStatusError(statusCode int, body []byte) error {
+	return promptStatusError{statusCode: statusCode, body: body}
+}
+
+func retryablePromptError(err error) bool {
+	var statusErr promptStatusError
+	if errors.As(err, &statusErr) {
+		return statusErr.statusCode == http.StatusTooManyRequests || statusErr.statusCode >= http.StatusInternalServerError
+	}
+
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(message, "did not include any choices") || strings.Contains(message, "returned an empty message")
+}
+
+func promptRetryDelay(attempt int, retryAfter *time.Duration) time.Duration {
+	if retryAfter != nil {
+		return *retryAfter
+	}
+	switch attempt {
+	case 0:
+		return 2 * time.Second
+	default:
+		return 6 * time.Second
+	}
+}
+
+func sleepForPromptRetry(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func retryAfterDuration(value string) *time.Duration {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	if seconds, err := strconv.Atoi(trimmed); err == nil {
+		duration := time.Duration(seconds) * time.Second
+		return &duration
+	}
+	if retryAt, err := http.ParseTime(trimmed); err == nil {
+		duration := time.Until(retryAt)
+		if duration < 0 {
+			duration = 0
+		}
+		return &duration
+	}
+	return nil
+}
+
+func setOpenRouterHeaders(request *http.Request, config Config) {
+	if !strings.Contains(strings.ToLower(strings.TrimSpace(config.BaseURL)), "openrouter.ai") {
+		return
+	}
+	request.Header.Set("HTTP-Referer", "http://localhost")
+	request.Header.Set("X-Title", "Codebase Explorer")
 }
 
 func normalizeResultText(result Result) Result {

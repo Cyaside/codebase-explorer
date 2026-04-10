@@ -174,3 +174,16 @@ func TestAnalyzeExecutesFullAIFunctionsWithProvider(t *testing.T) {
 		t.Fatalf("expected provider call per full-ai function only, got %d calls for %d functions", got, result.FullAI.PreparedFunctions)
 	}
 }
+
+func TestFullAIExecutionStatusTreatsUnverifiedOutputsAsExecuted(t *testing.T) {
+	t.Parallel()
+
+	status := fullAIExecutionStatus(fullai.Execution{
+		ExecutedCount: 2,
+		VerifiedCount: 1,
+		FailedCount:   0,
+	})
+	if status != "executed" {
+		t.Fatalf("expected executed status when all jobs ran without failures, got %q", status)
+	}
+}

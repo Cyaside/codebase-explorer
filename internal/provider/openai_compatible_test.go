@@ -2,9 +2,11 @@ package provider
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -146,6 +148,93 @@ func TestOpenAICompatibleClientCompleteReturnsRawContent(t *testing.T) {
 	if !result.Used || result.Content == "" {
 		t.Fatalf("expected raw prompt content, got %#v", result)
 	}
+}
+
+func TestOpenAICompatibleClientRetriesRateLimit(t *testing.T) {
+	t.Parallel()
+
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if requests.Add(1) == 1 {
+			w.Header().Set("Retry-After", "0")
+			http.Error(w, "rate limited", http.StatusTooManyRequests)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"summary\":\"retry ok\"}"}}]}`))
+	}))
+	defer server.Close()
+
+	client := NewOpenAICompatibleClient(server.Client())
+	result, err := client.Complete(t.Context(), PromptRequest{
+		Config: Config{
+			Name:    "openai-compatible",
+			Model:   "openai/gpt-oss-20b:free",
+			APIKey:  "test-key",
+			BaseURL: server.URL,
+		},
+		SystemPrompt: "system",
+		UserPrompt:   "user",
+	})
+	if err != nil {
+		t.Fatalf("complete prompt after retry: %v", err)
+	}
+	if result.Content == "" {
+		t.Fatalf("expected retry to return content, got %#v", result)
+	}
+	if got := requests.Load(); got != 2 {
+		t.Fatalf("expected one retry, got %d request(s)", got)
+	}
+}
+
+func TestOpenAICompatibleClientSetsOpenRouterHeaders(t *testing.T) {
+	t.Parallel()
+
+	client := NewOpenAICompatibleClient(captureDoer{t: t})
+	result, err := client.Complete(t.Context(), PromptRequest{
+		Config: Config{
+			Name:    "openai-compatible",
+			Model:   "openai/gpt-oss-20b:free",
+			APIKey:  "test-key",
+			BaseURL: "https://openrouter.ai/api/v1",
+		},
+		SystemPrompt: "system",
+		UserPrompt:   "user",
+	})
+	if err != nil {
+		t.Fatalf("complete prompt with captured request: %v", err)
+	}
+	if result.Content == "" {
+		t.Fatalf("expected captured response content, got %#v", result)
+	}
+}
+
+type captureDoer struct {
+	t *testing.T
+}
+
+func (doer captureDoer) Do(r *http.Request) (*http.Response, error) {
+	doer.t.Helper()
+
+	if !strings.Contains(r.URL.Host, "openrouter.ai") {
+		doer.t.Fatalf("expected OpenRouter host, got %q", r.URL.Host)
+	}
+	if r.Header.Get("Authorization") != "Bearer test-key" {
+		doer.t.Fatalf("expected bearer auth header")
+	}
+	if r.Header.Get("HTTP-Referer") == "" {
+		doer.t.Fatalf("expected OpenRouter referer header")
+	}
+	if r.Header.Get("X-Title") == "" {
+		doer.t.Fatalf("expected OpenRouter title header")
+	}
+
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"{\"summary\":\"headers ok\"}"}}]}`)),
+	}, nil
 }
 
 func TestParseSynthesisResultStripsMarkdownFence(t *testing.T) {

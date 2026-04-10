@@ -246,7 +246,7 @@ func fullAIExecutionStatus(execution fullai.Execution) string {
 		return "fallback"
 	case execution.FailedCount > 0:
 		return "partial"
-	case execution.VerifiedCount == execution.ExecutedCount:
+	case execution.ExecutedCount > 0:
 		return "executed"
 	default:
 		return "unverified"
