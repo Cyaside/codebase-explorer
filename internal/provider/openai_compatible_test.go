@@ -112,6 +112,42 @@ func TestOpenAICompatibleClientRejectsMalformedPayload(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleClientCompleteReturnsRawContent(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"choices": [
+				{
+					"message": {
+						"content": "{\"summary\":\"Function output\"}"
+					}
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewOpenAICompatibleClient(server.Client())
+	result, err := client.Complete(t.Context(), PromptRequest{
+		Config: Config{
+			Name:    "openai-compatible",
+			Model:   "mistral-small-latest",
+			APIKey:  "test-key",
+			BaseURL: server.URL,
+		},
+		SystemPrompt: "system",
+		UserPrompt:   "user",
+	})
+	if err != nil {
+		t.Fatalf("complete prompt: %v", err)
+	}
+	if !result.Used || result.Content == "" {
+		t.Fatalf("expected raw prompt content, got %#v", result)
+	}
+}
+
 func TestParseSynthesisResultStripsMarkdownFence(t *testing.T) {
 	t.Parallel()
 

@@ -29,14 +29,43 @@ func NewOpenAICompatibleClient(httpClient HTTPDoer) OpenAICompatibleClient {
 }
 
 func (c OpenAICompatibleClient) Synthesize(ctx context.Context, request Request) (Result, error) {
-	payload, err := marshalChatCompletionRequest(request)
+	systemPrompt, userPrompt, err := buildSynthesisPrompt(request.Context)
+	if err != nil {
+		return Result{}, err
+	}
+	promptResult, err := c.Complete(ctx, PromptRequest{
+		Config:       request.Config,
+		SystemPrompt: systemPrompt,
+		UserPrompt:   userPrompt,
+	})
+	if err != nil {
+		return Result{}, err
+	}
+	result, err := parseSynthesisResult(promptResult.Content)
 	if err != nil {
 		return Result{}, err
 	}
 
+	result.SchemaVersion = ResultSchemaVersion
+	result.GeneratedAt = promptResult.GeneratedAt
+	result.Provider = promptResult.Provider
+	result.Model = promptResult.Model
+	result.Status = ResultStatusAvailable
+	result.Used = true
+	result.FallbackReason = ""
+
+	return normalizeResultText(result), nil
+}
+
+func (c OpenAICompatibleClient) Complete(ctx context.Context, request PromptRequest) (PromptResult, error) {
+	payload, err := marshalPromptCompletionRequest(request)
+	if err != nil {
+		return PromptResult{}, err
+	}
+
 	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, chatCompletionsURL(request.Config), bytes.NewReader(payload))
 	if err != nil {
-		return Result{}, fmt.Errorf("build synthesis request: %w", err)
+		return PromptResult{}, fmt.Errorf("build prompt request: %w", err)
 	}
 	httpRequest.Header.Set("Authorization", "Bearer "+strings.TrimSpace(request.Config.APIKey))
 	httpRequest.Header.Set("Content-Type", "application/json")
@@ -44,43 +73,37 @@ func (c OpenAICompatibleClient) Synthesize(ctx context.Context, request Request)
 
 	httpResponse, err := c.httpClient.Do(httpRequest)
 	if err != nil {
-		return Result{}, fmt.Errorf("send synthesis request: %w", err)
+		return PromptResult{}, fmt.Errorf("send prompt request: %w", err)
 	}
 	defer httpResponse.Body.Close()
 
 	responseBody, err := io.ReadAll(io.LimitReader(httpResponse.Body, 2<<20))
 	if err != nil {
-		return Result{}, fmt.Errorf("read synthesis response: %w", err)
+		return PromptResult{}, fmt.Errorf("read prompt response: %w", err)
 	}
 
 	if httpResponse.StatusCode < http.StatusOK || httpResponse.StatusCode >= http.StatusMultipleChoices {
-		return Result{}, httpStatusError(httpResponse.StatusCode, responseBody)
+		return PromptResult{}, httpStatusError(httpResponse.StatusCode, responseBody)
 	}
 
 	var response openAICompatibleChatResponse
 	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return Result{}, fmt.Errorf("decode synthesis response: %w", err)
+		return PromptResult{}, fmt.Errorf("decode prompt response: %w", err)
 	}
 
 	content, err := response.messageContent()
 	if err != nil {
-		return Result{}, err
+		return PromptResult{}, err
 	}
 
-	result, err := parseSynthesisResult(content)
-	if err != nil {
-		return Result{}, err
-	}
-
-	result.SchemaVersion = ResultSchemaVersion
-	result.GeneratedAt = time.Now().UTC()
-	result.Provider = normalizeName(request.Config.Name)
-	result.Model = strings.TrimSpace(request.Config.Model)
-	result.Status = ResultStatusAvailable
-	result.Used = true
-	result.FallbackReason = ""
-
-	return normalizeResultText(result), nil
+	return PromptResult{
+		GeneratedAt: time.Now().UTC(),
+		Provider:    normalizeName(request.Config.Name),
+		Model:       strings.TrimSpace(request.Config.Model),
+		Status:      ResultStatusAvailable,
+		Used:        true,
+		Content:     strings.TrimSpace(content),
+	}, nil
 }
 
 type openAICompatibleChatRequest struct {
@@ -105,23 +128,18 @@ type openAICompatibleMessage struct {
 	Content string `json:"content"`
 }
 
-func marshalChatCompletionRequest(request Request) ([]byte, error) {
-	systemPrompt, userPrompt, err := buildSynthesisPrompt(request.Context)
-	if err != nil {
-		return nil, err
-	}
-
+func marshalPromptCompletionRequest(request PromptRequest) ([]byte, error) {
 	payload := openAICompatibleChatRequest{
 		Model: strings.TrimSpace(request.Config.Model),
 		Messages: []openAICompatibleChatMessage{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: userPrompt},
+			{Role: "system", Content: strings.TrimSpace(request.SystemPrompt)},
+			{Role: "user", Content: strings.TrimSpace(request.UserPrompt)},
 		},
 	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("marshal synthesis request: %w", err)
+		return nil, fmt.Errorf("marshal prompt request: %w", err)
 	}
 	return body, nil
 }

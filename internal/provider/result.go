@@ -16,11 +16,28 @@ const (
 
 type Client interface {
 	Synthesize(context.Context, Request) (Result, error)
+	Complete(context.Context, PromptRequest) (PromptResult, error)
 }
 
 type Request struct {
 	Config  Config
 	Context CondensedContext
+}
+
+type PromptRequest struct {
+	Config       Config
+	SystemPrompt string
+	UserPrompt   string
+}
+
+type PromptResult struct {
+	GeneratedAt    time.Time `json:"generated_at"`
+	Provider       string    `json:"provider"`
+	Model          string    `json:"model"`
+	Status         string    `json:"status"`
+	Used           bool      `json:"used"`
+	Content        string    `json:"content,omitempty"`
+	FallbackReason string    `json:"fallback_reason,omitempty"`
 }
 
 type Result struct {
