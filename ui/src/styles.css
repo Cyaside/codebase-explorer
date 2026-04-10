@@ -198,6 +198,10 @@
     @apply bg-emerald-400;
   }
 
+  .graph-node-dot-ai {
+    @apply bg-cyan-300;
+  }
+
   .graph-node-handle {
     opacity: 0;
   }

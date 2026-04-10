@@ -464,6 +464,9 @@ export function App() {
       const response = await startAnalyzeRun({
         repo_path: repoPath,
         deterministic_only: false,
+        ai_mode: "full-ai",
+        ai_read_budget: 24,
+        ai_token_budget: 32000,
         support_files: activeWorkspace.supportFiles,
         extra_ignore_patterns: activeWorkspace.ignorePatterns,
         provider: buildProviderPayload(profile, apiKey),

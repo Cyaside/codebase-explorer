@@ -172,6 +172,8 @@ export interface BundleData {
       rationale: string;
     }>;
   };
+  full_ai: FullAISummary;
+  full_ai_execution: FullAIExecution;
   mermaid: {
     architecture: string;
     dependencies: string;
@@ -180,6 +182,72 @@ export interface BundleData {
     architecture_diagram: string;
     dependency_diagram: string;
   };
+}
+
+export interface FullAISummary {
+  enabled: boolean;
+  mode: string;
+  status: string;
+  read_budget: number;
+  token_budget: number;
+  planned_targets: number;
+  planned_functions: number;
+  collected_items: number;
+  failed_items: number;
+  prepared_functions: number;
+  executed_functions: number;
+  verified_functions: number;
+  note: string;
+}
+
+export interface FullAIExecution {
+  mode: string;
+  provider: string;
+  model: string;
+  status: string;
+  executed_count: number;
+  verified_count: number;
+  failed_count: number;
+  note: string;
+  results: FullAIResult[];
+}
+
+export interface FullAIResult {
+  name: string;
+  status: string;
+  instruction_path: string;
+  evidence_paths: string[];
+  output: FullAIOutput;
+  verified: boolean;
+  error: string;
+}
+
+export interface FullAIOutput {
+  summary: string;
+  key_findings: FullAIFinding[];
+  recommendations: string[];
+  graph_edges: FullAIGraphEdge[];
+  issue_signals: FullAIIssueSignal[];
+  uncertainties: string[];
+}
+
+export interface FullAIFinding {
+  claim: string;
+  evidence_paths: string[];
+  confidence: string;
+}
+
+export interface FullAIGraphEdge {
+  from: string;
+  to: string;
+  label: string;
+  evidence_paths: string[];
+}
+
+export interface FullAIIssueSignal {
+  title: string;
+  severity: string;
+  evidence_paths: string[];
 }
 
 export interface PersistedUIState {

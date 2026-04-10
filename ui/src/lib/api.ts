@@ -17,6 +17,9 @@ import {
 export interface AnalyzePayload {
   repo_path: string;
   deterministic_only: boolean;
+  ai_mode: "standard" | "full-ai";
+  ai_read_budget: number;
+  ai_token_budget: number;
   support_files: string[];
   extra_ignore_patterns: string[];
   provider: {

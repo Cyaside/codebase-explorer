@@ -97,6 +97,8 @@ export function normalizeBundleData(value: unknown): BundleData {
   const metrics = asRecord(record.metrics);
   const changes = asRecord(record.changes);
   const ai = asRecord(record.ai);
+  const fullAI = asRecord(record.full_ai);
+  const fullAIExecution = asRecord(record.full_ai_execution);
   const mermaid = asRecord(record.mermaid);
   const links = asRecord(record.links);
 
@@ -194,6 +196,8 @@ export function normalizeBundleData(value: unknown): BundleData {
         };
       }),
     },
+    full_ai: normalizeFullAISummary(fullAI),
+    full_ai_execution: normalizeFullAIExecution(fullAIExecution),
     mermaid: {
       architecture: asString(mermaid.architecture),
       dependencies: asString(mermaid.dependencies),
@@ -202,6 +206,79 @@ export function normalizeBundleData(value: unknown): BundleData {
       architecture_diagram: asString(links.architecture_diagram),
       dependency_diagram: asString(links.dependency_diagram),
     },
+  };
+}
+
+function normalizeFullAISummary(record: UnknownRecord) {
+  return {
+    enabled: asBoolean(record.enabled),
+    mode: asString(record.mode),
+    status: asString(record.status),
+    read_budget: asNumber(record.read_budget),
+    token_budget: asNumber(record.token_budget),
+    planned_targets: asNumber(record.planned_targets),
+    planned_functions: asNumber(record.planned_functions),
+    collected_items: asNumber(record.collected_items),
+    failed_items: asNumber(record.failed_items),
+    prepared_functions: asNumber(record.prepared_functions),
+    executed_functions: asNumber(record.executed_functions),
+    verified_functions: asNumber(record.verified_functions),
+    note: asString(record.note),
+  };
+}
+
+function normalizeFullAIExecution(record: UnknownRecord) {
+  return {
+    mode: asString(record.mode),
+    provider: asString(record.provider),
+    model: asString(record.model),
+    status: asString(record.status),
+    executed_count: asNumber(record.executed_count),
+    verified_count: asNumber(record.verified_count),
+    failed_count: asNumber(record.failed_count),
+    note: asString(record.note),
+    results: asArray(record.results).map((item) => {
+      const result = asRecord(item);
+      const output = asRecord(result.output);
+      return {
+        name: asString(result.name),
+        status: asString(result.status),
+        instruction_path: asString(result.instruction_path),
+        evidence_paths: asStringArray(result.evidence_paths),
+        output: {
+          summary: asString(output.summary),
+          key_findings: asArray(output.key_findings).map((findingItem) => {
+            const finding = asRecord(findingItem);
+            return {
+              claim: asString(finding.claim),
+              evidence_paths: asStringArray(finding.evidence_paths),
+              confidence: asString(finding.confidence),
+            };
+          }),
+          recommendations: asStringArray(output.recommendations),
+          graph_edges: asArray(output.graph_edges).map((edgeItem) => {
+            const edge = asRecord(edgeItem);
+            return {
+              from: asString(edge.from),
+              to: asString(edge.to),
+              label: asString(edge.label),
+              evidence_paths: asStringArray(edge.evidence_paths),
+            };
+          }),
+          issue_signals: asArray(output.issue_signals).map((signalItem) => {
+            const signal = asRecord(signalItem);
+            return {
+              title: asString(signal.title),
+              severity: asString(signal.severity),
+              evidence_paths: asStringArray(signal.evidence_paths),
+            };
+          }),
+          uncertainties: asStringArray(output.uncertainties),
+        },
+        verified: asBoolean(result.verified),
+        error: asString(result.error),
+      };
+    }),
   };
 }
 

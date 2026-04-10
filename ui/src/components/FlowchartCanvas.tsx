@@ -11,6 +11,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 
+import { fullAIResult, hasFullAIOutput } from "@/lib/fullAi";
 import type { InspectorState, WorkbenchBundle } from "@/lib/types";
 
 const graphNodeWidth = 238;
@@ -25,7 +26,7 @@ interface GraphNodeData extends Record<string, unknown> {
   eyebrow: string;
   title: string;
   description: string;
-  tone: "project" | "module" | "entry" | "issue" | "reading";
+  tone: "project" | "module" | "entry" | "issue" | "reading" | "ai";
   inspector: InspectorState;
 }
 
@@ -118,7 +119,7 @@ function buildFlowGraph(bundle: WorkbenchBundle) {
     data: {
       eyebrow: "Workspace",
       title: bundle.summary.project_name || bundle.summary.name,
-      description: `${bundle.summary.project_type || "Repository"} · ${bundle.summary.total_files} files · ${bundle.summary.total_lines} lines`,
+      description: `${bundle.summary.project_type || "Repository"} - ${bundle.summary.total_files} files - ${bundle.summary.total_lines} lines`,
       inspector: {
         eyebrow: "Workspace",
         title: bundle.summary.project_name || bundle.summary.name,
@@ -177,7 +178,7 @@ function buildFlowGraph(bundle: WorkbenchBundle) {
       data: {
         eyebrow: "Module",
         title: module.path,
-        description: `${module.file_count} files · ${module.total_lines} lines · ${module.entry_point_count} entry point(s)`,
+        description: `${module.file_count} files - ${module.total_lines} lines - ${module.entry_point_count} entry point(s)`,
         inspector: {
           eyebrow: "Module",
           title: module.path,
@@ -207,7 +208,7 @@ function buildFlowGraph(bundle: WorkbenchBundle) {
       data: {
         eyebrow: "Issue focus",
         title: area.path,
-        description: `${area.mention_count} mention(s) · ${area.confidence}`,
+        description: `${area.mention_count} mention(s) - ${area.confidence}`,
         inspector: {
           eyebrow: "Issue focus",
           title: area.path,
@@ -262,7 +263,77 @@ function buildFlowGraph(bundle: WorkbenchBundle) {
     edges.push({ id: `${parent}-${nodeID}`, source: parent, target: nodeID });
   }
 
+  appendAIFlow(bundle, modules, nodes, edges);
+
   return layoutGraph(nodes, edges);
+}
+
+function appendAIFlow(bundle: WorkbenchBundle, modules: WorkbenchBundle["data"]["modules"], nodes: FlowNode[], edges: Edge[]) {
+  const result = fullAIResult(bundle, "flowchart");
+  if (!hasFullAIOutput(result) || !result.output.graph_edges.length) {
+    return;
+  }
+
+  const nodeIDs = new Set(nodes.map((node) => node.id));
+  for (const edge of result.output.graph_edges.slice(0, 10)) {
+    const source = ensureAIFlowNode(bundle, modules, nodes, nodeIDs, edge.from, edge.evidence_paths);
+    const target = ensureAIFlowNode(bundle, modules, nodes, nodeIDs, edge.to, edge.evidence_paths);
+    const edgeID = `ai:${source}->${target}:${edge.label}`;
+    if (!edges.some((item) => item.id === edgeID)) {
+      edges.push({ id: edgeID, label: edge.label, source, target });
+    }
+  }
+}
+
+function ensureAIFlowNode(
+  bundle: WorkbenchBundle,
+  modules: WorkbenchBundle["data"]["modules"],
+  nodes: FlowNode[],
+  nodeIDs: Set<string>,
+  endpoint: string,
+  evidencePaths: string[],
+) {
+  const title = endpoint.trim();
+  if (!title) {
+    return "project-root";
+  }
+
+  const module = modules.find((item) => title === item.path || title.startsWith(item.path));
+  if (module) {
+    return `module:${module.path}`;
+  }
+
+  const nodeID = `ai:${title.toLowerCase().replace(/[^a-z0-9._-]+/g, "-")}`;
+  if (nodeIDs.has(nodeID)) {
+    return nodeID;
+  }
+
+  nodeIDs.add(nodeID);
+  nodes.push({
+    data: {
+      eyebrow: "AI flow",
+      title,
+      description: "Flow node generated from full-AI graph evidence.",
+      inspector: {
+        eyebrow: "AI flow",
+        title,
+        description: "This node was emitted by the full-AI flowchart function.",
+        notes: evidencePaths.length ? evidencePaths : ["No evidence paths attached."],
+        properties: [
+          { label: "Project", value: bundle.summary.project_name || bundle.summary.name },
+          { label: "Source", value: "full-ai flowchart" },
+        ],
+      },
+      tone: "ai",
+    },
+    id: nodeID,
+    position: { x: 0, y: 0 },
+    sourcePosition: Position.Bottom,
+    targetPosition: Position.Top,
+    type: "card",
+  });
+
+  return nodeID;
 }
 
 function layoutGraph(nodes: FlowNode[], edges: Edge[]) {
