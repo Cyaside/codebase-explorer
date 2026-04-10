@@ -256,6 +256,8 @@ func buildViewerData(request WriteRequest, bundleName string) viewer.BundleData 
 		ReadingPath:          request.Analysis.ReadingPath,
 		Changes:              request.Changes,
 		AI:                   request.AIResult,
+		FullAI:               request.FullAISummary,
+		FullAIExecution:      request.FullAIExecution,
 		Mermaid: viewer.MermaidData{
 			Architecture: report.ArchitectureMermaid(request.Analysis),
 			Dependencies: report.DependenciesMermaid(request.Analysis),

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/changes"
+	"github.com/Cyaside/codebase-explorer/internal/fullai"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 )
 
@@ -31,6 +32,8 @@ type BundleData struct {
 	ReadingPath          []analyzer.ReadingPathItem `json:"reading_path"`
 	Changes              changes.Result             `json:"changes"`
 	AI                   provider.Result            `json:"ai"`
+	FullAI               fullai.Summary             `json:"full_ai"`
+	FullAIExecution      fullai.Execution           `json:"full_ai_execution"`
 	Mermaid              MermaidData                `json:"mermaid"`
 	Links                LinkData                   `json:"links"`
 }
