@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/Cyaside/codebase-explorer/internal/config"
@@ -113,7 +114,10 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 func TestAnalyzeExecutesFullAIFunctionsWithProvider(t *testing.T) {
 	t.Parallel()
 
+	var requestCount atomic.Int32
 	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+
 		var payload struct {
 			Messages []struct {
 				Content string `json:"content"`
@@ -162,5 +166,11 @@ func TestAnalyzeExecutesFullAIFunctionsWithProvider(t *testing.T) {
 	}
 	if result.FullAI.ExecutedFunctions == 0 || result.FullAI.VerifiedFunctions == 0 {
 		t.Fatalf("expected executed and verified function counts, got %#v", result.FullAI)
+	}
+	if result.AI.Status != "succeeded" || !result.AI.Used {
+		t.Fatalf("expected legacy AI summary to be projected from full-ai output, got %#v", result.AI)
+	}
+	if got := int(requestCount.Load()); got != result.FullAI.PreparedFunctions {
+		t.Fatalf("expected provider call per full-ai function only, got %d calls for %d functions", got, result.FullAI.PreparedFunctions)
 	}
 }

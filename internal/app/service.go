@@ -87,7 +87,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	}
 	aiContext := buildCondensedContext(analysis)
 	emitAnalyzeProgress(request, "ai-context", "ready", summarizeAIContext(aiContext))
-	aiResult, providerCacheStatus, err := s.buildAIResult(ctx, request, analysis, request.DeterministicOnly, aiContext)
+	aiResult, providerCacheStatus, err := s.buildFinalAIResult(ctx, request, analysis, aiContext, fullAIExecution)
 	if err != nil {
 		return AnalyzeResult{}, err
 	}
