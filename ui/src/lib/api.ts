@@ -3,6 +3,8 @@ import type {
   AnalyzeRun,
   BundleSummary,
   ConnectionProfile,
+  ProviderModelsResponse,
+  ProviderTestResponse,
   WorkbenchBundle,
   WorkbenchStatusResponse,
 } from "@/lib/types";
@@ -28,6 +30,15 @@ export interface AnalyzePayload {
     api_key: string;
     base_url: string;
   } | null;
+}
+
+export interface ProviderDiagnosticPayload {
+  provider: {
+    name: string;
+    model: string;
+    api_key: string;
+    base_url: string;
+  };
 }
 
 async function requestJSON<T>(url: string, options?: RequestInit): Promise<T> {
@@ -84,6 +95,20 @@ export function cancelAnalyzeRun(runID: string) {
   }).then((response) => ({
     run: normalizeAnalyzeRun(response.run),
   }));
+}
+
+export function fetchProviderModels(payload: ProviderDiagnosticPayload) {
+  return requestJSON<ProviderModelsResponse>("/api/provider/models", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function testProvider(payload: ProviderDiagnosticPayload) {
+  return requestJSON<ProviderTestResponse>("/api/provider/test", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function buildProviderPayload(profile: ConnectionProfile, apiKey: string) {

@@ -262,6 +262,115 @@ func TestWorkbenchAnalyzeAcceptsFullAIMode(t *testing.T) {
 	}
 }
 
+func TestWorkbenchProviderModelsListsRemoteModels(t *testing.T) {
+	t.Parallel()
+
+	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/models" {
+			t.Fatalf("expected model list path, got %q", r.URL.Path)
+		}
+		if authorization := r.Header.Get("Authorization"); authorization != "Bearer ui-key" {
+			t.Fatalf("expected bearer auth header, got %q", authorization)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"mistral-small-latest"},{"id":"mistral-large-latest"}]}`))
+	}))
+	defer providerServer.Close()
+
+	service := New(config.Settings{
+		DefaultOutputRoot: t.TempDir(),
+		AppVersion:        "test",
+		ConfigSource:      "test",
+	})
+	handler, err := service.workbenchHandler(service.settings.DefaultOutputRoot)
+	if err != nil {
+		t.Fatalf("build workbench handler: %v", err)
+	}
+
+	body := marshalWorkbenchProviderPayload(t, providerServer.URL, "")
+	request := httptest.NewRequest(http.MethodPost, "/api/provider/models", bytes.NewReader(body))
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+
+	var response struct {
+		Count  int      `json:"count"`
+		Models []string `json:"models"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode provider models response: %v", err)
+	}
+	if response.Count != 2 || len(response.Models) != 2 {
+		t.Fatalf("expected two model ids, got %#v", response)
+	}
+}
+
+func TestWorkbenchProviderTestCallsCompletion(t *testing.T) {
+	t.Parallel()
+
+	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			t.Fatalf("expected chat completion path, got %q", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"Codebase Explorer provider test ok"}}]}`))
+	}))
+	defer providerServer.Close()
+
+	service := New(config.Settings{
+		DefaultOutputRoot: t.TempDir(),
+		AppVersion:        "test",
+		ConfigSource:      "test",
+	})
+	handler, err := service.workbenchHandler(service.settings.DefaultOutputRoot)
+	if err != nil {
+		t.Fatalf("build workbench handler: %v", err)
+	}
+
+	body := marshalWorkbenchProviderPayload(t, providerServer.URL, "mistral-small-latest")
+	request := httptest.NewRequest(http.MethodPost, "/api/provider/test", bytes.NewReader(body))
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+
+	var response struct {
+		Status string `json:"status"`
+		Output string `json:"output"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode provider test response: %v", err)
+	}
+	if response.Status != "succeeded" || response.Output == "" {
+		t.Fatalf("expected provider test output, got %#v", response)
+	}
+}
+
+func marshalWorkbenchProviderPayload(t *testing.T, baseURL string, model string) []byte {
+	t.Helper()
+
+	requestBody := map[string]any{
+		"provider": map[string]any{
+			"name":     "openai-compatible",
+			"model":    model,
+			"api_key":  "ui-key",
+			"base_url": baseURL,
+		},
+	}
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		t.Fatalf("marshal provider payload: %v", err)
+	}
+	return body
+}
+
 func TestWorkbenchBundleDeleteRemovesBundleDirectory(t *testing.T) {
 	t.Parallel()
 

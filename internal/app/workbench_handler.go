@@ -75,6 +75,8 @@ func (s Service) workbenchHandler(outputRoot string) (http.Handler, error) {
 		s.handleWorkbenchStatus(w, r, outputRoot)
 	})
 	mux.HandleFunc("/api/doctor", s.handleWorkbenchDoctor)
+	mux.HandleFunc("/api/provider/models", s.handleWorkbenchProviderModels)
+	mux.HandleFunc("/api/provider/test", s.handleWorkbenchProviderTest)
 	mux.HandleFunc("/api/analyze", func(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkbenchAnalyze(w, r)
 	})

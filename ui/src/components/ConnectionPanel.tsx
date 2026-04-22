@@ -1,14 +1,17 @@
-import { CopyPlus, KeyRound, Save, Trash2 } from "lucide-react";
+import { Activity, CopyPlus, KeyRound, ListChecks, Save, Trash2 } from "lucide-react";
 
-import type { ConnectionProfile, SupportedProviderOption } from "@/lib/types";
+import type { ConnectionProfile, ProviderDiagnosticsState, SupportedProviderOption } from "@/lib/types";
 
 interface ConnectionPanelProps {
   apiKey: string;
+  diagnostics: ProviderDiagnosticsState;
   onAPIKeyChange: (value: string) => void;
   onChange: (profile: ConnectionProfile) => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onListModels: () => void;
   onSave: () => void;
+  onTestProvider: () => void;
   profile: ConnectionProfile;
   providerOptions: SupportedProviderOption[];
   validationErrors: string[];
@@ -16,11 +19,14 @@ interface ConnectionPanelProps {
 
 export function ConnectionPanel({
   apiKey,
+  diagnostics,
   onAPIKeyChange,
   onChange,
   onDelete,
   onDuplicate,
+  onListModels,
   onSave,
+  onTestProvider,
   profile,
   providerOptions,
   validationErrors,
@@ -139,6 +145,63 @@ export function ConnectionPanel({
           ))}
         </div>
       ) : null}
+
+      <div className="rounded-2xl border border-zinc-900 bg-black/50 px-3 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold uppercase tracking-[0.18em] text-zinc-500 text-xs">Diagnostics</p>
+            <p className="mt-2 text-xs leading-5 text-zinc-500">Test the selected endpoint, key, and model before running analysis.</p>
+          </div>
+          {diagnostics.busy ? <span className="run-pill run-pill-busy">{diagnostics.mode}</span> : null}
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className="secondary-control" disabled={diagnostics.busy} onClick={onListModels} type="button">
+            <ListChecks className="size-4" />
+            List models
+          </button>
+          <button className="secondary-control" disabled={diagnostics.busy} onClick={onTestProvider} type="button">
+            <Activity className="size-4" />
+            Test model
+          </button>
+        </div>
+
+        {diagnostics.error ? <p className="mt-3 rounded-2xl border border-red-950 bg-red-950/35 px-3 py-2 text-sm text-red-200">{diagnostics.error}</p> : null}
+        {diagnostics.test ? (
+          <div className="mt-3 rounded-2xl border border-zinc-900 bg-black px-3 py-3 text-xs leading-6 text-zinc-400">
+            <p className="font-semibold text-zinc-200">{diagnostics.test.status} - {diagnostics.test.model}</p>
+            <p>Latency: {diagnostics.test.latency_ms}ms</p>
+            <p className="mt-2 text-zinc-300">{diagnostics.test.output}</p>
+          </div>
+        ) : null}
+        {diagnostics.models ? (
+          <div className="mt-3 rounded-2xl border border-zinc-900 bg-black px-3 py-3 text-xs leading-6 text-zinc-400">
+            <p className="font-semibold text-zinc-200">{diagnostics.models.count} model(s) returned in {diagnostics.models.latency_ms}ms</p>
+            <div className="mt-2 max-h-40 overflow-y-auto pr-1">
+              {diagnostics.models.models.slice(0, 80).map((model) => (
+                <button
+                  className={`block w-full truncate rounded-xl px-2 py-1 text-left hover:bg-zinc-950 ${
+                    model === profile.provider.model ? "text-zinc-50" : "text-zinc-500"
+                  }`}
+                  key={model}
+                  onClick={() =>
+                    onChange({
+                      ...profile,
+                      provider: {
+                        ...profile.provider,
+                        model,
+                      },
+                    })
+                  }
+                  type="button"
+                >
+                  {model}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <button className="secondary-control" onClick={onSave} type="button">

@@ -13,6 +13,7 @@ import type {
   BundleSummary,
   ConnectionProfile,
   InspectorState,
+  ProviderDiagnosticsState,
   SavedWorkspace,
   SupportedProviderOption,
   TabKey,
@@ -37,6 +38,7 @@ interface TabPanelsProps {
   onDeleteWorkspace: (workspaceID: string) => void;
   onDuplicateProfile: () => void;
   onInspect: (value: InspectorState | null) => void;
+  onListProviderModels: () => void;
   onOpenConnections: () => void;
   onProfileChange: (profile: ConnectionProfile) => void;
   onSaveProfile: () => void;
@@ -45,8 +47,10 @@ interface TabPanelsProps {
   onSelectWorkspace: (workspaceID: string) => void;
   onSubmitAnalyze: () => void;
   onTabChange: (value: TabKey) => void;
+  onTestProvider: () => void;
   onWorkspaceChange: (workspace: SavedWorkspace) => void;
   profile: ConnectionProfile;
+  providerDiagnostics: ProviderDiagnosticsState;
   profiles: ConnectionProfile[];
   providerOptions: SupportedProviderOption[];
   repoInputRef: RefObject<HTMLInputElement | null>;
@@ -74,6 +78,7 @@ export function TabPanels(props: TabPanelsProps) {
     onDeleteWorkspace,
     onDuplicateProfile,
     onInspect,
+    onListProviderModels,
     onOpenConnections,
     onProfileChange,
     onSaveProfile,
@@ -82,8 +87,10 @@ export function TabPanels(props: TabPanelsProps) {
     onSelectWorkspace,
     onSubmitAnalyze,
     onTabChange,
+    onTestProvider,
     onWorkspaceChange,
     profile,
+    providerDiagnostics,
     profiles,
     providerOptions,
     repoInputRef,
@@ -166,11 +173,14 @@ export function TabPanels(props: TabPanelsProps) {
 
           <ConnectionPanel
             apiKey={apiKey}
+            diagnostics={providerDiagnostics}
             onAPIKeyChange={onAPIKeyChange}
             onChange={onProfileChange}
             onDelete={onDeleteProfile}
             onDuplicate={onDuplicateProfile}
+            onListModels={onListProviderModels}
             onSave={onSaveProfile}
+            onTestProvider={onTestProvider}
             profile={profile}
             providerOptions={providerOptions}
             validationErrors={validationErrors}
@@ -227,4 +237,3 @@ function TabTrigger({ children, value }: { children: ReactNode; value: TabKey })
     </Tabs.Trigger>
   );
 }
-

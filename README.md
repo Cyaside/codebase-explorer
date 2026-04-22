@@ -98,6 +98,7 @@ Workbench adalah local webapp ringan yang tetap jalan dari binary Go yang sama, 
 - membuka satu project aktif lewat saved workspace lokal
 - menyimpan beberapa connection profile secara lokal di browser
 - menjalankan full-AI analysis dari koneksi provider terpilih
+- mengetes provider, model, API key, dan model list langsung dari tab Connections
 - langsung membaca dashboard, summary, architecture, flowchart, issue tracking, dan recommendations
 - menampilkan flowchart project langsung di tab interaktif, bukan hanya source diagram mentah
 - melihat status full-AI, jumlah evidence yang dibaca, function outputs, dan verified counts

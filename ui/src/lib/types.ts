@@ -42,6 +42,30 @@ export interface SupportedProviderOption {
   requires_base_url: boolean;
 }
 
+export interface ProviderModelsResponse {
+  provider: string;
+  base_url: string;
+  count: number;
+  models: string[];
+  latency_ms: number;
+}
+
+export interface ProviderTestResponse {
+  provider: string;
+  model: string;
+  status: string;
+  output: string;
+  latency_ms: number;
+}
+
+export interface ProviderDiagnosticsState {
+  busy: boolean;
+  mode: "models" | "test" | "";
+  error: string;
+  models: ProviderModelsResponse | null;
+  test: ProviderTestResponse | null;
+}
+
 export interface WorkbenchStatusResponse {
   app_version: string;
   output_root: string;

@@ -4,7 +4,18 @@ import { Command, FolderOpenDot, RefreshCw } from "lucide-react";
 import { CommandPalette, type CommandPaletteAction } from "@/components/CommandPalette";
 import { Sidebar } from "@/components/Sidebar";
 import { TabPanels } from "@/components/TabPanels";
-import { buildProviderPayload, cancelAnalyzeRun, deleteBundle, fetchAnalyzeRun, fetchBundle, fetchStatus, mergeBundleSummary, startAnalyzeRun } from "@/lib/api";
+import {
+  buildProviderPayload,
+  cancelAnalyzeRun,
+  deleteBundle,
+  fetchAnalyzeRun,
+  fetchBundle,
+  fetchProviderModels,
+  fetchStatus,
+  mergeBundleSummary,
+  startAnalyzeRun,
+  testProvider,
+} from "@/lib/api";
 import { useWorkbenchShortcuts } from "@/hooks/useWorkbenchShortcuts";
 import { createWorkspace, defaultProfiles, loadProfiles, loadUIState, loadWorkspaces, persistProfiles, persistUIState, persistWorkspaces } from "@/lib/storage";
 import { openAnalyzeRunStream } from "@/lib/stream";
@@ -12,6 +23,7 @@ import type {
   AnalyzeRun,
   ConnectionProfile,
   InspectorState,
+  ProviderDiagnosticsState,
   SavedWorkspace,
   TabKey,
   WorkbenchBundle,
@@ -36,6 +48,14 @@ const workbenchTabs: TabKey[] = [
   "recommendations",
 ];
 
+const initialProviderDiagnostics: ProviderDiagnosticsState = {
+  busy: false,
+  mode: "",
+  error: "",
+  models: null,
+  test: null,
+};
+
 export function App() {
   const [status, setStatus] = useState<WorkbenchStatusResponse | null>(null);
   const [bundles, setBundles] = useState<WorkbenchStatusResponse["recent_bundles"]>([]);
@@ -51,6 +71,7 @@ export function App() {
   const [errorMessage, setErrorMessage] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [inspector, setInspector] = useState<InspectorState | null>(null);
+  const [providerDiagnostics, setProviderDiagnostics] = useState<ProviderDiagnosticsState>(initialProviderDiagnostics);
 
   const repoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -394,6 +415,81 @@ export function App() {
     setToastMessage(`Saved connection "${profile.label}". API keys remain only in session memory.`);
   }
 
+  async function handleListProviderModels() {
+    const blockingErrors = validationErrors.filter((error) => !error.toLowerCase().includes("model is required"));
+    if (blockingErrors.length) {
+      setErrorMessage(blockingErrors.join(" "));
+      return;
+    }
+
+    setErrorMessage("");
+    setProviderDiagnostics((current) => ({
+      ...current,
+      busy: true,
+      error: "",
+      mode: "models",
+      models: null,
+    }));
+    try {
+      const response = await fetchProviderModels({
+        provider: buildProviderPayload(profile, apiKey),
+      });
+      setProviderDiagnostics((current) => ({
+        ...current,
+        busy: false,
+        error: "",
+        mode: "",
+        models: response,
+      }));
+      setToastMessage(`Loaded ${response.count} model(s) from ${profile.label}.`);
+    } catch (error) {
+      setProviderDiagnostics((current) => ({
+        ...current,
+        busy: false,
+        error: error instanceof Error ? error.message : "Failed to list provider models.",
+        mode: "",
+        models: null,
+      }));
+    }
+  }
+
+  async function handleTestProvider() {
+    if (validationErrors.length) {
+      setErrorMessage(validationErrors.join(" "));
+      return;
+    }
+
+    setErrorMessage("");
+    setProviderDiagnostics((current) => ({
+      ...current,
+      busy: true,
+      error: "",
+      mode: "test",
+      test: null,
+    }));
+    try {
+      const response = await testProvider({
+        provider: buildProviderPayload(profile, apiKey),
+      });
+      setProviderDiagnostics((current) => ({
+        ...current,
+        busy: false,
+        error: "",
+        mode: "",
+        test: response,
+      }));
+      setToastMessage(`Provider test succeeded with ${response.model}.`);
+    } catch (error) {
+      setProviderDiagnostics((current) => ({
+        ...current,
+        busy: false,
+        error: error instanceof Error ? error.message : "Provider test failed.",
+        mode: "",
+        test: null,
+      }));
+    }
+  }
+
   function handleDuplicateProfile() {
     const cloneID = `profile-${Date.now()}`;
     const clone: ConnectionProfile = {
@@ -651,6 +747,9 @@ export function App() {
                 void handleDeleteWorkspace(workspaceID);
               }}
               onDuplicateProfile={handleDuplicateProfile}
+              onListProviderModels={() => {
+                void handleListProviderModels();
+              }}
               onInspect={(value) => {
                 setInspector(value);
                 if (value) {
@@ -659,6 +758,7 @@ export function App() {
               }}
               onOpenConnections={() => setActiveTab("connections")}
               onProfileChange={(nextProfile) => {
+                setProviderDiagnostics(initialProviderDiagnostics);
                 setProfiles((current) => current.map((item) => (item.id === nextProfile.id ? nextProfile : item)));
               }}
               onSaveProfile={handleSaveProfile}
@@ -666,6 +766,7 @@ export function App() {
                 void loadBundle(bundleName, workspaceID);
               }}
               onSelectProfile={(profileID) => {
+                setProviderDiagnostics(initialProviderDiagnostics);
                 if (activeWorkspace) {
                   updateWorkspace(activeWorkspace.id, { selectedProfile: profileID, updatedAt: new Date().toISOString() });
                 }
@@ -674,11 +775,15 @@ export function App() {
                 void selectWorkspace(workspaceID);
               }}
               onSubmitAnalyze={handleAnalyze}
+              onTestProvider={() => {
+                void handleTestProvider();
+              }}
               onTabChange={setActiveTab}
               onWorkspaceChange={(workspace) => {
                 updateWorkspace(workspace.id, workspace);
               }}
               profile={profile}
+              providerDiagnostics={providerDiagnostics}
               profiles={profiles}
               providerOptions={providerOptions}
               repoInputRef={repoInputRef}
