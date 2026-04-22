@@ -134,14 +134,15 @@ type Execution struct {
 }
 
 type FunctionResult struct {
-	Name            string         `json:"name"`
-	Status          string         `json:"status"`
-	InstructionPath string         `json:"instruction_path"`
-	EvidencePaths   []string       `json:"evidence_paths"`
-	RawOutput       string         `json:"raw_output,omitempty"`
-	Output          FunctionOutput `json:"output"`
-	Verified        bool           `json:"verified"`
-	Error           string         `json:"error,omitempty"`
+	Name            string               `json:"name"`
+	Status          string               `json:"status"`
+	InstructionPath string               `json:"instruction_path"`
+	EvidencePaths   []string             `json:"evidence_paths"`
+	RawOutput       string               `json:"raw_output,omitempty"`
+	Output          FunctionOutput       `json:"output"`
+	Verified        bool                 `json:"verified"`
+	Verification    FunctionVerification `json:"verification,omitempty"`
+	Error           string               `json:"error,omitempty"`
 }
 
 type FunctionOutput struct {
