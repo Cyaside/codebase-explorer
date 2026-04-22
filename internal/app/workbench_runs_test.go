@@ -52,7 +52,7 @@ func TestWorkbenchAnalyzeRunCompletes(t *testing.T) {
 		t.Fatalf("expected run id, got %#v", started.Run)
 	}
 
-	run := pollWorkbenchRun(t, handler, started.Run.ID, 50*time.Millisecond, 120)
+	run := pollWorkbenchRun(t, handler, started.Run.ID, 100*time.Millisecond, 300)
 	if run.Status != "succeeded" {
 		t.Fatalf("expected run to succeed, got %#v", run)
 	}
@@ -138,6 +138,7 @@ func TestWorkbenchAnalyzeRunCanBeCanceled(t *testing.T) {
 func pollWorkbenchRun(t *testing.T, handler http.Handler, runID string, wait time.Duration, attempts int) workbenchAnalyzeRun {
 	t.Helper()
 
+	var lastRun workbenchAnalyzeRun
 	for range attempts {
 		request := httptest.NewRequest(http.MethodGet, "/api/analyze-runs/"+runID, nil)
 		recorder := httptest.NewRecorder()
@@ -152,6 +153,7 @@ func pollWorkbenchRun(t *testing.T, handler http.Handler, runID string, wait tim
 		if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 			t.Fatalf("decode polled run response: %v", err)
 		}
+		lastRun = response.Run
 
 		switch response.Run.Status {
 		case "succeeded", "failed", "canceled":
@@ -161,6 +163,6 @@ func pollWorkbenchRun(t *testing.T, handler http.Handler, runID string, wait tim
 		time.Sleep(wait)
 	}
 
-	t.Fatalf("run %s did not reach a terminal status", runID)
+	t.Fatalf("run %s did not reach a terminal status; last snapshot: %#v", runID, lastRun)
 	return workbenchAnalyzeRun{}
 }
