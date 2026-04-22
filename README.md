@@ -129,3 +129,7 @@ Masalah yang paling umum:
 ## Status
 
 Deterministic analyzer, AI synthesis opsional, full-AI exploration, visual workbench, change-awareness, cache filesystem, `export`, dan `cache clear` sudah aktif. Produk sekarang sudah bisa dipakai end-to-end sebagai local-first repository orientation tool dengan optional deep AI pass.
+
+## License
+
+Codebase Explorer is licensed under the [Apache License 2.0](LICENSE).
