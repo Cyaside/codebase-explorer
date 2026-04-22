@@ -99,6 +99,7 @@ export function normalizeBundleData(value: unknown): BundleData {
   const ai = asRecord(record.ai);
   const fullAI = asRecord(record.full_ai);
   const fullAIExecution = asRecord(record.full_ai_execution);
+  const fullAIVerification = asRecord(record.full_ai_verification);
   const mermaid = asRecord(record.mermaid);
   const links = asRecord(record.links);
 
@@ -198,6 +199,7 @@ export function normalizeBundleData(value: unknown): BundleData {
     },
     full_ai: normalizeFullAISummary(fullAI),
     full_ai_execution: normalizeFullAIExecution(fullAIExecution),
+    full_ai_verification: normalizeFullAIVerification(fullAIVerification),
     mermaid: {
       architecture: asString(mermaid.architecture),
       dependencies: asString(mermaid.dependencies),
@@ -276,7 +278,39 @@ function normalizeFullAIExecution(record: UnknownRecord) {
           uncertainties: asStringArray(output.uncertainties),
         },
         verified: asBoolean(result.verified),
+        verification: normalizeFullAIFunctionVerification(asRecord(result.verification)),
         error: asString(result.error),
+      };
+    }),
+  };
+}
+
+function normalizeFullAIVerification(record: UnknownRecord) {
+  return {
+    status: asString(record.status),
+    verified_count: asNumber(record.verified_count),
+    warning_count: asNumber(record.warning_count),
+    failed_check_count: asNumber(record.failed_check_count),
+    note: asString(record.note),
+    functions: asArray(record.functions).map((item) => normalizeFullAIFunctionVerification(asRecord(item))),
+  };
+}
+
+function normalizeFullAIFunctionVerification(record: UnknownRecord) {
+  return {
+    name: asString(record.name),
+    status: asString(record.status),
+    verified: asBoolean(record.verified),
+    confidence: asNumber(record.confidence),
+    accepted_evidence_paths: asStringArray(record.accepted_evidence_paths),
+    rejected_evidence_paths: asStringArray(record.rejected_evidence_paths),
+    warnings: asStringArray(record.warnings),
+    checks: asArray(record.checks).map((item) => {
+      const check = asRecord(item);
+      return {
+        name: asString(check.name),
+        status: asString(check.status),
+        detail: asString(check.detail),
       };
     }),
   };

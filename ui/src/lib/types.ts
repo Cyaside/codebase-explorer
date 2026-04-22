@@ -198,6 +198,7 @@ export interface BundleData {
   };
   full_ai: FullAISummary;
   full_ai_execution: FullAIExecution;
+  full_ai_verification: FullAIVerification;
   mermaid: {
     architecture: string;
     dependencies: string;
@@ -243,6 +244,7 @@ export interface FullAIResult {
   evidence_paths: string[];
   output: FullAIOutput;
   verified: boolean;
+  verification: FullAIFunctionVerification;
   error: string;
 }
 
@@ -272,6 +274,32 @@ export interface FullAIIssueSignal {
   title: string;
   severity: string;
   evidence_paths: string[];
+}
+
+export interface FullAIVerification {
+  status: string;
+  verified_count: number;
+  warning_count: number;
+  failed_check_count: number;
+  note: string;
+  functions: FullAIFunctionVerification[];
+}
+
+export interface FullAIFunctionVerification {
+  name: string;
+  status: string;
+  verified: boolean;
+  confidence: number;
+  accepted_evidence_paths: string[];
+  rejected_evidence_paths: string[];
+  warnings: string[];
+  checks: FullAIVerificationCheck[];
+}
+
+export interface FullAIVerificationCheck {
+  name: string;
+  status: string;
+  detail: string;
 }
 
 export interface PersistedUIState {
