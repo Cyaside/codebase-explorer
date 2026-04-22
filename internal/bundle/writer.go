@@ -19,20 +19,21 @@ import (
 )
 
 type WriteRequest struct {
-	OutputRoot        string
-	DeterministicOnly bool
-	ScanResult        repo.ScanResult
-	Analysis          analyzer.Result
-	Changes           changes.Result
-	Warnings          []string
-	Cache             CacheMeta
-	AIContext         provider.CondensedContext
-	AIResult          provider.Result
-	FullAIPlan        fullai.Plan
-	FullAIEvidence    fullai.Evidence
-	FullAIFunctions   fullai.Functions
-	FullAIExecution   fullai.Execution
-	FullAISummary     fullai.Summary
+	OutputRoot         string
+	DeterministicOnly  bool
+	ScanResult         repo.ScanResult
+	Analysis           analyzer.Result
+	Changes            changes.Result
+	Warnings           []string
+	Cache              CacheMeta
+	AIContext          provider.CondensedContext
+	AIResult           provider.Result
+	FullAIPlan         fullai.Plan
+	FullAIEvidence     fullai.Evidence
+	FullAIFunctions    fullai.Functions
+	FullAIExecution    fullai.Execution
+	FullAIVerification fullai.Verification
+	FullAISummary      fullai.Summary
 }
 
 type WriteResult struct {
@@ -147,25 +148,29 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-execution.json"), request.FullAIExecution); err != nil {
 		return WriteResult{}, err
 	}
+	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-verification.json"), request.FullAIVerification); err != nil {
+		return WriteResult{}, err
+	}
 	if err := writeJSON(filepath.Join(bundlePath, "changes", "issue-correlation.json"), request.Changes); err != nil {
 		return WriteResult{}, err
 	}
 	contractMeta := map[string]any{
-		"bundle_schema_version":            request.Analysis.SchemaVersion,
-		"analysis_schema_version":          request.Analysis.SchemaVersion,
-		"metrics_schema_version":           request.Analysis.SchemaVersion,
-		"files_schema_version":             request.Analysis.SchemaVersion,
-		"modules_schema_version":           request.Analysis.SchemaVersion,
-		"changes_schema_version":           request.Changes.SchemaVersion,
-		"ai_context_schema_version":        request.AIContext.SchemaVersion,
-		"ai_result_schema_version":         request.AIResult.SchemaVersion,
-		"full_ai_plan_schema_version":      request.FullAIPlan.SchemaVersion,
-		"full_ai_evidence_schema_version":  request.FullAIEvidence.SchemaVersion,
-		"full_ai_functions_schema_version": request.FullAIFunctions.SchemaVersion,
-		"full_ai_execution_schema_version": request.FullAIExecution.SchemaVersion,
-		"full_ai_meta_schema_version":      request.FullAISummary.SchemaVersion,
-		"full_ai_mode":                     request.FullAISummary.Mode,
-		"tool_version":                     w.version,
+		"bundle_schema_version":               request.Analysis.SchemaVersion,
+		"analysis_schema_version":             request.Analysis.SchemaVersion,
+		"metrics_schema_version":              request.Analysis.SchemaVersion,
+		"files_schema_version":                request.Analysis.SchemaVersion,
+		"modules_schema_version":              request.Analysis.SchemaVersion,
+		"changes_schema_version":              request.Changes.SchemaVersion,
+		"ai_context_schema_version":           request.AIContext.SchemaVersion,
+		"ai_result_schema_version":            request.AIResult.SchemaVersion,
+		"full_ai_plan_schema_version":         request.FullAIPlan.SchemaVersion,
+		"full_ai_evidence_schema_version":     request.FullAIEvidence.SchemaVersion,
+		"full_ai_functions_schema_version":    request.FullAIFunctions.SchemaVersion,
+		"full_ai_execution_schema_version":    request.FullAIExecution.SchemaVersion,
+		"full_ai_verification_schema_version": request.FullAIVerification.SchemaVersion,
+		"full_ai_meta_schema_version":         request.FullAISummary.SchemaVersion,
+		"full_ai_mode":                        request.FullAISummary.Mode,
+		"tool_version":                        w.version,
 	}
 	if err := writeJSON(filepath.Join(bundlePath, "data", "contract.json"), contractMeta); err != nil {
 		return WriteResult{}, err
@@ -258,6 +263,7 @@ func buildViewerData(request WriteRequest, bundleName string) viewer.BundleData 
 		AI:                   request.AIResult,
 		FullAI:               request.FullAISummary,
 		FullAIExecution:      request.FullAIExecution,
+		FullAIVerification:   request.FullAIVerification,
 		Mermaid: viewer.MermaidData{
 			Architecture: report.ArchitectureMermaid(request.Analysis),
 			Dependencies: report.DependenciesMermaid(request.Analysis),

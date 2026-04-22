@@ -109,6 +109,21 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 	if execution.SchemaVersion != fullai.ExecutionSchemaVersion {
 		t.Fatalf("expected full-ai execution schema version %q, got %#v", fullai.ExecutionSchemaVersion, execution)
 	}
+
+	verificationContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "full-ai-verification.json"))
+	if err != nil {
+		t.Fatalf("read full-ai verification: %v", err)
+	}
+	var verification struct {
+		SchemaVersion string `json:"schema_version"`
+		Status        string `json:"status"`
+	}
+	if err := json.Unmarshal(verificationContents, &verification); err != nil {
+		t.Fatalf("unmarshal full-ai verification: %v", err)
+	}
+	if verification.SchemaVersion != fullai.VerificationSchemaVersion {
+		t.Fatalf("expected full-ai verification schema version %q, got %#v", fullai.VerificationSchemaVersion, verification)
+	}
 }
 
 func TestAnalyzeExecutesFullAIFunctionsWithProvider(t *testing.T) {

@@ -85,6 +85,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	if err != nil {
 		return AnalyzeResult{}, err
 	}
+	fullAIVerification := fullai.NewVerification(analysis.GeneratedAt, string(request.FullAI.Normalize().Mode), fullAIExecution.Results)
 	aiContext := buildCondensedContext(analysis)
 	emitAnalyzeProgress(request, "ai-context", "ready", summarizeAIContext(aiContext))
 	aiResult, providerCacheStatus, err := s.buildFinalAIResult(ctx, request, analysis, aiContext, fullAIExecution)
@@ -111,13 +112,14 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 			DeterministicStatus: state.Status,
 			ProviderStatus:      combinedProviderStatus,
 		},
-		AIContext:       aiContext,
-		AIResult:        aiResult,
-		FullAIPlan:      fullAIPlan,
-		FullAIEvidence:  fullAIEvidence,
-		FullAIFunctions: fullAIFunctions,
-		FullAIExecution: fullAIExecution,
-		FullAISummary:   fullAISummary,
+		AIContext:          aiContext,
+		AIResult:           aiResult,
+		FullAIPlan:         fullAIPlan,
+		FullAIEvidence:     fullAIEvidence,
+		FullAIFunctions:    fullAIFunctions,
+		FullAIExecution:    fullAIExecution,
+		FullAIVerification: fullAIVerification,
+		FullAISummary:      fullAISummary,
 	})
 	if err != nil {
 		return AnalyzeResult{}, fmt.Errorf("write bundle: %w", err)

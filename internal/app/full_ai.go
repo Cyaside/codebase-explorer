@@ -208,7 +208,8 @@ func executeFullAIJob(ctx context.Context, client provider.Client, config provid
 		}, nil
 	}
 
-	output, verified := fullai.VerifyFunctionOutput(job, output)
+	output, verification := fullai.VerifyFunctionOutputDetailed(job, output)
+	verified := verification.Verified
 	status := "verified"
 	if !verified {
 		status = "unverified"
@@ -222,6 +223,7 @@ func executeFullAIJob(ctx context.Context, client provider.Client, config provid
 		RawOutput:       promptResult.Content,
 		Output:          output,
 		Verified:        verified,
+		Verification:    verification,
 	}, nil
 }
 

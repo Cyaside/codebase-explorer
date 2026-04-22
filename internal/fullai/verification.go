@@ -41,6 +41,17 @@ type functionVerificationBuilder struct {
 	report FunctionVerification
 }
 
+func DisabledVerification(generatedAt time.Time, options Options, note string) Verification {
+	normalized := options.Normalize()
+	return Verification{
+		SchemaVersion: VerificationSchemaVersion,
+		GeneratedAt:   generatedAt,
+		Mode:          string(normalized.Mode),
+		Status:        "disabled",
+		Note:          strings.TrimSpace(note),
+	}
+}
+
 func NewVerification(generatedAt time.Time, mode string, results []FunctionResult) Verification {
 	report := Verification{
 		SchemaVersion: VerificationSchemaVersion,

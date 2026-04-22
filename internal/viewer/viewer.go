@@ -34,6 +34,7 @@ type BundleData struct {
 	AI                   provider.Result            `json:"ai"`
 	FullAI               fullai.Summary             `json:"full_ai"`
 	FullAIExecution      fullai.Execution           `json:"full_ai_execution"`
+	FullAIVerification   fullai.Verification        `json:"full_ai_verification"`
 	Mermaid              MermaidData                `json:"mermaid"`
 	Links                LinkData                   `json:"links"`
 }
