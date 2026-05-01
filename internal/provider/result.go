@@ -11,6 +11,7 @@ const (
 	ResultStatusDisabled  = "disabled"
 	ResultStatusSkipped   = "skipped"
 	ResultStatusAvailable = "succeeded"
+	ResultStatusPartial   = "partial"
 	ResultStatusFallback  = "fallback"
 )
 
@@ -37,6 +38,8 @@ type PromptResult struct {
 	Status         string    `json:"status"`
 	Used           bool      `json:"used"`
 	Content        string    `json:"content,omitempty"`
+	PromptTokens   int       `json:"prompt_tokens,omitempty"`
+	OutputTokens   int       `json:"output_tokens,omitempty"`
 	FallbackReason string    `json:"fallback_reason,omitempty"`
 }
 

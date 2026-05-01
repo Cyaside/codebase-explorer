@@ -10,17 +10,22 @@ import (
 
 func printUsage(output io.Writer) {
 	fmt.Fprintln(output, "Usage:")
-	fmt.Fprintln(output, "  codearch analyze <repo-path> [support-file ...] [--support <file>] [--issues <file>] [--changelog <file>] [--output <dir>] [--deterministic-only] [--full-ai] [--ai-read-budget <n>] [--ai-token-budget <n>] [--ignore <pattern>]")
+	fmt.Fprintln(output, "  codearch analyze <repo-path> [support-file ...] [--connection <saved-id>] [--support <file>] [--issues <file>] [--changelog <file>] [--output <dir>] [--ignore <pattern>]")
+	fmt.Fprintln(output, "    Requires a saved connection or CODEARCH_BASE_URL, CODEARCH_MODEL, and CODEARCH_API_KEY.")
 	fmt.Fprintln(output, "  codearch start [--addr <host:port>] [--no-browser]")
 	fmt.Fprintln(output, "  codearch serve [--addr <host:port>] [--no-browser]")
 	fmt.Fprintln(output, "  codearch open [bundle-path] [--no-browser]")
 	fmt.Fprintln(output, "  codearch export [bundle-path] [--output <zip-path>]")
-	fmt.Fprintln(output, "  codearch doctor")
+	fmt.Fprintln(output, "  codearch doctor [--connection <saved-id>]")
 	fmt.Fprintln(output, "  codearch cache clear")
 }
 
 func printAnalyzeResult(output io.Writer, result app.AnalyzeResult) {
-	fmt.Fprintf(output, "Analysis complete.\n")
+	if result.FullAI.Status == "partial" {
+		fmt.Fprintf(output, "Analysis partial; some AI sections failed.\n")
+	} else {
+		fmt.Fprintf(output, "Analysis complete.\n")
+	}
 	fmt.Fprintf(output, "Project: %s\n", result.ProjectName)
 	fmt.Fprintf(output, "Type: %s\n", result.ProjectType)
 	if result.PrimaryLanguage != "" {
@@ -47,14 +52,11 @@ func printAnalyzeResult(output io.Writer, result app.AnalyzeResult) {
 	if result.AI.Note != "" {
 		fmt.Fprintf(output, "AI note: %s\n", result.AI.Note)
 	}
-	if result.FullAI.Mode == "full-ai" || result.FullAI.Enabled {
-		fmt.Fprintf(output, "Full-AI mode: %s (%s)\n", result.FullAI.Mode, result.FullAI.Status)
-	}
 	if result.FullAI.Enabled {
-		fmt.Fprintf(output, "Full-AI plan: %d target(s), %d function task(s)\n", result.FullAI.PlannedTargets, result.FullAI.PlannedFunctions)
+		fmt.Fprintf(output, "AI analysis: %s; %d target(s), %d task(s)\n", result.FullAI.Status, result.FullAI.PlannedTargets, result.FullAI.PlannedFunctions)
 	}
-	if result.FullAI.Mode == "full-ai" && result.FullAI.Note != "" {
-		fmt.Fprintf(output, "Full-AI note: %s\n", result.FullAI.Note)
+	if result.FullAI.Note != "" {
+		fmt.Fprintf(output, "AI analysis note: %s\n", result.FullAI.Note)
 	}
 	if result.Changes.SupportFileCount > 0 {
 		fmt.Fprintf(output, "Support files: %d input(s), %d parsed item(s)\n", result.Changes.SupportFileCount, result.Changes.ParsedItemCount)
