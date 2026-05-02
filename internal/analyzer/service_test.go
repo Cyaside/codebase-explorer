@@ -17,7 +17,7 @@ func TestAnalyzeDetectsLanguagesAndHotspots(t *testing.T) {
 		t.Fatalf("scan sample repo: %v", err)
 	}
 
-	result := NewService("test").Analyze(scanResult, true)
+	result := NewService("test").Analyze(scanResult)
 
 	if result.ProjectType == "" {
 		t.Fatalf("expected project type to be detected")
@@ -95,7 +95,7 @@ func TestAnalyzeKeepsFixturePathsOutOfOrientationSignals(t *testing.T) {
 		t.Fatalf("scan repository root: %v", err)
 	}
 
-	result := NewService("test").Analyze(scanResult, true)
+	result := NewService("test").Analyze(scanResult)
 
 	for _, entryPoint := range result.EntryPoints {
 		if strings.Contains(entryPoint, "testdata/") {

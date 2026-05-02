@@ -9,19 +9,19 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/config"
 )
 
-func TestAnalyzeWritesDeterministicBundle(t *testing.T) {
+func TestAnalyzeWritesBundle(t *testing.T) {
 	t.Parallel()
 
 	service := New(config.Settings{
 		DefaultOutputRoot: t.TempDir(),
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
 	result, err := service.Analyze(t.Context(), AnalyzeRequest{
-		RepoPath:          repoPath,
-		DeterministicOnly: true,
+		RepoPath: repoPath,
 	})
 	if err != nil {
 		t.Fatalf("analyze sample repo: %v", err)
@@ -30,8 +30,8 @@ func TestAnalyzeWritesDeterministicBundle(t *testing.T) {
 	if result.OutputPath == "" {
 		t.Fatalf("expected output path to be returned")
 	}
-	if result.AI.Status != "skipped" {
-		t.Fatalf("expected deterministic-only analyze to mark AI summary as skipped, got %#v", result.AI)
+	if result.AI.Status != "succeeded" {
+		t.Fatalf("expected AI result in bundle, got %#v", result.AI)
 	}
 
 	analysisPath := filepath.Join(result.OutputPath, "data", "analysis.json")
@@ -68,11 +68,8 @@ func TestAnalyzeWritesDeterministicBundle(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(result.OutputPath, "data", "full-ai-execution.json")); err != nil {
 		t.Fatalf("expected full-ai execution contract to be written: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(result.OutputPath, "architecture", "module-graph.mmd")); err != nil {
-		t.Fatalf("expected architecture mermaid graph to be written: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(result.OutputPath, "dependencies", "dependency-graph.mmd")); err != nil {
-		t.Fatalf("expected dependency mermaid graph to be written: %v", err)
+	if _, err := os.Stat(filepath.Join(result.OutputPath, "data", "graphs.json")); err != nil {
+		t.Fatalf("expected structured graphs to be written: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(result.OutputPath, "ui", "index.html")); err != nil {
 		t.Fatalf("expected viewer index to be written: %v", err)
@@ -112,7 +109,7 @@ func TestAnalyzeWritesDeterministicBundle(t *testing.T) {
 	if aiResult.SchemaVersion != "ai-result.v1" {
 		t.Fatalf("expected AI result schema version ai-result.v1, got %q", aiResult.SchemaVersion)
 	}
-	if aiResult.Status != "skipped" {
-		t.Fatalf("expected deterministic-only analyze to skip AI synthesis, got %#v", aiResult)
+	if aiResult.Status != "succeeded" {
+		t.Fatalf("expected AI result to be persisted, got %#v", aiResult)
 	}
 }

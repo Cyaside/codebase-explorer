@@ -13,7 +13,7 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 )
 
-func TestAnalyzeFallsBackWhenProviderConfigIsInvalid(t *testing.T) {
+func TestAnalyzeRejectsInvalidConnectionBeforeScan(t *testing.T) {
 	t.Parallel()
 
 	service := New(config.Settings{
@@ -25,38 +25,23 @@ func TestAnalyzeFallsBackWhenProviderConfigIsInvalid(t *testing.T) {
 		},
 	})
 
-	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
-	result, err := service.Analyze(t.Context(), AnalyzeRequest{
-		RepoPath: repoPath,
+	_, err := service.Analyze(t.Context(), AnalyzeRequest{RepoPath: filepath.Join(t.TempDir(), "missing-repo")})
+	if err == nil || !strings.Contains(err.Error(), "requires a model") {
+		t.Fatalf("expected connection validation before repository scan, got %v", err)
+	}
+}
+
+func TestAnalyzeRejectsBlankAPIKeyBeforeScan(t *testing.T) {
+	t.Parallel()
+	service := New(config.Settings{DefaultOutputRoot: t.TempDir(), AppVersion: "test"})
+	_, err := service.Analyze(t.Context(), AnalyzeRequest{
+		RepoPath: filepath.Join(t.TempDir(), "missing-repo"),
+		ProviderOverride: &provider.Config{
+			Name: "compatible", Model: "fixture-model", BaseURL: "https://example.com/v1",
+		},
 	})
-	if err != nil {
-		t.Fatalf("analyze sample repo with invalid provider config: %v", err)
-	}
-
-	if result.AI.Status != "fallback" {
-		t.Fatalf("expected analyze result to surface fallback status, got %#v", result.AI)
-	}
-	if result.AI.Note == "" {
-		t.Fatalf("expected analyze result to surface fallback note")
-	}
-
-	aiResultContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "ai-result.json"))
-	if err != nil {
-		t.Fatalf("read ai result contract: %v", err)
-	}
-
-	var aiResult struct {
-		Status         string `json:"status"`
-		FallbackReason string `json:"fallback_reason"`
-	}
-	if err := json.Unmarshal(aiResultContents, &aiResult); err != nil {
-		t.Fatalf("unmarshal ai result contract: %v", err)
-	}
-	if aiResult.Status != "fallback" {
-		t.Fatalf("expected invalid provider config to fall back, got %#v", aiResult)
-	}
-	if aiResult.FallbackReason == "" {
-		t.Fatalf("expected fallback reason to be present")
+	if err == nil || !strings.Contains(err.Error(), "requires an API key") {
+		t.Fatalf("expected missing API key to be rejected before repository path, got %v", err)
 	}
 }
 
@@ -71,16 +56,7 @@ func TestAnalyzeUsesConfiguredProviderWhenAvailable(t *testing.T) {
 			t.Fatalf("expected bearer auth header, got %q", authorization)
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"choices": [
-				{
-					"message": {
-						"content": "{\"project_summary\":\"AI summary\",\"architecture_narrative\":\"AI narrative\",\"hotspot_explanations\":[{\"path\":\"internal/app/service.go\",\"explanation\":\"Coordinates the analyze flow.\"}],\"reading_path_explanations\":[{\"path\":\"cmd/codearch/main.go\",\"rationale\":\"Shows application startup.\"}]}"
-					}
-				}
-			]
-		}`))
+		writeFixtureBatch(w, r)
 	}))
 	defer server.Close()
 
@@ -107,7 +83,7 @@ func TestAnalyzeUsesConfiguredProviderWhenAvailable(t *testing.T) {
 	if result.AI.Status != "succeeded" || !result.AI.Used {
 		t.Fatalf("expected analyze result to surface synthesis success, got %#v", result.AI)
 	}
-	if result.AI.Provider != "openai-compatible" || result.AI.Model != "gpt-4.1-mini" {
+	if result.AI.Provider != "compatible" || result.AI.Model != "gpt-4.1-mini" {
 		t.Fatalf("expected analyze result to preserve provider identity, got %#v", result.AI)
 	}
 
@@ -133,7 +109,7 @@ func TestAnalyzeUsesConfiguredProviderWhenAvailable(t *testing.T) {
 	}
 }
 
-func TestAnalyzeFallsBackWhenProviderSynthesisFails(t *testing.T) {
+func TestAnalyzeFailsWhenProviderSynthesisFails(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -163,37 +139,11 @@ func TestAnalyzeFallsBackWhenProviderSynthesisFails(t *testing.T) {
 	})
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
-	result, err := service.Analyze(t.Context(), AnalyzeRequest{
+	_, err := service.Analyze(t.Context(), AnalyzeRequest{
 		RepoPath: repoPath,
 	})
-	if err != nil {
-		t.Fatalf("analyze sample repo with broken provider response: %v", err)
-	}
-
-	if result.AI.Status != "fallback" {
-		t.Fatalf("expected analyze result to surface fallback status, got %#v", result.AI)
-	}
-	if !strings.Contains(result.AI.Note, "parse synthesis response") {
-		t.Fatalf("expected analyze result to surface parse failure note, got %#v", result.AI)
-	}
-
-	aiResultContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "ai-result.json"))
-	if err != nil {
-		t.Fatalf("read ai result contract: %v", err)
-	}
-
-	var aiResult struct {
-		Status         string `json:"status"`
-		FallbackReason string `json:"fallback_reason"`
-	}
-	if err := json.Unmarshal(aiResultContents, &aiResult); err != nil {
-		t.Fatalf("unmarshal ai result contract: %v", err)
-	}
-	if aiResult.Status != "fallback" {
-		t.Fatalf("expected broken provider response to fall back, got %#v", aiResult)
-	}
-	if !strings.Contains(aiResult.FallbackReason, "parse synthesis response") {
-		t.Fatalf("expected parse failure to be surfaced, got %#v", aiResult)
+	if err == nil || !strings.Contains(err.Error(), "AI analysis failed") {
+		t.Fatalf("expected provider failure, got %v", err)
 	}
 }
 
@@ -205,16 +155,7 @@ func TestAnalyzeUsesRequestProviderOverrideWhenConfigured(t *testing.T) {
 			t.Fatalf("expected request override auth header, got %q", authorization)
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"choices": [
-				{
-					"message": {
-						"content": "{\"project_summary\":\"Request-level AI summary\",\"architecture_narrative\":\"Request-level AI narrative\"}"
-					}
-				}
-			]
-		}`))
+		writeFixtureBatch(w, r)
 	}))
 	defer server.Close()
 
@@ -241,7 +182,7 @@ func TestAnalyzeUsesRequestProviderOverrideWhenConfigured(t *testing.T) {
 	if result.AI.Status != "succeeded" || !result.AI.Used {
 		t.Fatalf("expected request override provider to succeed, got %#v", result.AI)
 	}
-	if result.AI.Provider != "openai-compatible" || result.AI.Model != "mistral-small-latest" {
+	if result.AI.Provider != "compatible" || result.AI.Model != "mistral-small-latest" {
 		t.Fatalf("expected request override provider identity to be preserved, got %#v", result.AI)
 	}
 
@@ -256,7 +197,7 @@ func TestAnalyzeUsesRequestProviderOverrideWhenConfigured(t *testing.T) {
 	if err := json.Unmarshal(aiResultContents, &aiResult); err != nil {
 		t.Fatalf("unmarshal ai result contract: %v", err)
 	}
-	if aiResult.ProjectSummary != "Request-level AI summary" {
+	if aiResult.ProjectSummary != "Fixture analysis" {
 		t.Fatalf("expected request override synthesis payload to be persisted, got %#v", aiResult)
 	}
 }
