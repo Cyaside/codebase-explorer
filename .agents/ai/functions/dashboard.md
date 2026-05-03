@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build the dashboard as the compressed control-plane view of the current project.
+The runtime assembles the dashboard locally from verified worker outputs and scan metrics.
 
 It should answer:
 - what this project is
@@ -18,7 +18,7 @@ Read from:
 - issues output
 - recommendations output
 
-## What The Agent Must Do
+## What The Runtime Must Do
 
 - identify the top-level project identity
 - surface a few high-signal metrics

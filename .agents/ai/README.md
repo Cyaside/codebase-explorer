@@ -8,7 +8,7 @@ Use this file as the orchestrator.
 
 The agent must not behave like a generic chat summarizer.
 It must behave like a repository orientation worker that:
-- inspects the codebase directly
+- inspects repository evidence selected and read by the runtime
 - gathers evidence before claiming structure
 - fills each analysis surface with grounded information
 - keeps outputs aligned with the product and bundle model
@@ -26,7 +26,7 @@ Then the agent must read the function-specific files it needs under:
 ## Exploration Contract
 
 The agent must:
-- inspect the repository directly
+- inspect the supplied repository evidence
 - prefer evidence from actual files over assumptions
 - identify uncertainty explicitly
 - distinguish facts from interpretations
@@ -55,13 +55,13 @@ The agent should work in this order:
    - reading-path candidates
    - support files if available
 
-3. Run the function specs
+3. Run the function specs assigned to the worker
    - summary
    - architecture
    - flowchart
    - issues
    - recommendations
-   - dashboard assembly
+   - dashboard assembly is performed locally by the runtime
 
 4. Verify consistency
    - paths in recommendations must exist
@@ -103,7 +103,7 @@ Every function output should include:
 
 ## Default Function Order
 
-When nothing else is specified, run in this order:
+Function outputs are combined by the runtime; dashboard is assembled locally. The logical display order is:
 1. summary
 2. architecture
 3. hotspots-and-dependencies
@@ -117,9 +117,10 @@ When nothing else is specified, run in this order:
 This AI orchestrator does not authorize reckless repository summarization.
 
 For the product:
-- deterministic analysis remains the default baseline
-- deeper AI exploration is optional when enabled by the runtime
-- AI output must still be reusable, structured, and evidence-backed
+- an OpenAI-compatible connection with an API key is required for every new run
+- local scanning selects evidence before AI reasoning
+- the runtime uses one worker call for compact context and at most two parallel worker calls for larger context
+- AI output must be reusable, structured, and evidence-backed
 
 ## Done Condition
 
