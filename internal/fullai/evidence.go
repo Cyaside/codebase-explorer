@@ -2,6 +2,7 @@ package fullai
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,6 +13,7 @@ import (
 )
 
 const maxEvidenceSnippetBytes = 6000
+const maxEvidenceReadBytes = 128 << 10
 
 type Collector struct{}
 
@@ -66,6 +68,10 @@ func collectEvidenceItem(input Input, target Target) EvidenceItem {
 		Priority:   target.Priority,
 		ReadStatus: "missing",
 	}
+	if SensitiveEvidencePath(target.Path) {
+		item.ReadStatus = "sensitive-skipped"
+		return item
+	}
 
 	resolvedPath, displayPath, resolution, lineCount, err := resolveEvidencePath(input, target)
 	item.ResolvedPath = resolvedPath
@@ -76,22 +82,39 @@ func collectEvidenceItem(input Input, target Target) EvidenceItem {
 		return item
 	}
 
-	contents, err := os.ReadFile(resolvedPath)
+	file, err := os.Open(resolvedPath)
 	if err != nil {
 		return item
 	}
-	item.ByteCount = len(contents)
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		return item
+	}
+	item.ByteCount = int(info.Size())
+	contents, err := io.ReadAll(io.LimitReader(file, maxEvidenceReadBytes+1))
+	if err != nil {
+		return item
+	}
+	if len(contents) > maxEvidenceReadBytes {
+		contents = contents[:maxEvidenceReadBytes]
+		item.Truncated = true
+		for trim := 0; trim < 4 && !utf8.Valid(contents); trim++ {
+			contents = contents[:len(contents)-1]
+		}
+	}
 
 	if !utf8.Valid(contents) {
 		item.ReadStatus = "binary-skipped"
 		return item
 	}
 
-	if len(contents) > maxEvidenceSnippetBytes {
-		item.Snippet = string(contents[:maxEvidenceSnippetBytes])
+	redacted := RedactSensitiveText(string(contents))
+	if len(redacted) > maxEvidenceSnippetBytes {
+		item.Snippet = validUTF8Prefix(redacted, maxEvidenceSnippetBytes)
 		item.Truncated = true
 	} else {
-		item.Snippet = string(contents)
+		item.Snippet = redacted
 	}
 	item.ReadStatus = "read"
 	if item.LineCount == 0 {
