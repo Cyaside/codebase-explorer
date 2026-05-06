@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Cyaside/codebase-explorer/internal/fullai"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 )
@@ -77,6 +78,22 @@ func BuildProviderKey(config provider.Config, context provider.CondensedContext,
 		Context: context,
 	}
 	return hashPayload(payload)
+}
+
+func BuildAIExecutionKey(config provider.Config, evidence fullai.Evidence, packHash string, version string) (string, error) {
+	return hashPayload(struct {
+		Version    string                `json:"version"`
+		PackHash   string                `json:"pack_hash"`
+		Name       string                `json:"name"`
+		Model      string                `json:"model"`
+		BaseURL    string                `json:"base_url"`
+		APIKeyHash string                `json:"api_key_hash"`
+		Evidence   []fullai.EvidenceItem `json:"evidence"`
+	}{
+		Version: version + ":adaptive-v2", PackHash: packHash,
+		Name: config.Name, Model: config.Model, BaseURL: config.BaseURL,
+		APIKeyHash: hashText(config.APIKey), Evidence: evidence.Items,
+	})
 }
 
 func snapshotRepository(rootPath string, patterns []string) ([]fileSnapshot, error) {

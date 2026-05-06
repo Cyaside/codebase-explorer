@@ -9,6 +9,7 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/cache"
 	"github.com/Cyaside/codebase-explorer/internal/changes"
+	"github.com/Cyaside/codebase-explorer/internal/fullai"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 )
 
@@ -38,7 +39,7 @@ func (s Service) loadDeterministicState(ctx context.Context, request AnalyzeRequ
 		return deterministicState{
 			ScanResult: payload.Scan,
 			Analysis:   payload.Analysis,
-			Changes:    payload.Changes,
+			Changes:    sanitizeChanges(payload.Changes),
 			Status:     cache.StatusHit,
 		}, nil
 	case errors.Is(err, cache.ErrCacheMiss):
@@ -80,11 +81,11 @@ func (s Service) computeDeterministicState(ctx context.Context, request AnalyzeR
 	emitAnalyzeProgress(request, "scan", "succeeded", fmt.Sprintf("scanned %d file(s)", len(scanResult.Files)))
 
 	emitAnalyzeProgress(request, "deterministic-analysis", "running", "building repository summary and heuristics")
-	analysis := s.analyzer.Analyze(scanResult, request.DeterministicOnly)
+	analysis := s.analyzer.Analyze(scanResult)
 	emitAnalyzeProgress(request, "deterministic-analysis", "succeeded", fmt.Sprintf("identified %d file(s) and %d line(s)", analysis.Metrics.TotalFiles, analysis.Metrics.TotalLines))
 
 	emitAnalyzeProgress(request, "change-awareness", "running", fmt.Sprintf("correlating %d support file(s)", len(supportFiles)))
-	changeResult := changes.Analyze(analysis.GeneratedAt, analysis, supportFiles)
+	changeResult := sanitizeChanges(changes.Analyze(analysis.GeneratedAt, analysis, supportFiles))
 	emitAnalyzeProgress(request, "change-awareness", "succeeded", changeResult.Note)
 
 	return deterministicState{
@@ -93,4 +94,21 @@ func (s Service) computeDeterministicState(ctx context.Context, request AnalyzeR
 		Changes:    changeResult,
 		Status:     status,
 	}, nil
+}
+
+func sanitizeChanges(result changes.Result) changes.Result {
+	for i := range result.RepeatedThemes {
+		result.RepeatedThemes[i].Name = fullai.RedactSensitiveText(result.RepeatedThemes[i].Name)
+	}
+	for i := range result.FrequentlyMentionedAreas {
+		for j := range result.FrequentlyMentionedAreas[i].Examples {
+			result.FrequentlyMentionedAreas[i].Examples[j] = fullai.RedactSensitiveText(result.FrequentlyMentionedAreas[i].Examples[j])
+		}
+	}
+	for i := range result.LikelyUnstableModules {
+		for j := range result.LikelyUnstableModules[i].Examples {
+			result.LikelyUnstableModules[i].Examples[j] = fullai.RedactSensitiveText(result.LikelyUnstableModules[i].Examples[j])
+		}
+	}
+	return result
 }

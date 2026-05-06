@@ -5,6 +5,7 @@ import (
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/changes"
+	"github.com/Cyaside/codebase-explorer/internal/fullai"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 )
@@ -29,6 +30,12 @@ type ProviderPayload struct {
 	Key        string          `json:"key"`
 	Result     provider.Result `json:"result"`
 	AppVersion string          `json:"app_version"`
+}
+
+type AIExecutionPayload struct {
+	CachedAt  time.Time        `json:"cached_at"`
+	Key       string           `json:"key"`
+	Execution fullai.Execution `json:"execution"`
 }
 
 type ClearResult struct {

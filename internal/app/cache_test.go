@@ -21,6 +21,7 @@ func TestAnalyzeReusesDeterministicCache(t *testing.T) {
 		CacheEnabled:      true,
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
@@ -53,16 +54,7 @@ func TestAnalyzeReusesProviderCache(t *testing.T) {
 	var requestCount int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&requestCount, 1)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"choices": [
-				{
-					"message": {
-						"content": "{\"project_summary\":\"AI summary\"}"
-					}
-				}
-			]
-		}`))
+		writeFixtureBatch(w, r)
 	}))
 	defer server.Close()
 
@@ -87,7 +79,7 @@ func TestAnalyzeReusesProviderCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first analyze with provider: %v", err)
 	}
-	if first.Cache.ProviderStatus != "miss" {
+	if first.Cache.ProviderStatus != "full-ai miss" {
 		t.Fatalf("expected first analyze to miss provider cache, got %#v", first.Cache)
 	}
 
@@ -95,7 +87,7 @@ func TestAnalyzeReusesProviderCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second analyze with provider: %v", err)
 	}
-	if second.Cache.ProviderStatus != "hit" {
+	if second.Cache.ProviderStatus != "full-ai hit" {
 		t.Fatalf("expected second analyze to hit provider cache, got %#v", second.Cache)
 	}
 	if atomic.LoadInt32(&requestCount) != 1 {
@@ -114,6 +106,7 @@ func TestClearCacheRemovesStoredEntries(t *testing.T) {
 		CacheEnabled:      true,
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")

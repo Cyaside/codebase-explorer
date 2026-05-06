@@ -53,6 +53,14 @@ func (s Store) SaveProvider(payload ProviderPayload) error {
 	return writeJSON(s.kindPath("provider", payload.Key), payload)
 }
 
+func (s Store) LoadAIExecution(key string) (AIExecutionPayload, error) {
+	return loadJSON[AIExecutionPayload](s.kindPath("ai-execution", key))
+}
+
+func (s Store) SaveAIExecution(payload AIExecutionPayload) error {
+	return writeJSON(s.kindPath("ai-execution", payload.Key), payload)
+}
+
 func (s Store) Clear() (ClearResult, error) {
 	result := ClearResult{CacheRoot: s.root}
 

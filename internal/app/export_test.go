@@ -19,6 +19,7 @@ func TestExportCreatesZipArchiveForLatestBundle(t *testing.T) {
 		CacheEnabled:      true,
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")

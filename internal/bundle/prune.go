@@ -29,6 +29,9 @@ func pruneBundles(outputRoot, currentBundlePath string, keepLatest int) (int, er
 		if !entry.IsDir() {
 			continue
 		}
+		if strings.HasPrefix(entry.Name(), ".codearch-staging-") {
+			continue
+		}
 
 		bundlePath := filepath.Join(outputRoot, entry.Name())
 		if !isManagedBundle(bundlePath) {
