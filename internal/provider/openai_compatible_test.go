@@ -3,12 +3,20 @@ package provider
 import (
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
 )
+
+func TestTemporaryNetworkErrorCanRetry(t *testing.T) {
+	t.Parallel()
+	if !retryablePromptError(&net.DNSError{IsTemporary: true}) {
+		t.Fatal("temporary network failure should be retried")
+	}
+}
 
 func TestOpenAICompatibleClientSynthesize(t *testing.T) {
 	t.Parallel()
@@ -71,7 +79,7 @@ func TestOpenAICompatibleClientSynthesize(t *testing.T) {
 	if !result.Successful() {
 		t.Fatalf("expected successful synthesis result, got %#v", result)
 	}
-	if result.Provider != "openai-compatible" {
+	if result.Provider != "compatible" {
 		t.Fatalf("expected provider identity to be preserved, got %#v", result)
 	}
 	if len(result.HotspotExplanations) != 1 {
@@ -120,6 +128,7 @@ func TestOpenAICompatibleClientCompleteReturnsRawContent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
+			"usage": {"prompt_tokens": 123, "completion_tokens": 45},
 			"choices": [
 				{
 					"message": {
@@ -147,6 +156,9 @@ func TestOpenAICompatibleClientCompleteReturnsRawContent(t *testing.T) {
 	}
 	if !result.Used || result.Content == "" {
 		t.Fatalf("expected raw prompt content, got %#v", result)
+	}
+	if result.PromptTokens != 123 || result.OutputTokens != 45 {
+		t.Fatalf("expected provider usage, got %#v", result)
 	}
 }
 
