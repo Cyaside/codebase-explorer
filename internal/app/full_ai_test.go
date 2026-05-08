@@ -21,6 +21,7 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 		DefaultOutputRoot: t.TempDir(),
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	result, err := service.Analyze(t.Context(), AnalyzeRequest{
@@ -34,8 +35,8 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 		t.Fatalf("analyze sample repo with full-ai scaffold: %v", err)
 	}
 
-	if !result.FullAI.Enabled || result.FullAI.Status != "provider-disabled" {
-		t.Fatalf("expected provider-disabled full-ai summary, got %#v", result.FullAI)
+	if !result.FullAI.Enabled || result.FullAI.Status != "executed" {
+		t.Fatalf("expected executed AI summary, got %#v", result.FullAI)
 	}
 	if result.FullAI.CollectedItems == 0 {
 		t.Fatalf("expected collected evidence items in full-ai summary, got %#v", result.FullAI)
@@ -59,8 +60,8 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 	if plan.SchemaVersion != fullai.PlanSchemaVersion {
 		t.Fatalf("expected full-ai plan schema version %q, got %#v", fullai.PlanSchemaVersion, plan)
 	}
-	if plan.ReadBudget != 6 {
-		t.Fatalf("expected configured full-ai read budget, got %#v", plan)
+	if plan.ReadBudget != fullai.DefaultReadBudget {
+		t.Fatalf("expected internal read budget, got %#v", plan)
 	}
 
 	evidenceContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "full-ai-evidence.json"))
@@ -70,6 +71,9 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 	var evidence struct {
 		SchemaVersion  string `json:"schema_version"`
 		CollectedItems int    `json:"collected_items"`
+		Items          []struct {
+			Snippet string `json:"snippet"`
+		} `json:"items"`
 	}
 	if err := json.Unmarshal(evidenceContents, &evidence); err != nil {
 		t.Fatalf("unmarshal full-ai evidence: %v", err)
@@ -79,6 +83,11 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 	}
 	if evidence.CollectedItems == 0 {
 		t.Fatalf("expected collected evidence items, got %#v", evidence)
+	}
+	for _, item := range evidence.Items {
+		if item.Snippet != "" {
+			t.Fatal("bundle must keep evidence metadata without source excerpts")
+		}
 	}
 
 	functionContents, err := os.ReadFile(filepath.Join(result.OutputPath, "data", "full-ai-functions.json"))
@@ -126,6 +135,63 @@ func TestAnalyzeWritesFullAIPlanWhenRequested(t *testing.T) {
 	}
 }
 
+func TestAnalyzeMarksPartialWhenSomeProviderJobsFail(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		content := "not-json"
+		if calls.Add(1) == 1 {
+			var payload struct {
+				Messages []struct {
+					Content string `json:"content"`
+				} `json:"messages"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&payload)
+			fixture := fixtureBatchOutput(payload.Messages[1].Content, "README.md")
+			delete(fixture["functions"].(map[string]any), "issues")
+			bytes, _ := json.Marshal(fixture)
+			content = string(bytes)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": content}}}})
+	}))
+	defer server.Close()
+	service := New(config.Settings{
+		DefaultOutputRoot: t.TempDir(), AppVersion: "test",
+		Provider: config.ProviderSettings{Name: "compatible", Model: "fixture", APIKey: "test-key", BaseURL: server.URL},
+	})
+	result, err := service.Analyze(t.Context(), AnalyzeRequest{
+		RepoPath: filepath.Join("..", "..", "testdata", "sample-repo"),
+		FullAI:   fullai.Options{Mode: fullai.ModeFull},
+	})
+	if err != nil {
+		t.Fatalf("analyze partial provider result: %v", err)
+	}
+	if result.FullAI.Status != "partial" || result.AI.Status != "partial" {
+		t.Fatalf("expected explicit partial status, got full=%#v ai=%#v", result.FullAI, result.AI)
+	}
+}
+
+func TestAnalyzeFailsWhenEveryProviderJobFails(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": "not-json"}}}})
+	}))
+	defer server.Close()
+	service := New(config.Settings{
+		DefaultOutputRoot: t.TempDir(), AppVersion: "test",
+		Provider: config.ProviderSettings{Name: "compatible", Model: "fixture", APIKey: "test-key", BaseURL: server.URL},
+	})
+	_, err := service.Analyze(t.Context(), AnalyzeRequest{
+		RepoPath: filepath.Join("..", "..", "testdata", "sample-repo"),
+		FullAI:   fullai.Options{Mode: fullai.ModeFull},
+	})
+	if err == nil || !strings.Contains(err.Error(), "AI analysis failed") {
+		t.Fatalf("expected failed provider run, got %v", err)
+	}
+}
+
 func TestAnalyzeExecutesFullAIFunctionsWithProvider(t *testing.T) {
 	t.Parallel()
 
@@ -142,10 +208,8 @@ func TestAnalyzeExecutesFullAIFunctionsWithProvider(t *testing.T) {
 			t.Fatalf("decode provider request: %v", err)
 		}
 
-		content := `{"summary":"Function summary","key_findings":[{"claim":"Evidence-backed claim","confidence":"high"}],"recommendations":["Keep exploring from the entry point"],"uncertainties":[]}`
-		if len(payload.Messages) > 1 && strings.Contains(payload.Messages[1].Content, "Summarize this repository context") {
-			content = `{"project_summary":"AI summary","architecture_narrative":"AI architecture","hotspot_explanations":[],"reading_path_explanations":[]}`
-		}
+		contentBytes, _ := json.Marshal(fixtureBatchOutput(payload.Messages[1].Content, "README.md"))
+		content := string(contentBytes)
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -185,8 +249,8 @@ func TestAnalyzeExecutesFullAIFunctionsWithProvider(t *testing.T) {
 	if result.AI.Status != "succeeded" || !result.AI.Used {
 		t.Fatalf("expected legacy AI summary to be projected from full-ai output, got %#v", result.AI)
 	}
-	if got := int(requestCount.Load()); got != result.FullAI.PreparedFunctions {
-		t.Fatalf("expected provider call per full-ai function only, got %d calls for %d functions", got, result.FullAI.PreparedFunctions)
+	if got := int(requestCount.Load()); got != 1 {
+		t.Fatalf("expected one provider call for compact context, got %d", got)
 	}
 }
 
