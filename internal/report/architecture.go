@@ -19,9 +19,9 @@ func ArchitectureREADME(analysis analyzer.Result, aiResult provider.Result) stri
 	builder.WriteString("## Related Views\n\n")
 	builder.WriteString("- [Open the local viewer](../ui/index.html)\n")
 	builder.WriteString("- [Review the root report](../README.md)\n")
-	builder.WriteString("- [Open the architecture Mermaid graph](module-graph.mmd)\n\n")
+	builder.WriteString("- [Inspect structured graph data](../data/graphs.json)\n\n")
 	builder.WriteString("## Orientation Graph\n\n")
-	builder.WriteString("- [module-graph.mmd](module-graph.mmd)\n\n")
+	builder.WriteString("Architecture nodes and supported edges are in [graphs.json](../data/graphs.json).\n\n")
 	builder.WriteString("## Core Modules\n\n")
 	for _, module := range analysis.Modules {
 		builder.WriteString(fmt.Sprintf("- `%s`: %d files, %d lines, %d entry point(s)\n", module.Path, module.FileCount, module.TotalLines, module.EntryPointCount))
