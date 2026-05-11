@@ -12,6 +12,7 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/changes"
 	"github.com/Cyaside/codebase-explorer/internal/fullai"
+	"github.com/Cyaside/codebase-explorer/internal/graph"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 	"github.com/Cyaside/codebase-explorer/internal/report"
@@ -34,6 +35,7 @@ type WriteRequest struct {
 	FullAIExecution    fullai.Execution
 	FullAIVerification fullai.Verification
 	FullAISummary      fullai.Summary
+	Graphs             graph.Set
 }
 
 type WriteResult struct {
@@ -62,11 +64,19 @@ func NewWriter(version string, keepLatest int) Writer {
 }
 
 func (w Writer) Write(request WriteRequest) (WriteResult, error) {
+	if err := os.MkdirAll(request.OutputRoot, 0o755); err != nil {
+		return WriteResult{}, fmt.Errorf("prepare output root: %w", err)
+	}
 	bundleName, err := nextBundleName(request.OutputRoot, request.Analysis.ProjectName, time.Now().UTC())
 	if err != nil {
 		return WriteResult{}, fmt.Errorf("allocate bundle name: %w", err)
 	}
-	bundlePath := filepath.Join(request.OutputRoot, bundleName)
+	finalBundlePath := filepath.Join(request.OutputRoot, bundleName)
+	bundlePath, err := os.MkdirTemp(request.OutputRoot, ".codearch-staging-*")
+	if err != nil {
+		return WriteResult{}, fmt.Errorf("prepare bundle staging directory: %w", err)
+	}
+	defer os.RemoveAll(bundlePath)
 
 	directories := []string{
 		bundlePath,
@@ -86,16 +96,14 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	}
 
 	files := map[string]string{
-		filepath.Join(bundlePath, "README.md"):                            report.RootREADME(request.ScanResult, request.Analysis, request.AIResult, request.Warnings, bundleName),
-		filepath.Join(bundlePath, "overview", "README.md"):                report.OverviewREADME(request.Analysis, request.AIResult),
-		filepath.Join(bundlePath, "architecture", "README.md"):            report.ArchitectureREADME(request.Analysis, request.AIResult),
-		filepath.Join(bundlePath, "architecture", "module-graph.mmd"):     report.ArchitectureMermaid(request.Analysis),
-		filepath.Join(bundlePath, "hotspots", "README.md"):                report.HotspotsREADME(request.Analysis, request.AIResult, request.Changes),
-		filepath.Join(bundlePath, "dependencies", "README.md"):            report.DependenciesREADME(request.Analysis),
-		filepath.Join(bundlePath, "dependencies", "dependency-graph.mmd"): report.DependenciesMermaid(request.Analysis),
-		filepath.Join(bundlePath, "reading-path", "README.md"):            report.ReadingPathREADME(request.Analysis, request.AIResult),
-		filepath.Join(bundlePath, "changes", "README.md"):                 report.ChangesREADME(request.Changes),
-		filepath.Join(bundlePath, "data", "README.md"):                    report.DataREADME(),
+		filepath.Join(bundlePath, "README.md"):                 report.RootREADME(request.ScanResult, request.Analysis, request.AIResult, request.Warnings, bundleName),
+		filepath.Join(bundlePath, "overview", "README.md"):     report.OverviewREADME(request.Analysis, request.AIResult),
+		filepath.Join(bundlePath, "architecture", "README.md"): report.ArchitectureREADME(request.Analysis, request.AIResult),
+		filepath.Join(bundlePath, "hotspots", "README.md"):     report.HotspotsREADME(request.Analysis, request.AIResult, request.Changes),
+		filepath.Join(bundlePath, "dependencies", "README.md"): report.DependenciesREADME(request.Analysis),
+		filepath.Join(bundlePath, "reading-path", "README.md"): report.ReadingPathREADME(request.Analysis, request.AIResult),
+		filepath.Join(bundlePath, "changes", "README.md"):      report.ChangesREADME(request.Changes),
+		filepath.Join(bundlePath, "data", "README.md"):         report.DataREADME(),
 	}
 
 	for pathOnDisk, contents := range files {
@@ -139,7 +147,12 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-meta.json"), request.FullAISummary); err != nil {
 		return WriteResult{}, err
 	}
-	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-evidence.json"), request.FullAIEvidence); err != nil {
+	evidenceManifest := request.FullAIEvidence
+	evidenceManifest.Items = append([]fullai.EvidenceItem(nil), request.FullAIEvidence.Items...)
+	for index := range evidenceManifest.Items {
+		evidenceManifest.Items[index].Snippet = ""
+	}
+	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-evidence.json"), evidenceManifest); err != nil {
 		return WriteResult{}, err
 	}
 	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-functions.json"), request.FullAIFunctions); err != nil {
@@ -149,6 +162,22 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		return WriteResult{}, err
 	}
 	if err := writeJSON(filepath.Join(bundlePath, "data", "full-ai-verification.json"), request.FullAIVerification); err != nil {
+		return WriteResult{}, err
+	}
+	if err := writeJSON(filepath.Join(bundlePath, "data", "graphs.json"), request.Graphs); err != nil {
+		return WriteResult{}, err
+	}
+	if err := writeJSON(filepath.Join(bundlePath, "data", "summary.json"), map[string]any{
+		"generated_at":       request.Analysis.GeneratedAt,
+		"project_name":       request.Analysis.ProjectName,
+		"project_type":       request.Analysis.ProjectType,
+		"analyzed_path":      request.Analysis.AnalyzedPath,
+		"total_files":        request.Analysis.Metrics.TotalFiles,
+		"total_lines":        request.Analysis.Metrics.TotalLines,
+		"ai_status":          request.AIResult.Status,
+		"warning_count":      len(request.Warnings),
+		"support_file_count": request.Changes.SupportFileCount,
+	}); err != nil {
 		return WriteResult{}, err
 	}
 	if err := writeJSON(filepath.Join(bundlePath, "changes", "issue-correlation.json"), request.Changes); err != nil {
@@ -169,6 +198,8 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		"full_ai_execution_schema_version":    request.FullAIExecution.SchemaVersion,
 		"full_ai_verification_schema_version": request.FullAIVerification.SchemaVersion,
 		"full_ai_meta_schema_version":         request.FullAISummary.SchemaVersion,
+		"agent_pack_hash":                     request.FullAIExecution.PackHash,
+		"agent_pack_version":                  fullai.PackVersion,
 		"full_ai_mode":                        request.FullAISummary.Mode,
 		"tool_version":                        w.version,
 	}
@@ -199,13 +230,16 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		return WriteResult{}, err
 	}
 
-	prunedBundles, err := pruneBundles(request.OutputRoot, bundlePath, w.keepLatest)
+	if err := os.Rename(bundlePath, finalBundlePath); err != nil {
+		return WriteResult{}, fmt.Errorf("publish completed bundle: %w", err)
+	}
+	prunedBundles, err := pruneBundles(request.OutputRoot, finalBundlePath, w.keepLatest)
 	if err != nil {
 		return WriteResult{}, err
 	}
 
 	return WriteResult{
-		BundlePath:     bundlePath,
+		BundlePath:     finalBundlePath,
 		PrunedBundles:  prunedBundles,
 		RetentionLimit: w.keepLatest,
 	}, nil
@@ -264,10 +298,7 @@ func buildViewerData(request WriteRequest, bundleName string) viewer.BundleData 
 		FullAI:               request.FullAISummary,
 		FullAIExecution:      request.FullAIExecution,
 		FullAIVerification:   request.FullAIVerification,
-		Mermaid: viewer.MermaidData{
-			Architecture: report.ArchitectureMermaid(request.Analysis),
-			Dependencies: report.DependenciesMermaid(request.Analysis),
-		},
+		Graphs:               request.Graphs,
 		Links: viewer.LinkData{
 			Root:                "README.md",
 			Overview:            "overview/README.md",
@@ -276,8 +307,8 @@ func buildViewerData(request WriteRequest, bundleName string) viewer.BundleData 
 			Hotspots:            "hotspots/README.md",
 			ReadingPath:         "reading-path/README.md",
 			Changes:             "changes/README.md",
-			ArchitectureDiagram: "architecture/module-graph.mmd",
-			DependencyDiagram:   "dependencies/dependency-graph.mmd",
+			ArchitectureDiagram: "data/graphs.json",
+			DependencyDiagram:   "data/graphs.json",
 		},
 	}
 }
