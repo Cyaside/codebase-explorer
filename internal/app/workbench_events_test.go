@@ -19,6 +19,7 @@ func TestWorkbenchAnalyzeRunEventsStream(t *testing.T) {
 		DefaultOutputRoot: t.TempDir(),
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	handler, err := service.workbenchHandler(service.settings.DefaultOutputRoot)
@@ -27,8 +28,7 @@ func TestWorkbenchAnalyzeRunEventsStream(t *testing.T) {
 	}
 
 	body, err := json.Marshal(map[string]any{
-		"repo_path":          filepath.Join("..", "..", "testdata", "sample-repo"),
-		"deterministic_only": true,
+		"repo_path": filepath.Join("..", "..", "testdata", "sample-repo"),
 	})
 	if err != nil {
 		t.Fatalf("marshal run body: %v", err)

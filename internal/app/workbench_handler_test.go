@@ -53,6 +53,7 @@ func TestWorkbenchStatusListsRecentBundles(t *testing.T) {
 		DefaultOutputRoot: t.TempDir(),
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
@@ -155,20 +156,7 @@ func TestWorkbenchStatusReportsSkippedBundleWarnings(t *testing.T) {
 
 func TestWorkbenchAnalyzeUsesProviderOverride(t *testing.T) {
 	t.Parallel()
-
-	providerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"choices": [
-				{
-					"message": {
-						"content": "{\"project_summary\":\"Workbench summary\",\"architecture_narrative\":\"Workbench architecture\"}"
-					}
-				}
-			]
-		}`))
-	}))
-	defer providerServer.Close()
+	connection := mockConnection(t)
 
 	service := New(config.Settings{
 		DefaultOutputRoot: t.TempDir(),
@@ -187,7 +175,7 @@ func TestWorkbenchAnalyzeUsesProviderOverride(t *testing.T) {
 			"name":     "openai-compatible",
 			"model":    "mistral-small-latest",
 			"api_key":  "ui-key",
-			"base_url": providerServer.URL,
+			"base_url": connection.BaseURL,
 		},
 	}
 	body, err := json.Marshal(requestBody)
@@ -218,13 +206,14 @@ func TestWorkbenchAnalyzeUsesProviderOverride(t *testing.T) {
 	}
 }
 
-func TestWorkbenchAnalyzeAcceptsFullAIMode(t *testing.T) {
+func TestWorkbenchAnalyzeUsesSingleWorkflow(t *testing.T) {
 	t.Parallel()
 
 	service := New(config.Settings{
 		DefaultOutputRoot: t.TempDir(),
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	handler, err := service.workbenchHandler(service.settings.DefaultOutputRoot)
@@ -233,10 +222,7 @@ func TestWorkbenchAnalyzeAcceptsFullAIMode(t *testing.T) {
 	}
 
 	requestBody := map[string]any{
-		"repo_path":       filepath.Join("..", "..", "testdata", "sample-repo"),
-		"ai_mode":         "full-ai",
-		"ai_read_budget":  5,
-		"ai_token_budget": 24000,
+		"repo_path": filepath.Join("..", "..", "testdata", "sample-repo"),
 	}
 	body, err := json.Marshal(requestBody)
 	if err != nil {
@@ -257,8 +243,34 @@ func TestWorkbenchAnalyzeAcceptsFullAIMode(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode analyze response: %v", err)
 	}
-	if !response.Result.FullAI.Enabled || response.Result.FullAI.Status != "provider-disabled" {
-		t.Fatalf("expected workbench analyze to carry provider-disabled full-ai summary, got %#v", response.Result.FullAI)
+	if !response.Result.FullAI.Enabled || response.Result.FullAI.Status != "executed" {
+		t.Fatalf("expected workbench analyze to execute AI workflow, got %#v", response.Result.FullAI)
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if _, containsBundleData := envelope["data"]; containsBundleData {
+		t.Fatal("analyze response should return metadata; bundle data is loaded from the bundle endpoint")
+	}
+}
+
+func TestWorkbenchAnalyzeRunRejectsLegacyOptionsAndBlankKey(t *testing.T) {
+	t.Parallel()
+	service := New(config.Settings{DefaultOutputRoot: t.TempDir(), AppVersion: "test", ConfigSource: "test"})
+	handler, err := service.workbenchHandler(service.settings.DefaultOutputRoot)
+	if err != nil {
+		t.Fatalf("build workbench handler: %v", err)
+	}
+	for _, body := range []string{
+		`{"repo_path":"missing","ai_mode":"full-ai"}`,
+		`{"repo_path":"missing","provider":{"name":"compatible","model":"fixture","base_url":"https://example.com/v1","api_key":""}}`,
+	} {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/analyze-runs", bytes.NewBufferString(body)))
+		if recorder.Code != http.StatusBadRequest {
+			t.Fatalf("expected invalid request to fail before queueing, got %d: %s", recorder.Code, recorder.Body.String())
+		}
 	}
 }
 
@@ -378,6 +390,7 @@ func TestWorkbenchBundleDeleteRemovesBundleDirectory(t *testing.T) {
 		DefaultOutputRoot: t.TempDir(),
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	result, err := service.Analyze(t.Context(), AnalyzeRequest{
