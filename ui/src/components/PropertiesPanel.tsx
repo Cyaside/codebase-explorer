@@ -51,7 +51,7 @@ export function PropertiesPanel({ activeRun, bundle, inspector, workspace }: Pro
               <PropertyRow label="AI status" value={bundle.summary.ai_status || "disabled"} />
               <PropertyRow label="Full-AI status" value={fullAIStatusLabel(bundle)} />
               <PropertyRow label="AI functions" value={`${bundle.data.full_ai_execution.executed_count}/${bundle.data.full_ai.prepared_functions}`} />
-              <PropertyRow label="Verified" value={String(bundle.data.full_ai_execution.verified_count)} />
+              <PropertyRow label="Evidence checks passed" value={String(bundle.data.full_ai_execution.verified_count)} />
               <PropertyRow label="Warnings" value={String(bundle.data.warnings.length)} />
             </div>
           ) : (

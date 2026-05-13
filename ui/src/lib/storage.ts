@@ -5,16 +5,16 @@ const UI_STATE_STORAGE_KEY = "codearch.workbench.state.v2";
 const WORKSPACE_STORAGE_KEY = "codearch.workbench.workspaces.v1";
 
 const presetProfiles: ConnectionProfile[] = [
-  { id: "openai", label: "OpenAI", provider: { name: "openai", model: "gpt-4.1-mini", baseUrl: "" } },
+  { id: "openai", label: "OpenAI", provider: { name: "compatible", model: "gpt-4.1-mini", baseUrl: "https://api.openai.com/v1" } },
   {
     id: "openrouter",
     label: "OpenRouter",
-    provider: { name: "openai-compatible", model: "openai/gpt-4.1-mini", baseUrl: "https://openrouter.ai/api/v1" },
+    provider: { name: "compatible", model: "openai/gpt-4.1-mini", baseUrl: "https://openrouter.ai/api/v1" },
   },
   {
     id: "mistral",
     label: "Mistral",
-    provider: { name: "openai-compatible", model: "mistral-small-latest", baseUrl: "https://api.mistral.ai/v1" },
+    provider: { name: "compatible", model: "mistral-small-latest", baseUrl: "https://api.mistral.ai/v1" },
   },
 ];
 
@@ -24,7 +24,9 @@ function sanitizeProvider(value: unknown): ProviderProfile | null {
   }
 
   const provider = value as Record<string, unknown>;
-  const name = typeof provider.name === "string" ? provider.name.trim() : "";
+  const storedName = typeof provider.name === "string" ? provider.name.trim().toLowerCase() : "";
+  const name = storedName === "openai" || storedName === "openai-compatible" ? "compatible" : storedName;
+  const storedBaseUrl = typeof provider.baseUrl === "string" ? provider.baseUrl.trim() : "";
   if (!name) {
     return null;
   }
@@ -32,7 +34,7 @@ function sanitizeProvider(value: unknown): ProviderProfile | null {
   return {
     name,
     model: typeof provider.model === "string" ? provider.model.trim() : "",
-    baseUrl: typeof provider.baseUrl === "string" ? provider.baseUrl.trim() : "",
+    baseUrl: storedName === "openai" && !storedBaseUrl ? "https://api.openai.com/v1" : storedBaseUrl,
   };
 }
 

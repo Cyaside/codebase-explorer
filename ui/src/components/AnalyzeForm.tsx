@@ -7,6 +7,7 @@ import { formatRelativeTime } from "@/lib/utils";
 interface AnalyzeFormProps {
   busy: boolean;
   busyDetail: string;
+  connectionReady: boolean;
   currentConnectionLabel: string;
   onCancel: () => void;
   onCreateWorkspace: () => void;
@@ -21,6 +22,7 @@ interface AnalyzeFormProps {
 export function AnalyzeForm({
   busy,
   busyDetail,
+  connectionReady,
   currentConnectionLabel,
   onCancel,
   onCreateWorkspace,
@@ -63,7 +65,9 @@ export function AnalyzeForm({
           <p className="mt-2 text-sm text-zinc-500">One active project per app instance. Saved locally so you can reopen it later.</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={busy ? "run-pill run-pill-busy" : "run-pill"}>{busy ? "Running" : "Ready"}</span>
+          <span className={busy ? "run-pill run-pill-busy" : "run-pill"}>
+            {busy ? "Running" : !workspace.repoPath.trim() ? "Add repository" : connectionReady ? "Ready" : "Set up connection"}
+          </span>
           <button className="secondary-control" onClick={() => setAdvancedOpen((current) => !current)} type="button">
             <SlidersHorizontal className="size-4" />
             Advanced
@@ -165,7 +169,7 @@ export function AnalyzeForm({
           <span className="hint-chip">[ ] tabs</span>
           <span className="hint-chip">J / K projects</span>
         </div>
-        <p className="text-sm text-zinc-500">{busy ? busyDetail || "Background analysis is running." : "Local-first path only. GitHub URLs stay out of scope here."}</p>
+        <p className="text-sm text-zinc-500">{busy ? busyDetail || "Analysis is running." : "Choose a local repository path and a connection with an API key."}</p>
       </div>
 
       {run ? (

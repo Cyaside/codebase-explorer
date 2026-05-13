@@ -5,7 +5,7 @@ import { FolderCog } from "lucide-react";
 import { ArchitectureView, DashboardView, IssuesView, RecommendationsView, SummaryView } from "@/components/AnalysisViews";
 import { AnalyzeForm } from "@/components/AnalyzeForm";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
-import { FlowchartCanvas } from "@/components/FlowchartCanvas";
+import { EvidenceGraph } from "@/components/EvidenceGraph";
 import { ProjectsPanel } from "@/components/ProjectsPanel";
 import { PropertiesPanel } from "@/components/PropertiesPanel";
 import type {
@@ -25,6 +25,7 @@ interface TabPanelsProps {
   activeWorkspace: SavedWorkspace | null;
   activeWorkspaceID: string;
   apiKey: string;
+  hasSavedKey: boolean;
   bundle: WorkbenchBundle | null;
   bundles: BundleSummary[];
   busy: boolean;
@@ -32,6 +33,7 @@ interface TabPanelsProps {
   inspector: InspectorState | null;
   onAPIKeyChange: (value: string) => void;
   onCancelAnalyze: () => void;
+  onClearSavedKey: () => void;
   onCreateWorkspace: () => void;
   onDeleteBundle: (bundleName: string) => void;
   onDeleteProfile: () => void;
@@ -65,6 +67,7 @@ export function TabPanels(props: TabPanelsProps) {
     activeWorkspace,
     activeWorkspaceID,
     apiKey,
+    hasSavedKey,
     bundle,
     bundles,
     busy,
@@ -72,6 +75,7 @@ export function TabPanels(props: TabPanelsProps) {
     inspector,
     onAPIKeyChange,
     onCancelAnalyze,
+    onClearSavedKey,
     onCreateWorkspace,
     onDeleteBundle,
     onDeleteProfile,
@@ -109,7 +113,7 @@ export function TabPanels(props: TabPanelsProps) {
         <TabTrigger value="dashboard">Dashboard</TabTrigger>
         <TabTrigger value="summary">Summary</TabTrigger>
         <TabTrigger value="architecture">Architecture</TabTrigger>
-        <TabTrigger value="flowchart">Flowchart</TabTrigger>
+        <TabTrigger value="flowchart">Graphs</TabTrigger>
         <TabTrigger value="issues">Issues</TabTrigger>
         <TabTrigger value="recommendations">Recommendations</TabTrigger>
       </Tabs.List>
@@ -132,6 +136,7 @@ export function TabPanels(props: TabPanelsProps) {
         <AnalyzeForm
           busy={busy}
           busyDetail={busyDetail}
+          connectionReady={validationErrors.length === 0}
           currentConnectionLabel={profile.label}
           onCancel={onCancelAnalyze}
           onCreateWorkspace={onCreateWorkspace}
@@ -173,9 +178,11 @@ export function TabPanels(props: TabPanelsProps) {
 
           <ConnectionPanel
             apiKey={apiKey}
+            hasSavedKey={hasSavedKey}
             diagnostics={providerDiagnostics}
             onAPIKeyChange={onAPIKeyChange}
             onChange={onProfileChange}
+            onClearKey={onClearSavedKey}
             onDelete={onDeleteProfile}
             onDuplicate={onDuplicateProfile}
             onListModels={onListProviderModels}
@@ -207,15 +214,15 @@ export function TabPanels(props: TabPanelsProps) {
       <Tabs.Content value="flowchart">
         <div className="space-y-4">
           <section className="panel-block">
-            <p className="panel-kicker">Flowchart</p>
+            <p className="panel-kicker">Repository graphs</p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50">
-              {bundle ? `${bundle.summary.project_name || bundle.summary.name} graph` : "Project graph"}
+              {bundle ? bundle.summary.project_name || bundle.summary.name : "Project graphs"}
             </h2>
             <p className="mt-3 text-sm leading-6 text-zinc-400">
-              {bundle ? "Interactive topology rendered directly in the workbench." : "Run an analysis to unlock the project graph."}
+              {bundle ? "Explore architecture, supported execution flows, and local dependencies. Select a node or relation for evidence." : "Run an analysis to unlock the project graphs."}
             </p>
           </section>
-          <FlowchartCanvas bundle={bundle} onInspect={onInspect} />
+          <EvidenceGraph bundle={bundle} />
         </div>
       </Tabs.Content>
 

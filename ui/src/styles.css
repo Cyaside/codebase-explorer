@@ -205,6 +205,30 @@
   .graph-node-handle {
     opacity: 0;
   }
+
+  .evidence-node {
+    @apply flex h-[92px] w-[220px] flex-col overflow-hidden rounded-lg border border-slate-600 bg-[#f7f9fc] px-3 py-2 text-slate-900 shadow-lg shadow-black/20;
+  }
+
+  .evidence-node-selected {
+    @apply border-blue-500 ring-2 ring-blue-400/40;
+  }
+
+  .evidence-node-faded {
+    opacity: 0.25;
+  }
+
+  .evidence-node-type {
+    @apply text-[10px] font-semibold uppercase tracking-[0.11em] text-slate-500;
+  }
+
+  .evidence-node strong {
+    @apply mt-1 truncate text-sm font-semibold;
+  }
+
+  .evidence-node small {
+    @apply mt-1 truncate font-mono text-[10px] text-slate-500;
+  }
 }
 
 .codearch-flow {

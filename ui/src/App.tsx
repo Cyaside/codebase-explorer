@@ -8,11 +8,14 @@ import {
   buildProviderPayload,
   cancelAnalyzeRun,
   deleteBundle,
+  deleteSavedCredential,
   fetchAnalyzeRun,
   fetchBundle,
   fetchProviderModels,
+  fetchSavedCredentials,
   fetchStatus,
   mergeBundleSummary,
+  saveCredential,
   startAnalyzeRun,
   testProvider,
 } from "@/lib/api";
@@ -35,6 +38,7 @@ import { validateProfile } from "@/lib/validation";
 const initialUIState = loadUIState();
 const initialProfiles = loadProfiles();
 const initialWorkspaces = loadWorkspaces();
+const ACTIVE_RUN_STORAGE_KEY = "codearch.workbench.active-run.v1";
 const workbenchTabs: TabKey[] = [
   "projects",
   "project",
@@ -65,6 +69,7 @@ export function App() {
   const [activeWorkspaceID, setActiveWorkspaceID] = useState(initialUIState.activeWorkspace || initialWorkspaces[0]?.id || "");
   const [activeTab, setActiveTab] = useState<TabKey>(initialUIState.activeTab || "projects");
   const [profileSecrets, setProfileSecrets] = useState<Record<string, string>>({});
+  const [savedCredentials, setSavedCredentials] = useState<Record<string, string>>({});
   const [activeRun, setActiveRun] = useState<AnalyzeRun | null>(null);
   const [busyDetail, setBusyDetail] = useState("");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -74,13 +79,16 @@ export function App() {
   const [providerDiagnostics, setProviderDiagnostics] = useState<ProviderDiagnosticsState>(initialProviderDiagnostics);
 
   const repoInputRef = useRef<HTMLInputElement | null>(null);
+  const completedRunRef = useRef("");
+  const runWorkspaceIDRef = useRef("");
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceID) || null;
   const activeProfileID = activeWorkspace?.selectedProfile || profiles[0]?.id || "";
   const profile = profiles.find((item) => item.id === activeProfileID) || profiles[0] || defaultProfiles()[0];
   const providerOptions = status?.supported_providers || [];
   const apiKey = profile ? profileSecrets[profile.id] || "" : "";
-  const validationErrors = profile ? validateProfile(profile, apiKey, providerOptions) : [];
+  const hasSavedKey = !!profile && savedCredentials[profile.id] === profile.provider.baseUrl.trim().replace(/\/+$/, "");
+  const validationErrors = profile ? validateProfile(profile, apiKey, providerOptions, hasSavedKey) : [];
   const workspaceBundles = activeWorkspace ? bundles.filter((bundle) => matchesWorkspace(bundle.analyzed_path, activeWorkspace.repoPath)) : [];
   const selectedBundleName = activeWorkspace?.activeBundle || workspaceBundles[0]?.name || "";
   const currentBundle = selectedBundleName ? bundleCache[selectedBundleName] || null : null;
@@ -88,6 +96,34 @@ export function App() {
 
   useEffect(() => {
     void refreshStatus();
+    void fetchSavedCredentials().then((connections) => {
+      setSavedCredentials(Object.fromEntries(connections.map((item) => [item.id, item.base_url])));
+      setProfiles((current) => {
+        const next = [...current];
+        for (const saved of connections) {
+          const restored: ConnectionProfile = {
+            id: saved.id,
+            label: saved.label,
+            provider: { name: "compatible", model: saved.model, baseUrl: saved.base_url },
+          };
+          const index = next.findIndex((item) => item.id === saved.id);
+          if (index >= 0) next[index] = restored;
+          else next.push(restored);
+        }
+        return next;
+      });
+    }).catch((error) => setErrorMessage(error instanceof Error ? error.message : "Could not load saved connections."));
+    try {
+      const persisted = JSON.parse(window.sessionStorage.getItem(ACTIVE_RUN_STORAGE_KEY) || "null") as { id?: string; workspace_id?: string } | null;
+      if (persisted?.id) {
+        runWorkspaceIDRef.current = persisted.workspace_id || "";
+        void fetchAnalyzeRun(persisted.id).then((response) => applyRunSnapshot(response.run)).catch(() => {
+          window.sessionStorage.removeItem(ACTIVE_RUN_STORAGE_KEY);
+        });
+      }
+    } catch {
+      window.sessionStorage.removeItem(ACTIVE_RUN_STORAGE_KEY);
+    }
   }, []);
 
   useEffect(() => {
@@ -280,7 +316,7 @@ export function App() {
           ? activeWorkspace.activeBundle
           : scopedBundles[0]?.name || "");
 
-      if (nextBundleName) {
+      if (activeWorkspace && nextBundleName) {
         await loadBundle(nextBundleName, activeWorkspace?.id);
       }
     } catch (error) {
@@ -369,29 +405,38 @@ export function App() {
   function applyRunSnapshot(run: AnalyzeRun) {
     setActiveRun(run);
     setBusyDetail(run.progress[run.progress.length - 1]?.detail || run.status);
+    if (["succeeded", "partial", "failed", "canceled"].includes(run.status)) {
+      window.sessionStorage.removeItem(ACTIVE_RUN_STORAGE_KEY);
+    }
 
-    if (run.status === "succeeded" && run.response) {
+    if ((run.status === "succeeded" || run.status === "partial") && run.response) {
+      if (completedRunRef.current === run.id) {
+        return;
+      }
+      completedRunRef.current = run.id;
       const response = run.response;
       setErrorMessage("");
-      setBundleCache((current) => ({
-        ...current,
-        [response.bundle.name]: {
-          summary: response.bundle,
-          data: response.data,
-        },
-      }));
       setBundles((current) => mergeBundleSummary(current, response.bundle));
 
-      if (activeWorkspace) {
-        updateWorkspace(activeWorkspace.id, {
+      const runWorkspaceID = runWorkspaceIDRef.current || activeWorkspace?.id || "";
+      const runWorkspace = workspaces.find((workspace) => workspace.id === runWorkspaceID);
+      if (runWorkspaceID) {
+        updateWorkspace(runWorkspaceID, {
           activeBundle: response.bundle.name,
-          label: activeWorkspace.label === "Untitled Project" ? response.bundle.project_name || activeWorkspace.label : activeWorkspace.label,
+          label: runWorkspace?.label === "Untitled Project" ? response.bundle.project_name || runWorkspace.label : runWorkspace?.label || "Untitled Project",
           updatedAt: new Date().toISOString(),
         });
       }
 
-      setToastMessage(`Analysis ready for ${response.bundle.project_name || response.result.project_name || "repository"}.`);
-      void refreshStatus(response.bundle.name);
+      setToastMessage(run.status === "partial"
+        ? `Partial analysis for ${response.bundle.project_name || response.result.project_name || "repository"}; some AI sections failed.`
+        : `Analysis ready for ${response.bundle.project_name || response.result.project_name || "repository"}.`);
+      if (runWorkspaceID && runWorkspaceID !== activeWorkspace?.id) {
+        void loadBundle(response.bundle.name, runWorkspaceID);
+        void refreshStatus();
+      } else {
+        void refreshStatus(response.bundle.name);
+      }
       return;
     }
 
@@ -405,14 +450,25 @@ export function App() {
     }
   }
 
-  function handleSaveProfile() {
+  async function currentConnectionPayload() {
+    const saved = await saveCredential(profile, apiKey.trim());
+    setSavedCredentials((current) => ({ ...current, [saved.id]: saved.base_url }));
+    if (apiKey.trim()) setProfileSecrets((current) => ({ ...current, [profile.id]: "" }));
+    return { provider: buildProviderPayload(profile, ""), credential_id: profile.id };
+  }
+
+  async function handleSaveProfile() {
     if (validationErrors.length) {
       setErrorMessage(validationErrors.join(" "));
       return;
     }
-
-    setErrorMessage("");
-    setToastMessage(`Saved connection "${profile.label}". API keys remain only in session memory.`);
+    try {
+      await currentConnectionPayload();
+      setErrorMessage("");
+      setToastMessage(`Saved connection "${profile.label}" on this computer.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not save connection.");
+    }
   }
 
   async function handleListProviderModels() {
@@ -431,9 +487,7 @@ export function App() {
       models: null,
     }));
     try {
-      const response = await fetchProviderModels({
-        provider: buildProviderPayload(profile, apiKey),
-      });
+      const response = await fetchProviderModels(await currentConnectionPayload());
       setProviderDiagnostics((current) => ({
         ...current,
         busy: false,
@@ -468,9 +522,7 @@ export function App() {
       test: null,
     }));
     try {
-      const response = await testProvider({
-        provider: buildProviderPayload(profile, apiKey),
-      });
+      const response = await testProvider(await currentConnectionPayload());
       setProviderDiagnostics((current) => ({
         ...current,
         busy: false,
@@ -505,14 +557,10 @@ export function App() {
         updatedAt: new Date().toISOString(),
       });
     }
-    setProfileSecrets((current) => ({
-      ...current,
-      [cloneID]: current[profile.id] || "",
-    }));
     setToastMessage(`Duplicated "${profile.label}".`);
   }
 
-  function handleDeleteProfile() {
+  async function handleDeleteProfile() {
     if (profiles.length <= 1) {
       setErrorMessage("Keep at least one connection profile available.");
       return;
@@ -520,6 +568,20 @@ export function App() {
     if (profile.locked) {
       setErrorMessage("Preset profiles cannot be deleted.");
       return;
+    }
+
+    if (savedCredentials[profile.id]) {
+      try {
+        await deleteSavedCredential(profile.id);
+        setSavedCredentials((current) => {
+          const next = { ...current };
+          delete next[profile.id];
+          return next;
+        });
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Could not delete saved connection.");
+        return;
+      }
     }
 
     const fallbackProfileID = profiles.find((item) => item.id !== profile.id)?.id || profiles[0]?.id || "";
@@ -535,6 +597,20 @@ export function App() {
       ),
     );
     setToastMessage(`Deleted "${profile.label}".`);
+  }
+
+  async function handleClearSavedKey() {
+    try {
+      await deleteSavedCredential(profile.id);
+      setSavedCredentials((current) => {
+        const next = { ...current };
+        delete next[profile.id];
+        return next;
+      });
+      setToastMessage(`Cleared the saved key for "${profile.label}".`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not clear saved key.");
+    }
   }
 
   async function handleAnalyze() {
@@ -557,16 +633,15 @@ export function App() {
     setErrorMessage("");
 
     try {
+      const connection = await currentConnectionPayload();
       const response = await startAnalyzeRun({
         repo_path: repoPath,
-        deterministic_only: false,
-        ai_mode: "full-ai",
-        ai_read_budget: 24,
-        ai_token_budget: 32000,
         support_files: activeWorkspace.supportFiles,
         extra_ignore_patterns: activeWorkspace.ignorePatterns,
-        provider: buildProviderPayload(profile, apiKey),
+        ...connection,
       });
+      runWorkspaceIDRef.current = activeWorkspace.id;
+      window.sessionStorage.setItem(ACTIVE_RUN_STORAGE_KEY, JSON.stringify({ id: response.run.id, workspace_id: activeWorkspace.id }));
       applyRunSnapshot(response.run);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Analyze request failed.");
@@ -726,6 +801,7 @@ export function App() {
               activeWorkspace={activeWorkspace}
               activeWorkspaceID={activeWorkspaceID}
               apiKey={apiKey}
+              hasSavedKey={hasSavedKey}
               bundle={currentBundle}
               bundles={bundles}
               busy={busy}
@@ -738,6 +814,7 @@ export function App() {
                 }))
               }
               onCancelAnalyze={handleCancelAnalyze}
+              onClearSavedKey={() => { void handleClearSavedKey(); }}
               onCreateWorkspace={handleCreateWorkspace}
               onDeleteBundle={(bundleName) => {
                 void handleDeleteBundle(bundleName);
@@ -761,7 +838,7 @@ export function App() {
                 setProviderDiagnostics(initialProviderDiagnostics);
                 setProfiles((current) => current.map((item) => (item.id === nextProfile.id ? nextProfile : item)));
               }}
-              onSaveProfile={handleSaveProfile}
+              onSaveProfile={() => { void handleSaveProfile(); }}
               onSelectBundle={(bundleName, workspaceID) => {
                 void loadBundle(bundleName, workspaceID);
               }}
@@ -963,7 +1040,7 @@ function tabTitle(tab: TabKey) {
     case "architecture":
       return "Architecture";
     case "flowchart":
-      return "Flowchart";
+      return "Graphs";
     case "issues":
       return "Issues";
     case "recommendations":

@@ -33,7 +33,7 @@ const viewItems: Array<{ icon: ReactNode; label: string; value: TabKey }> = [
   { icon: <LayoutDashboard className="size-4" />, label: "Dashboard", value: "dashboard" },
   { icon: <BookOpenText className="size-4" />, label: "Summary", value: "summary" },
   { icon: <Shapes className="size-4" />, label: "Architecture", value: "architecture" },
-  { icon: <Network className="size-4" />, label: "Flowchart", value: "flowchart" },
+  { icon: <Network className="size-4" />, label: "Graphs", value: "flowchart" },
   { icon: <FileSearch2 className="size-4" />, label: "Issues", value: "issues" },
   { icon: <Sparkles className="size-4" />, label: "Recommendations", value: "recommendations" },
 ];

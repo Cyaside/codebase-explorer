@@ -50,7 +50,6 @@ export function normalizeAnalyzeResponse(value: unknown): AnalyzeResponse {
       primary_language: asString(result.primary_language),
     },
     bundle: normalizeBundleSummary(record.bundle),
-    data: normalizeBundleData(record.data),
   };
 }
 
@@ -100,6 +99,7 @@ export function normalizeBundleData(value: unknown): BundleData {
   const fullAI = asRecord(record.full_ai);
   const fullAIExecution = asRecord(record.full_ai_execution);
   const fullAIVerification = asRecord(record.full_ai_verification);
+  const graphs = asRecord(record.graphs);
   const mermaid = asRecord(record.mermaid);
   const links = asRecord(record.links);
 
@@ -200,6 +200,37 @@ export function normalizeBundleData(value: unknown): BundleData {
     full_ai: normalizeFullAISummary(fullAI),
     full_ai_execution: normalizeFullAIExecution(fullAIExecution),
     full_ai_verification: normalizeFullAIVerification(fullAIVerification),
+    graphs: {
+      schema_version: asString(graphs.schema_version),
+      views: asArray(graphs.views).map((item) => {
+        const view = asRecord(item);
+        return {
+          id: asString(view.id),
+          note: asString(view.note),
+          nodes: asArray(view.nodes).map((value) => {
+            const node = asRecord(value);
+            return {
+              id: asString(node.id),
+              label: asString(node.label),
+              type: asString(node.type),
+              path: asString(node.path),
+              evidence_paths: asStringArray(node.evidence_paths),
+            };
+          }),
+          edges: asArray(view.edges).map((value) => {
+            const edge = asRecord(value);
+            return {
+              id: asString(edge.id),
+              source: asString(edge.source),
+              target: asString(edge.target),
+              relation: asString(edge.relation),
+              evidence_paths: asStringArray(edge.evidence_paths),
+              source_kind: asString(edge.source_kind),
+            };
+          }),
+        };
+      }),
+    },
     mermaid: {
       architecture: asString(mermaid.architecture),
       dependencies: asString(mermaid.dependencies),
@@ -213,6 +244,16 @@ export function normalizeBundleData(value: unknown): BundleData {
 
 function normalizeFullAISummary(record: UnknownRecord) {
   return {
+    pack_version: asString(record.pack_version),
+    pack_hash: asString(record.pack_hash),
+    provider: asString(record.provider),
+    model: asString(record.model),
+    call_count: asNumber(record.call_count),
+    repair_calls: asNumber(record.repair_calls),
+    prompt_bytes: asNumber(record.prompt_bytes),
+    prompt_tokens: asNumber(record.prompt_tokens),
+    output_tokens: asNumber(record.output_tokens),
+    duration_ms: asNumber(record.duration_ms),
     enabled: asBoolean(record.enabled),
     mode: asString(record.mode),
     status: asString(record.status),

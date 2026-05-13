@@ -91,7 +91,6 @@ export interface AnalyzeResponse {
     primary_language: string;
   };
   bundle: BundleSummary;
-  data: BundleData;
 }
 
 export interface AnalyzeProgressEvent {
@@ -199,6 +198,7 @@ export interface BundleData {
   full_ai: FullAISummary;
   full_ai_execution: FullAIExecution;
   full_ai_verification: FullAIVerification;
+  graphs: GraphSet;
   mermaid: {
     architecture: string;
     dependencies: string;
@@ -209,7 +209,46 @@ export interface BundleData {
   };
 }
 
+export interface GraphSet {
+  schema_version: string;
+  views: GraphView[];
+}
+
+export interface GraphView {
+  id: "architecture" | "flow" | "dependencies" | string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  note: string;
+}
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  type: string;
+  path: string;
+  evidence_paths: string[];
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  relation: string;
+  evidence_paths: string[];
+  source_kind: string;
+}
+
 export interface FullAISummary {
+	pack_version: string;
+	pack_hash: string;
+	provider: string;
+	model: string;
+	call_count: number;
+	repair_calls: number;
+	prompt_bytes: number;
+	prompt_tokens: number;
+	output_tokens: number;
+	duration_ms: number;
   enabled: boolean;
   mode: string;
   status: string;

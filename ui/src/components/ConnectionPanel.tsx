@@ -4,9 +4,11 @@ import type { ConnectionProfile, ProviderDiagnosticsState, SupportedProviderOpti
 
 interface ConnectionPanelProps {
   apiKey: string;
+  hasSavedKey: boolean;
   diagnostics: ProviderDiagnosticsState;
   onAPIKeyChange: (value: string) => void;
   onChange: (profile: ConnectionProfile) => void;
+  onClearKey: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onListModels: () => void;
@@ -19,9 +21,11 @@ interface ConnectionPanelProps {
 
 export function ConnectionPanel({
   apiKey,
+  hasSavedKey,
   diagnostics,
   onAPIKeyChange,
   onChange,
+  onClearKey,
   onDelete,
   onDuplicate,
   onListModels,
@@ -31,8 +35,7 @@ export function ConnectionPanel({
   providerOptions,
   validationErrors,
 }: ConnectionPanelProps) {
-  const providerName = profile.provider.name;
-  const providerMeta = providerOptions.find((item) => item.name === providerName);
+  const providerMeta = providerOptions.find((item) => item.name === "compatible");
 
   return (
     <section className="rail-section">
@@ -50,30 +53,6 @@ export function ConnectionPanel({
             type="text"
             value={profile.label}
           />
-        </label>
-
-        <label className="compact-field">
-          <span className="compact-label">Provider mode</span>
-          <select
-            className="compact-input"
-            onChange={(event) =>
-              onChange({
-                ...profile,
-                provider: {
-                  name: event.target.value,
-                  model: profile.provider.model || "",
-                  baseUrl: event.target.value === "openai" ? "" : profile.provider.baseUrl || "",
-                },
-              })
-            }
-            value={providerName}
-          >
-            {providerOptions.map((option) => (
-              <option key={option.name} value={option.name}>
-                {option.name}
-              </option>
-            ))}
-          </select>
         </label>
 
         <label className="compact-field">
@@ -121,12 +100,13 @@ export function ConnectionPanel({
             <input
               className="compact-input pl-10"
               onChange={(event) => onAPIKeyChange(event.target.value)}
-              placeholder="Session memory only"
+              placeholder={hasSavedKey ? "Saved in local backend; enter to replace" : "Enter API key"}
               type="password"
               value={apiKey}
             />
           </div>
         </label>
+        <p className="text-xs text-zinc-500">{hasSavedKey ? "Key saved on this computer. It is never sent back to the browser." : "Save to store the key in the local backend, outside this repository."}</p>
       </div>
 
       {providerMeta ? (
@@ -212,6 +192,7 @@ export function ConnectionPanel({
           <CopyPlus className="size-4" />
           Duplicate
         </button>
+        {hasSavedKey ? <button className="secondary-control danger" onClick={onClearKey} type="button">Clear saved key</button> : null}
         <button className="secondary-control danger" disabled={profile.locked} onClick={onDelete} type="button">
           <Trash2 className="size-4" />
           Delete
