@@ -39,7 +39,7 @@ export function PropertiesPanel({ activeRun, bundle, inspector, workspace }: Pro
               <p className="text-sm leading-6 text-zinc-400">{activeRun.progress[activeRun.progress.length - 1]?.detail || activeRun.error || "No run details."}</p>
             </div>
           ) : (
-            <p className="text-sm leading-6 text-zinc-500">No active run. Start an analyze pass from the project setup tab.</p>
+            <p className="text-sm leading-6 text-zinc-500">No active run. Start analysis from Project setup.</p>
           )}
         </RailPanel>
 

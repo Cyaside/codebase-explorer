@@ -38,7 +38,7 @@ export function ConnectionPanel({
   const providerMeta = providerOptions.find((item) => item.name === "compatible");
 
   return (
-    <section className="rail-section">
+    <section className="rail-section connection-panel">
       <div>
         <p className="panel-kicker">Connection</p>
         <h3 className="mt-3 text-lg font-semibold text-zinc-100">{profile.label}</h3>
@@ -184,7 +184,7 @@ export function ConnectionPanel({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button className="secondary-control" onClick={onSave} type="button">
+        <button className="primary-control" onClick={onSave} type="button">
           <Save className="size-4" />
           Save
         </button>

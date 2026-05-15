@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useRef, useState } from "react";
-import { Command, FolderOpenDot, RefreshCw } from "lucide-react";
+import { Command, FolderOpenDot, Play, RefreshCw } from "lucide-react";
 
 import { CommandPalette, type CommandPaletteAction } from "@/components/CommandPalette";
 import { Sidebar } from "@/components/Sidebar";
@@ -738,10 +738,11 @@ export function App() {
   const readmeHref = currentBundle ? bundleLink(currentBundle.summary.name, "README.md") : "";
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100">
+    <div className="app-shell">
+      <a className="skip-link" href="#workbench-main">Skip to content</a>
       <CommandPalette actions={commandActions} onClose={() => setCommandPaletteOpen(false)} open={commandPaletteOpen} />
 
-      <div className="grid min-h-screen xl:grid-cols-[15.5rem_minmax(0,1fr)]">
+      <div className="app-layout">
         <Sidebar
           activeTab={activeTab}
           activeWorkspaceID={activeWorkspaceID}
@@ -753,37 +754,26 @@ export function App() {
           workspaces={workspaces}
         />
 
-        <main className="px-4 py-4 xl:px-5">
-          <div className="space-y-4">
-            <header className="topbar-shell">
-              <div>
-                <p className="panel-kicker">{tabTitle(activeTab)}</p>
-                <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50">
-                  {activeWorkspace?.label || "Codebase Explorer"}
-                </h1>
-                <p className="mt-2 text-sm text-zinc-500">
-                  {activeWorkspace?.repoPath || "Create a project workspace and point it at one local repository."}
-                </p>
+        <main className="workbench-main" id="workbench-main" tabIndex={-1}>
+          <div className="workbench-content">
+            <header className="workbench-header">
+              <div className="workbench-breadcrumb">
+                <span>Workspace</span><span aria-hidden="true">/</span>
+                <span>{activeWorkspace?.label || "No project"}</span><span aria-hidden="true">/</span>
+                <strong>{tabTitle(activeTab)}</strong>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <button className="secondary-control" onClick={() => setCommandPaletteOpen(true)} type="button">
-                  <Command className="size-4" />
-                  Command
-                </button>
-                <button className="secondary-control" onClick={() => void refreshStatus()} type="button">
-                  <RefreshCw className="size-4" />
-                  Refresh
-                </button>
-                <a
-                  aria-disabled={!currentBundle}
-                  className={!currentBundle ? "secondary-control pointer-events-none opacity-50" : "secondary-control"}
-                  href={readmeHref || undefined}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <FolderOpenDot className="size-4" />
-                  Open README
-                </a>
+              <div className="workbench-heading">
+                <div className="min-w-0">
+                  <p className="panel-kicker">{currentBundle ? `${currentBundle.summary.project_type || "Repository"} · ${currentBundle.summary.total_files} files` : "Local workbench"}</p>
+                  <h1>{tabTitle(activeTab)}</h1>
+                  <p className="workbench-subtitle">{activeWorkspace?.repoPath || "Select a project and connect a repository to begin."}</p>
+                </div>
+                <div className="workbench-actions">
+                  <button aria-label="Open command palette" className="secondary-control icon-control" onClick={() => setCommandPaletteOpen(true)} title="Command palette (Ctrl+K)" type="button"><Command className="size-4" /></button>
+                  <button aria-label="Refresh workbench" className="secondary-control icon-control" onClick={() => void refreshStatus()} title="Refresh" type="button"><RefreshCw className="size-4" /></button>
+                  {currentBundle ? <a className="secondary-control icon-control" href={readmeHref} rel="noreferrer" target="_blank" title="Open bundle README" aria-label="Open bundle README"><FolderOpenDot className="size-4" /></a> : null}
+                  {activeTab !== "project" ? <button className="primary-control" onClick={() => setActiveTab("project")} type="button"><Play className="size-3.5" /> Analyze</button> : null}
+                </div>
               </div>
             </header>
 
@@ -984,7 +974,7 @@ function buildDefaultInspector(workspace: SavedWorkspace | null, bundle: Workben
       eyebrow: tabTitle(activeTab),
       title: bundle.summary.project_name || bundle.summary.name,
       description: bundle.data.project.summary || bundle.data.ai.project_summary || "No project summary available.",
-      notes: [bundle.data.ai.note || "Repository bundle with optional AI synthesis."],
+      notes: [bundle.data.ai.note || "Repository analysis with provider synthesis."],
       properties: [
         { label: "Workspace", value: workspace?.label || "Unknown" },
         { label: "Bundle", value: bundle.summary.name },
@@ -1028,7 +1018,7 @@ function tabTitle(tab: TabKey) {
     case "projects":
       return "Projects";
     case "dashboard":
-      return "Dashboard";
+      return "Overview";
     case "project":
       return "Project Setup";
     case "connections":

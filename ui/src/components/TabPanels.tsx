@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from "react";
+import type { RefObject } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 import { FolderCog } from "lucide-react";
 
@@ -105,19 +105,6 @@ export function TabPanels(props: TabPanelsProps) {
 
   return (
     <Tabs.Root className="space-y-4" onValueChange={(value) => onTabChange(value as TabKey)} value={activeTab}>
-      <Tabs.List className="tab-strip">
-        <TabTrigger value="projects">Projects</TabTrigger>
-        <TabTrigger value="project">Project Setup</TabTrigger>
-        <TabTrigger value="connections">Connections</TabTrigger>
-        <TabTrigger value="properties">Properties</TabTrigger>
-        <TabTrigger value="dashboard">Dashboard</TabTrigger>
-        <TabTrigger value="summary">Summary</TabTrigger>
-        <TabTrigger value="architecture">Architecture</TabTrigger>
-        <TabTrigger value="flowchart">Graphs</TabTrigger>
-        <TabTrigger value="issues">Issues</TabTrigger>
-        <TabTrigger value="recommendations">Recommendations</TabTrigger>
-      </Tabs.List>
-
       <Tabs.Content value="projects">
         <ProjectsPanel
           activeWorkspaceID={activeWorkspaceID}
@@ -159,7 +146,7 @@ export function TabPanels(props: TabPanelsProps) {
             <div className="mt-4 space-y-2">
               {profiles.map((item) => (
                 <button
-                  className={`panel-row${item.id === profile.id ? " border-zinc-800 bg-zinc-950" : ""}`}
+                  className={`panel-row${item.id === profile.id ? " panel-row-selected" : ""}`}
                   key={item.id}
                   onClick={() => onSelectProfile(item.id)}
                   type="button"
@@ -213,15 +200,6 @@ export function TabPanels(props: TabPanelsProps) {
 
       <Tabs.Content value="flowchart">
         <div className="space-y-4">
-          <section className="panel-block">
-            <p className="panel-kicker">Repository graphs</p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50">
-              {bundle ? bundle.summary.project_name || bundle.summary.name : "Project graphs"}
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-zinc-400">
-              {bundle ? "Explore architecture, supported execution flows, and local dependencies. Select a node or relation for evidence." : "Run an analysis to unlock the project graphs."}
-            </p>
-          </section>
           <EvidenceGraph bundle={bundle} />
         </div>
       </Tabs.Content>
@@ -234,13 +212,5 @@ export function TabPanels(props: TabPanelsProps) {
         <RecommendationsView bundle={bundle} onInspect={onInspect} />
       </Tabs.Content>
     </Tabs.Root>
-  );
-}
-
-function TabTrigger({ children, value }: { children: ReactNode; value: TabKey }) {
-  return (
-    <Tabs.Trigger className="tab-trigger" value={value}>
-      {children}
-    </Tabs.Trigger>
   );
 }

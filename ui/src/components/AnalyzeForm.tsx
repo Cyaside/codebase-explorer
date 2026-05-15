@@ -42,8 +42,7 @@ export function AnalyzeForm({
           <p className="panel-kicker">Launcher</p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50">Open one project and keep the whole shell scoped to it.</h2>
           <p className="mt-4 text-sm leading-7 text-zinc-400">
-            This workbench is no longer a global bundle browser. Create a workspace, point it at one local repository, then keep analysis,
-            graph inspection, issues, and recommendations anchored to that project.
+            Create a workspace for a local repository. Analysis, graphs, issues, and recommendations will stay attached to that project.
           </p>
         </div>
         <button className="primary-control" onClick={onCreateWorkspace} type="button">
@@ -62,7 +61,7 @@ export function AnalyzeForm({
         <div>
           <p className="panel-kicker">Project setup</p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50">{workspace.label}</h2>
-          <p className="mt-2 text-sm text-zinc-500">One active project per app instance. Saved locally so you can reopen it later.</p>
+          <p className="mt-2 text-sm text-zinc-500">Repository settings stay on this computer and can be reopened later.</p>
         </div>
         <div className="flex items-center gap-2">
           <span className={busy ? "run-pill run-pill-busy" : "run-pill"}>
@@ -166,7 +165,7 @@ export function AnalyzeForm({
         <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
           <span className="hint-chip">Ctrl+Enter analyze</span>
           <span className="hint-chip">Ctrl+K command</span>
-          <span className="hint-chip">[ ] tabs</span>
+          <span className="hint-chip">[ ] views</span>
           <span className="hint-chip">J / K projects</span>
         </div>
         <p className="text-sm text-zinc-500">{busy ? busyDetail || "Analysis is running." : "Choose a local repository path and a connection with an API key."}</p>

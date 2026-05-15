@@ -66,11 +66,11 @@ export function FullAIStatusPanel({ bundle }: { bundle: WorkbenchBundle }) {
         <ShieldCheck className="size-4 text-zinc-500" />
         <p className="panel-kicker">AI analysis</p>
       </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="analysis-health-grid">
         {stats.map((item) => (
-          <div className="rounded-2xl border border-zinc-900 bg-black px-3 py-3" key={item.label}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">{item.label}</p>
-            <p className="mt-2 text-sm font-semibold text-zinc-100">{item.value}</p>
+          <div className="analysis-health-item" key={item.label}>
+            <p>{item.label}</p>
+            <strong>{item.value}</strong>
           </div>
         ))}
       </div>
