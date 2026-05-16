@@ -93,8 +93,8 @@ func VerifyFunctionOutputDetailed(job FunctionJob, output FunctionOutput) (Funct
 		return output, builder.report
 	}
 
+	output = filterGraphEndpointPaths(output, allowed, builder)
 	output, evidenceOK := verifyEvidencePaths(output, allowed, builder)
-	verifyGraphEndpointPaths(output, allowed, builder)
 	verifyFunctionShape(job.Name, output, builder)
 	if evidenceOK {
 		builder.pass("evidence.paths", "all referenced evidence paths are allowed for this function")
@@ -104,8 +104,10 @@ func VerifyFunctionOutputDetailed(job FunctionJob, output FunctionOutput) (Funct
 	return output, builder.report
 }
 
-func verifyGraphEndpointPaths(output FunctionOutput, allowed map[string]struct{}, builder *functionVerificationBuilder) {
+func filterGraphEndpointPaths(output FunctionOutput, allowed map[string]struct{}, builder *functionVerificationBuilder) FunctionOutput {
+	accepted := make([]GraphEdge, 0, len(output.GraphEdges))
 	for _, edge := range output.GraphEdges {
+		valid := true
 		for _, endpoint := range []string{edge.From, edge.To} {
 			value := strings.ReplaceAll(strings.TrimSpace(endpoint), "\\", "/")
 			lower := strings.ToLower(value)
@@ -128,10 +130,17 @@ func verifyGraphEndpointPaths(output FunctionOutput, allowed map[string]struct{}
 				}
 			}
 			if !backed {
-				builder.fail("graph.endpoint", "path-like graph endpoint is absent from readable evidence: "+value)
+				builder.warn("graph.endpoint", "removed graph edge with endpoint absent from readable evidence: "+value)
+				valid = false
+				break
 			}
 		}
+		if valid {
+			accepted = append(accepted, edge)
+		}
 	}
+	output.GraphEdges = accepted
+	return output
 }
 
 func VerifyFunctionOutput(job FunctionJob, output FunctionOutput) (FunctionOutput, bool) {

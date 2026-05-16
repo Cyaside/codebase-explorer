@@ -58,8 +58,7 @@ func TestWorkbenchStatusListsRecentBundles(t *testing.T) {
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
 	if _, err := service.Analyze(t.Context(), AnalyzeRequest{
-		RepoPath:          repoPath,
-		DeterministicOnly: true,
+		RepoPath: repoPath,
 	}); err != nil {
 		t.Fatalf("seed bundle: %v", err)
 	}
@@ -394,8 +393,7 @@ func TestWorkbenchBundleDeleteRemovesBundleDirectory(t *testing.T) {
 	})
 
 	result, err := service.Analyze(t.Context(), AnalyzeRequest{
-		RepoPath:          filepath.Join("..", "..", "testdata", "sample-repo"),
-		DeterministicOnly: true,
+		RepoPath: filepath.Join("..", "..", "testdata", "sample-repo"),
 	})
 	if err != nil {
 		t.Fatalf("seed bundle: %v", err)

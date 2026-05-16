@@ -45,14 +45,6 @@ func (s Store) SaveDeterministic(payload DeterministicPayload) error {
 	return writeJSON(s.kindPath("deterministic", payload.Key), payload)
 }
 
-func (s Store) LoadProvider(key string) (ProviderPayload, error) {
-	return loadJSON[ProviderPayload](s.kindPath("provider", key))
-}
-
-func (s Store) SaveProvider(payload ProviderPayload) error {
-	return writeJSON(s.kindPath("provider", payload.Key), payload)
-}
-
 func (s Store) LoadAIExecution(key string) (AIExecutionPayload, error) {
 	return loadJSON[AIExecutionPayload](s.kindPath("ai-execution", key))
 }

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/config"
 	"github.com/Cyaside/codebase-explorer/internal/fullai"
+	"github.com/Cyaside/codebase-explorer/internal/provider"
 )
 
 func TestAdaptiveAIUsesTwoParallelCallsAndLoadsAgentPack(t *testing.T) {
@@ -133,5 +135,78 @@ func TestRepairOnlyRequestsTheMissingSection(t *testing.T) {
 	}
 	if execution.Status != "executed" || execution.RepairCalls != 1 || calls.Load() != 2 || len(repairNames) != 1 || repairNames[0] != "issues" {
 		t.Fatalf("repair was not scoped to missing issues: status=%s repair=%d calls=%d names=%v", execution.Status, execution.RepairCalls, calls.Load(), repairNames)
+	}
+}
+
+func TestAdaptiveAIPreservesVerifiedSectionsWhenRepairDeadlineExpires(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	releaseRepair := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) > 1 {
+			<-releaseRepair
+			return
+		}
+		var payload struct {
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		fixture := fixtureBatchOutput(payload.Messages[1].Content, "README.md")
+		delete(fixture["functions"].(map[string]any), "issues")
+		content, _ := json.Marshal(fixture)
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": string(content)}}}})
+	}))
+	defer server.Close()
+	service := New(config.Settings{AppVersion: "test", DefaultOutputRoot: t.TempDir(), Provider: config.ProviderSettings{
+		Name: "compatible", Model: "fixture", APIKey: "test-key", BaseURL: server.URL,
+	}})
+	jobs := make([]fullai.FunctionJob, 0, 7)
+	for _, name := range []string{"summary", "architecture", "hotspots-and-dependencies", "flowchart", "issues", "recommendations", "dashboard"} {
+		jobs = append(jobs, fullai.FunctionJob{Name: name, InstructionPath: ".agents/ai/functions/" + name + ".md", EvidencePaths: []string{"README.md"}})
+	}
+	evidence := fullai.Evidence{Items: []fullai.EvidenceItem{{DisplayPath: "README.md", Snippet: "project evidence", ReadStatus: "read"}}}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	execution, _, err := service.executeAdaptiveAI(ctx, AnalyzeRequest{}, analyzer.Result{}, fullai.Functions{Jobs: jobs}, evidence, fullai.Summary{})
+	close(releaseRepair)
+	if err != nil {
+		t.Fatalf("expected partial result after repair deadline, got %v", err)
+	}
+	if execution.Status != "partial" || execution.VerifiedCount == 0 || execution.RepairCalls != 1 || calls.Load() != 2 {
+		t.Fatalf("verified sections were not preserved: status=%s verified=%d repair=%d calls=%d", execution.Status, execution.VerifiedCount, execution.RepairCalls, calls.Load())
+	}
+}
+
+func TestBatchAcceptsCitationsFromEvidenceReadByAnotherJob(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		content, _ := json.Marshal(fixtureBatchOutput(payload.Messages[1].Content, "README.md"))
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": string(content)}}}})
+	}))
+	defer server.Close()
+	config := provider.Config{Name: "compatible", Model: "fixture", APIKey: "test-key", BaseURL: server.URL}
+	client, err := provider.NewRegistry().ClientFor(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs := []fullai.FunctionJob{
+		{Name: "summary", InstructionPath: ".agents/ai/functions/summary.md", EvidencePaths: []string{"README.md"}},
+		{Name: "architecture", InstructionPath: ".agents/ai/functions/architecture.md", EvidencePaths: []string{"internal/app.go"}},
+	}
+	evidence := fullai.Evidence{Items: []fullai.EvidenceItem{
+		{DisplayPath: "README.md", Snippet: "overview", ReadStatus: "read"},
+		{DisplayPath: "internal/app.go", Snippet: "package app", ReadStatus: "read"},
+	}}
+	outcome := runAIBatch(t.Context(), client, config, jobs, evidence, workerEvidenceLimit)
+	if outcome.err != nil || len(outcome.results) != 2 || !outcome.results[0].Verified || !outcome.results[1].Verified {
+		t.Fatalf("batch rejected evidence actually read by the worker: %#v", outcome)
 	}
 }

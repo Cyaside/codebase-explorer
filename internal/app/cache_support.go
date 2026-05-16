@@ -26,7 +26,7 @@ func (s Service) loadDeterministicState(ctx context.Context, request AnalyzeRequ
 		return s.computeDeterministicState(ctx, request, repoPath, supportFiles, cache.StatusDisabled)
 	}
 
-	cacheKey, err := cache.BuildDeterministicKey(repoPath, request.ExtraIgnorePatterns, supportFiles, s.settings.AppVersion, request.DeterministicOnly)
+	cacheKey, err := cache.BuildDeterministicKey(repoPath, request.ExtraIgnorePatterns, supportFiles, s.settings.AppVersion)
 	if err != nil {
 		emitAnalyzeProgress(request, "cache", "bypass", "could not build deterministic cache key; continuing without cache")
 		return s.computeDeterministicState(ctx, request, repoPath, supportFiles, cache.StatusMiss)

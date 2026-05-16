@@ -44,3 +44,21 @@ func TestBatchPromptContainsCurrentAgentGuideContents(t *testing.T) {
 		t.Fatal("batch provider payload did not change with the embedded guide content")
 	}
 }
+
+func TestParseBatchOutputRepairsTrailingJSONCommas(t *testing.T) {
+	t.Parallel()
+	content := `{"functions":{"summary":{"summary":"comma,} stays intact","key_findings":[],},"issues":{"summary":"ok"},},}`
+	outputs, err := ParseBatchOutput(content)
+	if err != nil || len(outputs) != 2 || outputs["summary"].Summary != "comma,} stays intact" {
+		t.Fatalf("trailing commas discarded usable sections: outputs=%#v error=%v", outputs, err)
+	}
+}
+
+func TestParseBatchOutputKeepsCompletedSectionsFromBrokenResponse(t *testing.T) {
+	t.Parallel()
+	content := `{"functions":{"summary":{"summary":"complete"},"architecture":{"summary":"also complete"},"issues":{broken}}}`
+	outputs, err := ParseBatchOutput(content)
+	if err != nil || len(outputs) != 2 || outputs["summary"].Summary != "complete" || outputs["architecture"].Summary != "also complete" {
+		t.Fatalf("completed functions were lost: outputs=%#v error=%v", outputs, err)
+	}
+}

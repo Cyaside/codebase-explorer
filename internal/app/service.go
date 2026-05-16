@@ -62,9 +62,7 @@ func New(settings config.Settings) Service {
 func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Minute)
 	defer cancel()
-	// New runs always use the single AI workflow. Legacy mode fields are kept
-	// temporarily for callers that still construct AnalyzeRequest directly.
-	request.DeterministicOnly = false
+	// New runs always use the single AI workflow.
 	request.FullAI = fullai.Options{Mode: fullai.ModeFull}
 	if request.CredentialID != "" {
 		if request.ProviderOverride != nil {
@@ -115,12 +113,16 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	fullAIPlan, fullAISummary := s.buildFullAIPlan(request, scanResult, analysis, changeResult, supportFiles)
 	fullAIEvidence, fullAISummary := s.collectFullAIEvidence(request, scanResult, analysis, changeResult, supportFiles, fullAIPlan, fullAISummary)
 	fullAIFunctions, fullAISummary := s.prepareFullAIFunctions(request, scanResult, analysis, changeResult, supportFiles, fullAIPlan, fullAIEvidence, fullAISummary)
-	fullAIExecution, fullAISummary, err := s.executeAdaptiveAI(ctx, request, analysis, fullAIFunctions, fullAIEvidence, fullAISummary)
+	// Leave time to validate and publish a partial bundle if a slow provider
+	// exhausts the AI portion of the run.
+	aiCtx, cancelAI := context.WithTimeout(ctx, 6*time.Minute)
+	fullAIExecution, fullAISummary, err := s.executeAdaptiveAI(aiCtx, request, analysis, fullAIFunctions, fullAIEvidence, fullAISummary)
+	cancelAI()
 	if err != nil {
 		return AnalyzeResult{}, err
 	}
 	fullAIExecution.PackHash = packHash
-	if fullAIExecution.ExecutedCount == 0 && request.FullAI.Normalize().Mode.Enabled() {
+	if fullAIExecution.ExecutedCount == 0 {
 		return AnalyzeResult{}, fmt.Errorf("AI analysis failed: %s", strings.TrimSpace(fullAIExecution.Note))
 	}
 	fullAIVerification := fullai.NewVerification(analysis.GeneratedAt, string(request.FullAI.Normalize().Mode), fullAIExecution.Results)
@@ -139,12 +141,11 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	emitAnalyzeProgress(request, "bundle-write", "running", "writing bundle output")
 	combinedProviderStatus := combineProviderStatus(providerCacheStatus, fullAICacheStatus(fullAISummary))
 	writeResult, err := s.writer.Write(bundle.WriteRequest{
-		OutputRoot:        outputRoot,
-		DeterministicOnly: request.DeterministicOnly,
-		ScanResult:        scanResult,
-		Analysis:          analysis,
-		Changes:           changeResult,
-		Warnings:          warnings,
+		OutputRoot: outputRoot,
+		ScanResult: scanResult,
+		Analysis:   analysis,
+		Changes:    changeResult,
+		Warnings:   warnings,
 		Cache: bundle.CacheMeta{
 			Enabled:             s.cache.Enabled(),
 			Root:                s.cache.Root(),

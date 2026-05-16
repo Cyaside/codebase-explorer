@@ -25,6 +25,7 @@ func buildBatchPromptFrom(files fs.FS, jobs []FunctionJob, evidence Evidence, ma
 	var system strings.Builder
 	system.WriteString(functionSystemPrompt)
 	system.WriteString("\nReturn a JSON object with a functions property mapping each requested function name to its output object. Include every requested function.\n")
+	system.WriteString("Keep each summary under 80 words and each function to at most 3 findings, 3 recommendations, 6 graph edges, and 3 issue signals. Use exact evidence file paths for path-like graph endpoints; use short names without slashes for conceptual steps.\n")
 	for _, filePath := range packPrelude {
 		data, err := fs.ReadFile(files, filePath)
 		if err != nil {
@@ -58,7 +59,7 @@ func buildBatchPromptFrom(files fs.FS, jobs []FunctionJob, evidence Evidence, ma
 		system.Write(guide)
 		requested = append(requested, map[string]any{
 			"name": job.Name, "objective": job.Objective, "focus": job.Focus,
-			"allowed_evidence_paths": job.EvidencePaths,
+			"priority_evidence_paths": job.EvidencePaths,
 		})
 		for _, item := range evidenceForJob(job, evidence.Items) {
 			if _, ok := seen[item.DisplayPath]; ok {
@@ -76,6 +77,15 @@ func buildBatchPromptFrom(files fs.FS, jobs []FunctionJob, evidence Evidence, ma
 				selected[i].Truncated = true
 			}
 		}
+	}
+	allowedPaths := make([]string, 0, len(selected))
+	for _, item := range selected {
+		if item.ReadStatus == "read" && item.Snippet != "" {
+			allowedPaths = append(allowedPaths, item.DisplayPath)
+		}
+	}
+	for _, function := range requested {
+		function["allowed_evidence_paths"] = allowedPaths
 	}
 	payload, err := json.Marshal(map[string]any{
 		"functions": requested, "evidence_items": selected,
@@ -108,11 +118,20 @@ func validUTF8Prefix(value string, limit int) string {
 }
 
 func ParseBatchOutput(content string) (map[string]FunctionOutput, error) {
+	content = stripMarkdownFence(content)
 	var envelope struct {
 		Functions map[string]json.RawMessage `json:"functions"`
 	}
-	if err := json.Unmarshal([]byte(stripMarkdownFence(content)), &envelope); err != nil {
-		return nil, fmt.Errorf("parse batch response: %w", err)
+	if err := json.Unmarshal([]byte(content), &envelope); err != nil {
+		content = removeTrailingJSONCommas(content)
+		if cleanErr := json.Unmarshal([]byte(content), &envelope); cleanErr != nil {
+			// A response may end or break after complete function objects. Keep
+			// those objects so only the missing sections need a repair call.
+			if completed := parseCompletedBatchFunctions(content); len(completed) > 0 {
+				return completed, nil
+			}
+			return nil, fmt.Errorf("parse batch response: %w", cleanErr)
+		}
 	}
 	if len(envelope.Functions) == 0 {
 		return nil, fmt.Errorf("batch response has no functions")
@@ -126,4 +145,81 @@ func ParseBatchOutput(content string) (map[string]FunctionOutput, error) {
 		outputs[name] = output
 	}
 	return outputs, nil
+}
+
+func removeTrailingJSONCommas(content string) string {
+	var clean strings.Builder
+	clean.Grow(len(content))
+	inString, escaped := false, false
+	for index := 0; index < len(content); index++ {
+		character := content[index]
+		if inString {
+			clean.WriteByte(character)
+			if escaped {
+				escaped = false
+			} else if character == '\\' {
+				escaped = true
+			} else if character == '"' {
+				inString = false
+			}
+			continue
+		}
+		if character == '"' {
+			inString = true
+		}
+		if character == ',' {
+			lookahead := index + 1
+			for lookahead < len(content) && (content[lookahead] == ' ' || content[lookahead] == '\n' || content[lookahead] == '\r' || content[lookahead] == '\t') {
+				lookahead++
+			}
+			if lookahead < len(content) && (content[lookahead] == '}' || content[lookahead] == ']') {
+				continue
+			}
+		}
+		clean.WriteByte(character)
+	}
+	return clean.String()
+}
+
+func parseCompletedBatchFunctions(content string) map[string]FunctionOutput {
+	decoder := json.NewDecoder(strings.NewReader(content))
+	start, err := decoder.Token()
+	if err != nil || start != json.Delim('{') {
+		return nil
+	}
+	outputs := map[string]FunctionOutput{}
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return outputs
+		}
+		if key != "functions" {
+			var ignored json.RawMessage
+			if decoder.Decode(&ignored) != nil {
+				return outputs
+			}
+			continue
+		}
+		start, err := decoder.Token()
+		if err != nil || start != json.Delim('{') {
+			return outputs
+		}
+		for decoder.More() {
+			nameToken, err := decoder.Token()
+			name, ok := nameToken.(string)
+			if err != nil || !ok {
+				return outputs
+			}
+			var raw json.RawMessage
+			if decoder.Decode(&raw) != nil {
+				return outputs
+			}
+			output, err := ParseFunctionOutput(string(raw))
+			if err == nil {
+				outputs[name] = output
+			}
+		}
+		return outputs
+	}
+	return outputs
 }

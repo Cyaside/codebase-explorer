@@ -9,7 +9,6 @@ type AnalyzeRequest struct {
 	RepoPath             string
 	CredentialID         string
 	OutputRoot           string
-	DeterministicOnly    bool
 	FullAI               fullai.Options
 	ExtraIgnorePatterns  []string
 	OptionalSupportFiles []string

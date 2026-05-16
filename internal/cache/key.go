@@ -24,24 +24,14 @@ type fileSnapshot struct {
 }
 
 type deterministicKeyPayload struct {
-	Version           string         `json:"version"`
-	RootPath          string         `json:"root_path"`
-	DeterministicOnly bool           `json:"deterministic_only"`
-	IgnorePatterns    []string       `json:"ignore_patterns"`
-	Repository        []fileSnapshot `json:"repository"`
-	SupportFiles      []fileSnapshot `json:"support_files"`
+	Version        string         `json:"version"`
+	RootPath       string         `json:"root_path"`
+	IgnorePatterns []string       `json:"ignore_patterns"`
+	Repository     []fileSnapshot `json:"repository"`
+	SupportFiles   []fileSnapshot `json:"support_files"`
 }
 
-type providerKeyPayload struct {
-	Version string                    `json:"version"`
-	Name    string                    `json:"name"`
-	Model   string                    `json:"model"`
-	BaseURL string                    `json:"base_url"`
-	APIKey  string                    `json:"api_key_hash"`
-	Context provider.CondensedContext `json:"context"`
-}
-
-func BuildDeterministicKey(rootPath string, extraIgnorePatterns []string, supportFiles []string, version string, deterministicOnly bool) (string, error) {
+func BuildDeterministicKey(rootPath string, extraIgnorePatterns []string, supportFiles []string, version string) (string, error) {
 	patterns, err := repo.LoadPatterns(rootPath, extraIgnorePatterns)
 	if err != nil {
 		return "", err
@@ -57,26 +47,13 @@ func BuildDeterministicKey(rootPath string, extraIgnorePatterns []string, suppor
 	}
 
 	payload := deterministicKeyPayload{
-		Version:           strings.TrimSpace(version),
-		RootPath:          filepath.Clean(rootPath),
-		DeterministicOnly: deterministicOnly,
-		IgnorePatterns:    patterns,
-		Repository:        repositorySnapshot,
-		SupportFiles:      supportSnapshot,
+		Version:        strings.TrimSpace(version),
+		RootPath:       filepath.Clean(rootPath),
+		IgnorePatterns: patterns,
+		Repository:     repositorySnapshot,
+		SupportFiles:   supportSnapshot,
 	}
 
-	return hashPayload(payload)
-}
-
-func BuildProviderKey(config provider.Config, context provider.CondensedContext, version string) (string, error) {
-	payload := providerKeyPayload{
-		Version: strings.TrimSpace(version),
-		Name:    strings.TrimSpace(config.Name),
-		Model:   strings.TrimSpace(config.Model),
-		BaseURL: strings.TrimSpace(config.BaseURL),
-		APIKey:  hashText(strings.TrimSpace(config.APIKey)),
-		Context: context,
-	}
 	return hashPayload(payload)
 }
 

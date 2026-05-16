@@ -16,6 +16,7 @@ import (
 const compactCombinedSizeThreshold = 27000
 const projectedOutputBytesPerFunction = 1500
 const workerEvidenceLimit = 40000
+const repairCallTimeout = 60 * time.Second
 
 type batchOutcome struct {
 	results      []fullai.FunctionResult
@@ -102,7 +103,7 @@ func (s Service) executeAdaptiveAI(ctx context.Context, request AnalyzeRequest, 
 		execution.PromptBytes += outcome.promptBytes
 		execution.PromptTokens += outcome.promptTokens
 		execution.OutputTokens += outcome.outputTokens
-		if errors.Is(outcome.err, context.Canceled) || ctx.Err() != nil {
+		if ctx.Err() == context.Canceled {
 			return fullai.Execution{}, summary, ctx.Err()
 		}
 		for _, result := range outcome.results {
@@ -115,15 +116,20 @@ func (s Service) executeAdaptiveAI(ctx context.Context, request AnalyzeRequest, 
 			failed = append(failed, job)
 		}
 	}
-	if len(failed) > 0 {
+	if len(failed) > 0 && ctx.Err() == nil {
 		emitAnalyzeProgress(request, "full-ai-retry", "running", fmt.Sprintf("retrying %d failed or unverified section(s) once", len(failed)))
-		outcome := runAIBatch(ctx, client, config, failed, evidence, 12000)
+		repairCtx, cancelRepair := context.WithTimeout(ctx, repairCallTimeout)
+		outcome := runAIBatch(repairCtx, client, config, failed, evidence, 12000)
+		cancelRepair()
 		execution.PromptBytes += outcome.promptBytes
 		execution.PromptTokens += outcome.promptTokens
 		execution.OutputTokens += outcome.outputTokens
 		execution.RepairCalls = 1
-		if errors.Is(outcome.err, context.Canceled) || ctx.Err() != nil {
+		if ctx.Err() == context.Canceled {
 			return fullai.Execution{}, summary, ctx.Err()
+		}
+		if errors.Is(outcome.err, context.DeadlineExceeded) {
+			emitAnalyzeProgress(request, "full-ai-retry", "incomplete", "repair timed out; keeping sections that already passed verification")
 		}
 		for _, result := range outcome.results {
 			if result.Status == "verified" || byName[result.Name].Status == "" {
@@ -202,6 +208,7 @@ func groupAIJobs(jobs []fullai.FunctionJob, evidence fullai.Evidence) [][]fullai
 }
 
 func runAIBatch(ctx context.Context, client provider.Client, config provider.Config, jobs []fullai.FunctionJob, evidence fullai.Evidence, evidenceLimit int) batchOutcome {
+	readablePaths := readableBatchEvidencePaths(jobs, evidence)
 	prompt, err := fullai.BuildBatchPrompt(jobs, evidence, evidenceLimit)
 	if err != nil {
 		return failedBatch(jobs, err, config.APIKey)
@@ -231,7 +238,9 @@ func runAIBatch(ctx context.Context, client provider.Client, config provider.Con
 			result.Error = "provider omitted or malformed this function output"
 		} else {
 			output = fullai.RedactFunctionOutput(output)
-			output, report := fullai.VerifyFunctionOutputDetailed(job, output)
+			verificationJob := job
+			verificationJob.EvidencePaths = readablePaths
+			output, report := fullai.VerifyFunctionOutputDetailed(verificationJob, output)
 			result.Output = output
 			result.Verification = report
 			result.Verified = report.Verified
@@ -240,6 +249,32 @@ func runAIBatch(ctx context.Context, client provider.Client, config provider.Con
 		results = append(results, result)
 	}
 	return batchOutcome{results: results, promptBytes: len(prompt.SystemPrompt) + len(prompt.UserPrompt), promptTokens: response.PromptTokens, outputTokens: response.OutputTokens}
+}
+
+func readableBatchEvidencePaths(jobs []fullai.FunctionJob, evidence fullai.Evidence) []string {
+	requested := make(map[string]struct{})
+	for _, job := range jobs {
+		for _, path := range job.EvidencePaths {
+			requested[path] = struct{}{}
+		}
+	}
+	paths := make([]string, 0, len(requested))
+	seen := make(map[string]struct{})
+	for _, item := range evidence.Items {
+		path := item.DisplayPath
+		if item.ReadStatus != "read" || item.Snippet == "" {
+			continue
+		}
+		if _, ok := requested[path]; !ok {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		paths = append(paths, path)
+	}
+	return paths
 }
 
 func failedBatch(jobs []fullai.FunctionJob, err error, apiKey string) batchOutcome {

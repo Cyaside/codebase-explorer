@@ -21,7 +21,6 @@ import (
 
 type WriteRequest struct {
 	OutputRoot         string
-	DeterministicOnly  bool
 	ScanResult         repo.ScanResult
 	Analysis           analyzer.Result
 	Changes            changes.Result
@@ -212,7 +211,6 @@ func (w Writer) Write(request WriteRequest) (WriteResult, error) {
 		"cache_root":             request.Cache.Root,
 		"deterministic_status":   request.Cache.DeterministicStatus,
 		"provider_status":        request.Cache.ProviderStatus,
-		"deterministic_only":     request.DeterministicOnly,
 		"full_ai_mode":           request.FullAISummary.Mode,
 		"generated_at":           request.Analysis.GeneratedAt,
 		"output_retention_limit": w.keepLatest,

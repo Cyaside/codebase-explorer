@@ -24,8 +24,7 @@ func TestExportCreatesZipArchiveForLatestBundle(t *testing.T) {
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
 	analyzeResult, err := service.Analyze(t.Context(), AnalyzeRequest{
-		RepoPath:          repoPath,
-		DeterministicOnly: true,
+		RepoPath: repoPath,
 	})
 	if err != nil {
 		t.Fatalf("seed bundle through analyze: %v", err)

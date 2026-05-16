@@ -25,7 +25,6 @@ func TestAnalyzeWritesChangesCorrelationBundle(t *testing.T) {
 
 	result, err := service.Analyze(t.Context(), AnalyzeRequest{
 		RepoPath:             repoPath,
-		DeterministicOnly:    true,
 		OptionalSupportFiles: []string{issuesPath, changelogPath},
 	})
 	if err != nil {

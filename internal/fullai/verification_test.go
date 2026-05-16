@@ -30,11 +30,24 @@ func TestVerifyFunctionOutputDetailedAcceptsFlowchartEdges(t *testing.T) {
 
 func TestVerifyFunctionOutputDetailedRejectsInventedGraphFile(t *testing.T) {
 	t.Parallel()
-	_, report := VerifyFunctionOutputDetailed(FunctionJob{Name: "flowchart", EvidencePaths: []string{"cmd/main.go"}}, FunctionOutput{
+	output, report := VerifyFunctionOutputDetailed(FunctionJob{Name: "flowchart", EvidencePaths: []string{"cmd/main.go"}}, FunctionOutput{
 		GraphEdges: []GraphEdge{{From: "missing/file.go", To: "CLI", EvidencePaths: []string{"cmd/main.go"}}},
 	})
-	if report.Verified || !hasVerificationCheck(report, "graph.endpoint", "fail") {
+	if report.Verified || len(output.GraphEdges) != 0 || !hasVerificationCheck(report, "graph.endpoint", "warn") || !hasVerificationCheck(report, "graph.edges", "fail") {
 		t.Fatalf("invented graph endpoint should fail path checks: %#v", report)
+	}
+}
+
+func TestVerifyFunctionOutputDetailedKeepsSupportedFlowchartEdges(t *testing.T) {
+	t.Parallel()
+	output, report := VerifyFunctionOutputDetailed(FunctionJob{Name: "flowchart", EvidencePaths: []string{"cmd/main.go"}}, FunctionOutput{
+		GraphEdges: []GraphEdge{
+			{From: "CLI", To: "Analyzer", EvidencePaths: []string{"cmd/main.go"}},
+			{From: "missing/file.go", To: "CLI", EvidencePaths: []string{"cmd/main.go"}},
+		},
+	})
+	if !report.Verified || len(output.GraphEdges) != 1 || !hasVerificationCheck(report, "graph.endpoint", "warn") {
+		t.Fatalf("supported edge should remain while invented edge is removed: output=%#v report=%#v", output, report)
 	}
 }
 

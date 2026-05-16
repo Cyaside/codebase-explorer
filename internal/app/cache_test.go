@@ -26,8 +26,7 @@ func TestAnalyzeReusesDeterministicCache(t *testing.T) {
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
 	first, err := service.Analyze(t.Context(), AnalyzeRequest{
-		RepoPath:          repoPath,
-		DeterministicOnly: true,
+		RepoPath: repoPath,
 	})
 	if err != nil {
 		t.Fatalf("first analyze: %v", err)
@@ -37,8 +36,7 @@ func TestAnalyzeReusesDeterministicCache(t *testing.T) {
 	}
 
 	second, err := service.Analyze(t.Context(), AnalyzeRequest{
-		RepoPath:          repoPath,
-		DeterministicOnly: true,
+		RepoPath: repoPath,
 	})
 	if err != nil {
 		t.Fatalf("second analyze: %v", err)
@@ -111,8 +109,7 @@ func TestClearCacheRemovesStoredEntries(t *testing.T) {
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
 	if _, err := service.Analyze(t.Context(), AnalyzeRequest{
-		RepoPath:          repoPath,
-		DeterministicOnly: true,
+		RepoPath: repoPath,
 	}); err != nil {
 		t.Fatalf("seed cache through analyze: %v", err)
 	}
