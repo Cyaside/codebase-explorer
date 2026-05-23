@@ -99,30 +99,38 @@
     infoBlock("Supporting files", sectionList(data.changes.sources, (source) => `
       <article class="item">
         <strong>${html(source.path)}</strong>
-        <span>${html(source.kind)} Â· ${html(source.format)} Â· ${html(source.status)}</span>
+        <span>${html(source.kind)} &middot; ${html(source.format)} &middot; ${html(source.status)}</span>
         ${source.message ? `<p>${html(source.message)}</p>` : ""}
       </article>
     `, "No supporting files were recorded.")),
     infoBlock("Frequently mentioned areas", sectionList(data.changes.frequently_mentioned_areas, (area) => `
       <article class="item">
         <strong>${html(area.path)}</strong>
-        <span>${area.mention_count} mention(s) Â· ${html(area.confidence)} confidence</span>
+        <span>${area.mention_count} mention(s) &middot; ${html(area.confidence)} confidence</span>
         ${area.reasons && area.reasons.length ? `<p>${html(area.reasons.join("; "))}</p>` : ""}
       </article>
     `, "No repository areas were matched strongly enough.")),
     infoBlock("Repeated themes", sectionList(data.changes.repeated_themes, (theme) => `
       <article class="item">
         <strong>${html(theme.name)}</strong>
-        <span>${theme.mention_count} mention(s) Â· ${theme.source_count} source(s)</span>
+        <span>${theme.mention_count} mention(s) &middot; ${theme.source_count} source(s)</span>
         ${theme.related_areas && theme.related_areas.length ? `<p>Related areas: ${html(theme.related_areas.join(", "))}</p>` : ""}
       </article>
     `, "No repeated themes met the reporting threshold."))
   ].join("");
 
-  document.getElementById("diagrams-body").innerHTML = [
-    diagramBlock("Architecture Mermaid", data.mermaid.architecture, data.links.architecture_diagram),
-    diagramBlock("Dependency Mermaid", data.mermaid.dependencies, data.links.dependency_diagram),
-  ].join("");
+  const graphViews = data.graphs?.views || [];
+  document.getElementById("diagrams-body").innerHTML = graphViews.length
+    ? graphViews.map((view) => {
+        const nodes = view.nodes || [];
+        const labels = new Map(nodes.map((node) => [node.id, node.label]));
+        const edges = view.edges || [];
+        const rows = edges.slice(0, 12).map((edge) => `<article class="item"><strong>${html(labels.get(edge.source) || edge.source)} → ${html(labels.get(edge.target) || edge.target)}</strong><span>${html(edge.relation)}</span></article>`);
+        return infoBlock(`${view.id} · ${nodes.length} nodes · ${edges.length} relationships`, rows.length
+          ? `<div class="stack">${rows.join("")}</div>${edges.length > rows.length ? `<p class="empty">Showing ${rows.length} relationships. Open graphs.json for the full set.</p>` : ""}`
+          : `<p class="empty">No relationships in this view.</p>`);
+      }).join("") + (data.links?.architecture_diagram ? `<p><a class="viewer-link" href="../${html(data.links.architecture_diagram)}">Open structured graph data</a></p>` : "")
+    : `<p class="empty">This older bundle has no structured graph data.</p>`;
 
   document.getElementById("bundle-links").innerHTML = [
     linkItem("Root README", data.links.root),
@@ -147,16 +155,6 @@
       return `<p class="empty">No entries recorded.</p>`;
     }
     return `<div class="pill-row">${items.map((item) => `<span class="pill">${html(item)}</span>`).join("")}</div>`;
-  }
-
-  function diagramBlock(title, source, href) {
-    return `
-      <section class="block">
-        <h4>${html(title)}</h4>
-        <p><a class="viewer-link" href="../${html(href)}">Open raw Mermaid file</a></p>
-        <pre class="code-block">${html(source || "No diagram source available.")}</pre>
-      </section>
-    `;
   }
 
   function linkItem(label, href) {

@@ -91,21 +91,57 @@ func architecture(analysis analyzer.Result, execution fullai.Execution) View {
 		if bestPath != "" {
 			view.Edges = append(view.Edges, newEdge(node.ID, known[bestPath].ID, "belongs-to", []string{entryPath}, "scan"))
 		}
+		known[entryPath] = node
 	}
 	for _, result := range execution.Results {
 		if result.Name != "architecture" || !result.Verified {
 			continue
 		}
 		for _, edge := range result.Output.GraphEdges {
-			from, fromOK := known[normalize(edge.From)]
-			to, toOK := known[normalize(edge.To)]
-			if fromOK && toOK && len(edge.EvidencePaths) > 0 {
+			if len(edge.EvidencePaths) == 0 {
+				continue
+			}
+			from := architectureNode(edge.From, edge.EvidencePaths, known, &view)
+			to := architectureNode(edge.To, edge.EvidencePaths, known, &view)
+			if from.ID != to.ID {
 				view.Edges = append(view.Edges, newEdge(from.ID, to.ID, edge.Label, edge.EvidencePaths, "ai-evidence"))
 			}
 		}
 	}
 	view.Edges = uniqueEdges(view.Edges)
 	return view
+}
+
+func architectureNode(label string, evidence []string, known map[string]Node, view *View) Node {
+	name := normalize(label)
+	if node, ok := known[name]; ok {
+		for _, evidencePath := range evidence {
+			if !slices.Contains(node.EvidencePaths, evidencePath) {
+				node.EvidencePaths = append(node.EvidencePaths, evidencePath)
+			}
+		}
+		known[name] = node
+		for index := range view.Nodes {
+			if view.Nodes[index].ID == node.ID {
+				view.Nodes[index] = node
+				break
+			}
+		}
+		return node
+	}
+	typeName := "component"
+	pathName := ""
+	if strings.Contains(name, "/") || path.Ext(name) != "" {
+		typeName = "file"
+		pathName = name
+		if path.Ext(name) == "" {
+			typeName = "module"
+		}
+	}
+	node := Node{ID: nodeID("architecture", name), Label: name, Type: typeName, Path: pathName, EvidencePaths: append([]string(nil), evidence...)}
+	known[name] = node
+	view.Nodes = append(view.Nodes, node)
+	return node
 }
 
 func flow(execution fullai.Execution) View {
@@ -152,6 +188,12 @@ func dependencies(root string, analysis analyzer.Result) View {
 	}
 	moduleName := readGoModule(root)
 	nodes := map[string]Node{}
+	type moduleImport struct {
+		from     string
+		to       string
+		evidence map[string]struct{}
+	}
+	imports := map[string]*moduleImport{}
 	for _, file := range analysis.Files {
 		filePath := normalize(file.Path)
 		absolute := filepath.Join(root, filepath.FromSlash(filePath))
@@ -171,14 +213,46 @@ func dependencies(root string, analysis analyzer.Result) View {
 			fromID, toID := nodeID("dependency", from), nodeID("dependency", to)
 			nodes[fromID] = Node{ID: fromID, Label: from, Type: "module", Path: from}
 			nodes[toID] = Node{ID: toID, Label: to, Type: "module", Path: to}
-			view.Edges = append(view.Edges, newEdge(fromID, toID, "imports", []string{filePath, target}, "parsed-import"))
+			key := fromID + "\x00" + toID
+			importGroup := imports[key]
+			if importGroup == nil {
+				importGroup = &moduleImport{from: fromID, to: toID, evidence: map[string]struct{}{}}
+				imports[key] = importGroup
+			}
+			importGroup.evidence[filePath] = struct{}{}
+			importGroup.evidence[target] = struct{}{}
 		}
 	}
 	for _, node := range nodes {
 		view.Nodes = append(view.Nodes, node)
 	}
 	slices.SortFunc(view.Nodes, func(a, b Node) int { return strings.Compare(a.ID, b.ID) })
+	for _, importGroup := range imports {
+		evidence := make([]string, 0, len(importGroup.evidence))
+		for filePath := range importGroup.evidence {
+			evidence = append(evidence, filePath)
+		}
+		slices.Sort(evidence)
+		view.Edges = append(view.Edges, newEdge(importGroup.from, importGroup.to, "imports", evidence, "parsed-import"))
+	}
 	view.Edges = uniqueEdges(view.Edges)
+	nodeEvidence := map[string]map[string]struct{}{}
+	for _, edge := range view.Edges {
+		for _, id := range []string{edge.Source, edge.Target} {
+			if nodeEvidence[id] == nil {
+				nodeEvidence[id] = map[string]struct{}{}
+			}
+			for _, filePath := range edge.EvidencePaths {
+				nodeEvidence[id][filePath] = struct{}{}
+			}
+		}
+	}
+	for index := range view.Nodes {
+		for filePath := range nodeEvidence[view.Nodes[index].ID] {
+			view.Nodes[index].EvidencePaths = append(view.Nodes[index].EvidencePaths, filePath)
+		}
+		slices.Sort(view.Nodes[index].EvidencePaths)
+	}
 	if len(view.Edges) == 0 {
 		view.Note = "No resolved local imports were found for supported Go and JavaScript/TypeScript files."
 	}
