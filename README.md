@@ -7,6 +7,7 @@
     <a href="go.mod"><img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" /></a>
     <a href="ui/package.json"><img alt="React 19" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" /></a>
     <a href="LICENSE"><img alt="Apache 2.0 license" src="https://img.shields.io/badge/License-Apache%202.0-64748B" /></a>
+    <a href="https://github.com/Cyaside/codebase-explorer/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/Cyaside/codebase-explorer/actions/workflows/ci.yml/badge.svg?branch=renovasi" /></a>
   </p>
   <p>
     <a href="#why-codebase-explorer">Why</a> ·
@@ -17,12 +18,7 @@
   </p>
 </div>
 
-<p align="center">
-  <a href="media/codebase-explorer-demo.webm">
-    <img src="media/demo-preview.png" alt="Codebase Explorer dark workbench showing an evidence-linked architecture graph" width="900" />
-  </a>
-</p>
-<p align="center"><a href="media/codebase-explorer-demo.webm">Watch the 24-second workbench demo (WebM)</a></p>
+https://github.com/user-attachments/assets/9fdedceb-da4f-42b4-801b-be9c74a5b5d0
 
 ## Why Codebase Explorer?
 
@@ -127,5 +123,7 @@ Then run the backend checks from the repository root:
 go test ./...
 go vet ./...
 ```
+
+The [CI workflow](.github/workflows/ci.yml) runs Go tests, vet, and a build on Linux and Windows. It also typechecks and builds the React workbench. It runs on pushes to `main` or `renovasi`, pull requests to `main`, and manual dispatch.
 
 The project is licensed under [Apache 2.0](LICENSE).
