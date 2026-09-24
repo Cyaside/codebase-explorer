@@ -20,7 +20,6 @@ export interface ConnectionProfile {
   id: string;
   label: string;
   provider: ProviderProfile;
-  locked?: boolean;
 }
 
 export interface SavedWorkspace {
@@ -29,7 +28,6 @@ export interface SavedWorkspace {
   repoPath: string;
   supportFiles: string[];
   ignorePatterns: string[];
-  selectedProfile: string;
   activeBundle: string;
   createdAt: string;
   updatedAt: string;
@@ -199,14 +197,6 @@ export interface BundleData {
   full_ai_execution: FullAIExecution;
   full_ai_verification: FullAIVerification;
   graphs: GraphSet;
-  mermaid: {
-    architecture: string;
-    dependencies: string;
-  };
-  links: {
-    architecture_diagram: string;
-    dependency_diagram: string;
-  };
 }
 
 export interface GraphSet {

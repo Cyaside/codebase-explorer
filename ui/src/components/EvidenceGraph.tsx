@@ -33,12 +33,17 @@ const viewLabels: Record<string, string> = {
   dependencies: "Dependencies & impact",
 };
 
+function displayNodeLabel(node: GraphNode) {
+  return node.type === "module" && node.label === "." ? "Repository root" : node.label;
+}
+
 interface CanvasNodeData extends Record<string, unknown> {
   label: string;
   type: string;
   path: string;
   evidencePaths: string[];
   faded: boolean;
+	compact: boolean;
 }
 
 interface CanvasEdgeData extends Record<string, unknown> {
@@ -48,6 +53,7 @@ interface CanvasEdgeData extends Record<string, unknown> {
   route?: Array<{ x: number; y: number }>;
   faded: boolean;
   flowing: boolean;
+	showLabel: boolean;
 }
 
 type CanvasNode = Node<CanvasNodeData, "evidence">;
@@ -76,7 +82,7 @@ function roundedRoute(points: Array<{ x: number; y: number }>) {
 
 function EvidenceNode({ data, selected }: NodeProps<CanvasNode>) {
   return (
-    <div className={`evidence-node${selected ? " evidence-node-selected" : ""}${data.faded ? " evidence-node-faded" : ""}`} data-kind={data.type}>
+	<div className={`evidence-node${data.compact ? " evidence-node-compact" : ""}${selected ? " evidence-node-selected" : ""}${data.faded ? " evidence-node-faded" : ""}`} data-kind={data.type}>
       <Handle className="graph-node-handle" position={Position.Left} type="target" />
       <span className="evidence-node-type"><span className="evidence-node-dot" aria-hidden="true" />{data.type.replaceAll("-", " ")}</span>
       <strong title={data.label}>{data.label}</strong>
@@ -98,7 +104,7 @@ function RoutedEdge({ id, sourceX, sourceY, targetX, targetY, data, markerEnd }:
     <>
       <BaseEdge id={id} markerEnd={markerEnd} path={path} style={{ opacity: data?.faded ? 0.12 : 0.9, stroke: "#698b96", strokeWidth: 1.5 }} />
       {!data?.faded && data?.flowing ? <path className="graph-edge-flow" d={path} fill="none" pointerEvents="none" /> : null}
-      {!data?.faded && data?.relation ? (
+	  {!data?.faded && data?.showLabel && data?.relation ? (
         <EdgeText
           x={center.x}
           y={center.y}
@@ -134,17 +140,20 @@ function defaultFocus(view: GraphView) {
 async function layout(view: GraphView, shown: Set<string>) {
   const nodes = view.nodes.filter((node) => shown.has(node.id));
   const edges = view.edges.filter((edge) => shown.has(edge.source) && shown.has(edge.target));
+	const compact = view.id === "dependencies" && view.edges.length > 35;
+	const width = compact ? 184 : nodeWidth;
+	const height = compact ? 80 : nodeHeight;
   const input: ElkNode = {
     id: "root",
     layoutOptions: {
       "elk.algorithm": "layered",
       "elk.direction": "RIGHT",
       "elk.edgeRouting": "ORTHOGONAL",
-      "elk.spacing.nodeNode": "34",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "130",
+	  "elk.spacing.nodeNode": compact ? "24" : "34",
+	  "elk.layered.spacing.nodeNodeBetweenLayers": compact ? "62" : "130",
       "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
     },
-    children: nodes.map((node) => ({ id: node.id, width: nodeWidth, height: nodeHeight })),
+	children: nodes.map((node) => ({ id: node.id, width, height })),
     edges: edges.map((edge) => ({ id: edge.id, sources: [edge.source], targets: [edge.target] })),
   };
   const result = await (await getElk()).layout(input);
@@ -158,16 +167,17 @@ async function layout(view: GraphView, shown: Set<string>) {
     id: node.id,
     type: "evidence",
     position: { x: locations.get(node.id)?.x || 0, y: locations.get(node.id)?.y || 0 },
-    initialWidth: nodeWidth,
-    initialHeight: nodeHeight,
+	initialWidth: width,
+	initialHeight: height,
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
     data: {
-      label: node.label,
+      label: displayNodeLabel(node),
       type: node.type,
       path: node.path,
       evidencePaths: node.evidence_paths,
       faded: false,
+	  compact,
     },
   }));
   const canvasEdges: CanvasEdge[] = edges.map((edge, index) => ({
@@ -183,6 +193,7 @@ async function layout(view: GraphView, shown: Set<string>) {
       route: routes.get(edge.id),
       faded: false,
       flowing: index < 64,
+	  showLabel: edge.source_kind !== "parsed-import" || view.edges.length <= 12,
     },
   }));
   return { nodes: canvasNodes, edges: canvasEdges };
@@ -192,7 +203,7 @@ function nodeInspector(node: GraphNode, view: GraphView): InspectorState {
   const adjacent = view.edges.filter((edge) => edge.source === node.id || edge.target === node.id);
   return {
     eyebrow: viewLabels[view.id] || "Graph",
-    title: node.label,
+    title: displayNodeLabel(node),
     description: `${node.type.replaceAll("-", " ")} with ${adjacent.length} visible relationship(s).`,
     notes: node.evidence_paths.length ? node.evidence_paths : ["This node comes from the repository scan."],
     properties: [
@@ -226,22 +237,34 @@ export function EvidenceGraph({ bundle }: { bundle: WorkbenchBundle | null }) {
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance<CanvasNode, CanvasEdge> | null>(null);
   const view = views.find((item) => item.id === viewID) || views[0];
   const effectiveFocus = view?.nodes.some((node) => node.id === focusID) ? focusID : view ? defaultFocus(view) : "";
-  const limited = !!view && view.nodes.length > 60;
-  const layoutFocus = limited ? effectiveFocus : "";
-  const shown = useMemo(() => {
-    if (!view) return new Set<string>();
-    if (!limited) return new Set(view.nodes.map((node) => node.id));
-    const neighbors = neighborhood(view, layoutFocus);
-    const ordered = view.nodes.filter((node) => neighbors.has(node.id) && node.id !== layoutFocus).sort((a, b) => a.label.localeCompare(b.label));
-    return new Set([layoutFocus, ...ordered.slice(0, 59).map((node) => node.id)]);
-  }, [view, limited, layoutFocus]);
+	const limited = !!view && (view.nodes.length > 60 || (view.id === "dependencies" && view.edges.length > 35));
+	const layoutFocus = limited ? effectiveFocus : "";
+	const shown = useMemo(() => {
+	  if (!view) return new Set<string>();
+	  if (!limited) {
+	    if (view.id !== "architecture" || !view.edges.length) return new Set(view.nodes.map((node) => node.id));
+	    const connected = new Set(view.edges.flatMap((edge) => [edge.source, edge.target]));
+	    if (focusID) connected.add(focusID);
+	    return connected;
+	  }
+	  const neighbors = neighborhood(view, layoutFocus);
+	  const degree = new Map<string, number>();
+	  for (const edge of view.edges) {
+	    degree.set(edge.source, (degree.get(edge.source) || 0) + 1);
+	    degree.set(edge.target, (degree.get(edge.target) || 0) + 1);
+	  }
+	  const ordered = view.nodes.filter((node) => neighbors.has(node.id) && node.id !== layoutFocus).sort((a, b) =>
+	    view.id === "dependencies" ? (degree.get(b.id) || 0) - (degree.get(a.id) || 0) || a.label.localeCompare(b.label) : a.label.localeCompare(b.label));
+	  const neighborLimit = view.id === "dependencies" && view.edges.length > 35 ? 4 : 59;
+	  return new Set([layoutFocus, ...ordered.slice(0, neighborLimit).map((node) => node.id)]);
+	}, [view, limited, layoutFocus, focusID]);
   const highlighted = useMemo(() => {
     if (!view || !focusID) return new Set<string>();
     return neighborhood(view, focusID);
   }, [view, focusID]);
   const displayCanvas = useMemo(() => ({
     nodes: canvas.nodes.map((node) => ({ ...node, data: { ...node.data, faded: highlighted.size > 0 && !highlighted.has(node.id) } })),
-    edges: canvas.edges.map((edge) => ({ ...edge, data: { evidencePaths: edge.data?.evidencePaths || [], relation: edge.data?.relation || "", sourceKind: edge.data?.sourceKind || "", route: edge.data?.route, flowing: edge.data?.flowing || false, faded: highlighted.size > 0 && !(highlighted.has(edge.source) && highlighted.has(edge.target)) } })),
+    edges: canvas.edges.map((edge) => ({ ...edge, data: { evidencePaths: edge.data?.evidencePaths || [], relation: edge.data?.relation || "", sourceKind: edge.data?.sourceKind || "", route: edge.data?.route, flowing: edge.data?.flowing || false, showLabel: edge.data?.showLabel || false, faded: highlighted.size > 0 && !(highlighted.has(edge.source) && highlighted.has(edge.target)) } })),
   }), [canvas, highlighted]);
 
   useEffect(() => {
@@ -273,13 +296,13 @@ export function EvidenceGraph({ bundle }: { bundle: WorkbenchBundle | null }) {
     if (!focusID || !flowInstance) return;
     const focusedNode = canvas.nodes.find((node) => node.id === focusID);
     if (!focusedNode) return;
-    void flowInstance.setCenter(focusedNode.position.x + nodeWidth / 2, focusedNode.position.y + nodeHeight / 2, { zoom: 0.9, duration: 260 });
+	void flowInstance.setCenter(focusedNode.position.x + (focusedNode.initialWidth || nodeWidth) / 2, focusedNode.position.y + (focusedNode.initialHeight || nodeHeight) / 2, { zoom: 0.9, duration: 260 });
   }, [canvas.nodes, flowInstance, focusID]);
 
   if (!bundle) return <div className="graph-shell grid place-items-center text-sm text-zinc-500">Run analysis to create evidence-backed graph views.</div>;
   if (!views.length) return <div className="graph-shell grid place-items-center px-6 text-center text-sm text-zinc-500">This older bundle has no structured graph. Create a new analysis to explore architecture, flow, and dependencies.</div>;
 
-  const matches = view?.nodes.filter((node) => `${node.label} ${node.path}`.toLowerCase().includes(query.toLowerCase())).slice(0, 12) || [];
+  const matches = view?.nodes.filter((node) => `${displayNodeLabel(node)} ${node.path}`.toLowerCase().includes(query.toLowerCase())).slice(0, 12) || [];
 
   return (
     <div className="space-y-3">
@@ -308,14 +331,15 @@ export function EvidenceGraph({ bundle }: { bundle: WorkbenchBundle | null }) {
           />
           {query ? (
             <div className="mt-1 flex flex-wrap gap-1">
-              {matches.map((node) => <button className="rounded border border-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500" key={node.id} onClick={() => { setFocusID(node.id); setQuery(""); setSelectedInspector(nodeInspector(node, view)); }} type="button">{node.label}</button>)}
+              {matches.map((node) => <button className="rounded border border-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500" key={node.id} onClick={() => { setFocusID(node.id); setQuery(""); setSelectedInspector(nodeInspector(node, view)); }} type="button">{displayNodeLabel(node)}</button>)}
               {!matches.length ? <span className="text-xs text-zinc-500">No matching node.</span> : null}
             </div>
           ) : null}
         </div>
         {focusID ? <button className="secondary-control !py-2" onClick={() => setFocusID("")} type="button">Clear focus</button> : null}
       </div>
-      {limited ? <p className="text-xs text-zinc-500">Large graph: showing up to 60 nodes around the selected node. Search for any other node to explore its neighbors.</p> : null}
+	  {limited ? <p className="text-xs text-zinc-500">Showing modules around the selected node. Search for another module to follow its connections.</p> : null}
+	  {!limited && view.id === "architecture" && shown.size < view.nodes.length ? <p className="text-xs text-zinc-500">Showing connected components. Search to inspect other modules.</p> : null}
       {view.note ? <p className="text-xs text-zinc-500">{view.note}</p> : null}
       <div className="graph-workspace">
       <div className="graph-shell">
@@ -328,7 +352,8 @@ export function EvidenceGraph({ bundle }: { bundle: WorkbenchBundle | null }) {
             key={`${bundle.summary.name}:${view.id}:${limited ? effectiveFocus : "all"}:${canvas.nodes.length}`}
             className="codearch-flow"
             colorMode="dark"
-            defaultViewport={{ x: 38, y: 180, zoom: 0.88 }}
+		    fitView
+		    fitViewOptions={{ padding: 0.15, minZoom: view.id === "dependencies" && limited ? 0.72 : 0.1, maxZoom: 0.95 }}
             edgeTypes={edgeTypes}
             edges={displayCanvas.edges}
             maxZoom={1.7}

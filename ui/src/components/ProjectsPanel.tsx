@@ -1,7 +1,7 @@
 import { FolderPlus, Layers3, Trash2 } from "lucide-react";
 
 import type { BundleSummary, SavedWorkspace } from "@/lib/types";
-import { cn, formatRelativeTime, normalizeLocalPath } from "@/lib/utils";
+import { cn, formatRelativeTime, matchesWorkspace } from "@/lib/utils";
 
 interface ProjectsPanelProps {
   activeWorkspaceID: string;
@@ -122,12 +122,4 @@ export function ProjectsPanel({
       </section>
     </div>
   );
-}
-
-function matchesWorkspace(bundlePath: string, workspacePath: string) {
-  if (!workspacePath.trim()) {
-    return false;
-  }
-
-  return normalizeLocalPath(bundlePath) === normalizeLocalPath(workspacePath);
 }

@@ -1,22 +1,15 @@
 import type { ConnectionProfile, PersistedUIState, ProviderProfile, SavedWorkspace } from "@/lib/types";
 
-const PROFILE_STORAGE_KEY = "codearch.workbench.profiles.v3";
+const PROFILE_STORAGE_KEY = "codearch.workbench.connection.v1";
+const LEGACY_PROFILE_STORAGE_KEY = "codearch.workbench.profiles.v3";
 const UI_STATE_STORAGE_KEY = "codearch.workbench.state.v2";
 const WORKSPACE_STORAGE_KEY = "codearch.workbench.workspaces.v1";
 
-const presetProfiles: ConnectionProfile[] = [
-  { id: "openai", label: "OpenAI", provider: { name: "compatible", model: "gpt-4.1-mini", baseUrl: "https://api.openai.com/v1" } },
-  {
-    id: "openrouter",
-    label: "OpenRouter",
-    provider: { name: "compatible", model: "openai/gpt-4.1-mini", baseUrl: "https://openrouter.ai/api/v1" },
-  },
-  {
-    id: "mistral",
-    label: "Mistral",
-    provider: { name: "compatible", model: "mistral-small-latest", baseUrl: "https://api.mistral.ai/v1" },
-  },
-];
+const defaultConnection: ConnectionProfile = {
+  id: "openai",
+  label: "OpenAI-compatible",
+  provider: { name: "compatible", model: "", baseUrl: "" },
+};
 
 function sanitizeProvider(value: unknown): ProviderProfile | null {
   if (!value || typeof value !== "object") {
@@ -44,21 +37,15 @@ function sanitizeProfile(value: unknown): ConnectionProfile | null {
   }
 
   const profile = value as Record<string, unknown>;
-  const id = typeof profile.id === "string" ? profile.id.trim() : "";
-  const label = typeof profile.label === "string" ? profile.label.trim() : "";
   const provider = sanitizeProvider(profile.provider);
-  if (!id || !label) {
-    return null;
-  }
   if (!provider) {
     return null;
   }
 
   return {
-    id,
-    label,
-    provider,
-    locked: Boolean(profile.locked),
+    id: defaultConnection.id,
+    label: defaultConnection.label,
+    provider: { ...provider, name: "compatible" },
   };
 }
 
@@ -88,7 +75,6 @@ function sanitizeWorkspace(value: unknown): SavedWorkspace | null {
     repoPath,
     supportFiles: sanitizeStringArray(workspace.supportFiles),
     ignorePatterns: sanitizeStringArray(workspace.ignorePatterns),
-    selectedProfile: typeof workspace.selectedProfile === "string" ? workspace.selectedProfile.trim() : presetProfiles[0].id,
     activeBundle: typeof workspace.activeBundle === "string" ? workspace.activeBundle.trim() : "",
     createdAt: typeof workspace.createdAt === "string" ? workspace.createdAt : now,
     updatedAt: typeof workspace.updatedAt === "string" ? workspace.updatedAt : now,
@@ -99,7 +85,6 @@ function cloneProfile(profile: ConnectionProfile): ConnectionProfile {
   return {
     id: profile.id,
     label: profile.label,
-    locked: profile.locked,
     provider: { ...profile.provider },
   };
 }
@@ -112,53 +97,37 @@ function cloneWorkspace(workspace: SavedWorkspace): SavedWorkspace {
   };
 }
 
-export function defaultProfiles() {
-  return presetProfiles.map(cloneProfile);
+export function defaultProfile() {
+  return cloneProfile(defaultConnection);
 }
 
-export function loadProfiles() {
+export function loadProfile() {
   try {
     const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
-    if (!raw) {
-      return defaultProfiles();
+    if (raw) {
+      return sanitizeProfile(JSON.parse(raw)) || defaultProfile();
     }
-
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return defaultProfiles();
-    }
-
-    const sanitized = parsed
-      .map(sanitizeProfile)
-      .filter((profile): profile is ConnectionProfile => profile !== null);
-    const merged = sanitized.map(cloneProfile);
-    const seen = new Set(merged.map((profile) => profile.id));
-
-    for (const profile of presetProfiles) {
-      if (!seen.has(profile.id)) {
-        merged.unshift(cloneProfile(profile));
-      }
-    }
-
-    return merged.length ? merged : defaultProfiles();
+    const legacy = JSON.parse(window.localStorage.getItem(LEGACY_PROFILE_STORAGE_KEY) || "[]") as unknown;
+    const previous = Array.isArray(legacy) ? legacy.find((item) => item && typeof item === "object" && (item as { id?: string }).id === "openai") : null;
+    return sanitizeProfile(previous) || defaultProfile();
   } catch {
-    return defaultProfiles();
+    return defaultProfile();
   }
 }
 
-export function persistProfiles(profiles: ConnectionProfile[]) {
-  const persisted = profiles.map((profile) => ({
-    id: profile.id,
-    label: profile.label,
-    locked: profile.locked,
+export function persistProfile(profile: ConnectionProfile) {
+  const persisted = {
+    id: defaultConnection.id,
+    label: defaultConnection.label,
     provider: {
-      name: profile.provider.name,
+      name: "compatible",
       model: profile.provider.model,
       baseUrl: profile.provider.baseUrl,
     },
-  }));
+  };
 
   window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(persisted));
+  window.localStorage.removeItem(LEGACY_PROFILE_STORAGE_KEY);
 }
 
 export function loadWorkspaces() {
@@ -228,7 +197,6 @@ export function createWorkspace(seed?: Partial<SavedWorkspace>): SavedWorkspace 
     repoPath: seed?.repoPath?.trim() || "",
     supportFiles: seed?.supportFiles ? [...seed.supportFiles] : [],
     ignorePatterns: seed?.ignorePatterns ? [...seed.ignorePatterns] : [],
-    selectedProfile: seed?.selectedProfile || presetProfiles[0].id,
     activeBundle: seed?.activeBundle || "",
     createdAt: seed?.createdAt || timestamp,
     updatedAt: seed?.updatedAt || timestamp,

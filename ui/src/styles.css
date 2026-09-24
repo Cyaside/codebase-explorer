@@ -38,10 +38,6 @@
     @apply rounded-[1.65rem] border border-zinc-900 bg-zinc-950 px-5 py-5;
   }
 
-  .topbar-shell {
-    @apply flex flex-wrap items-start justify-between gap-4 rounded-[1.65rem] border border-zinc-900 bg-black px-5 py-5;
-  }
-
   .sidebar-shell {
     @apply flex min-h-screen flex-col gap-5 border-r border-zinc-900 bg-[#060606] px-4 py-4;
   }
@@ -64,10 +60,6 @@
 
   .sidebar-project {
     @apply block w-full rounded-2xl border border-transparent px-3 py-3 text-left transition hover:border-zinc-900 hover:bg-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-700;
-  }
-
-  .sidebar-project-active {
-    @apply border-zinc-800 bg-zinc-900;
   }
 
   .sidebar-empty {
@@ -114,14 +106,6 @@
     @apply inline-flex items-center rounded-full border border-zinc-900 bg-black px-2.5 py-1 text-[11px] text-zinc-500;
   }
 
-  .tab-strip {
-    @apply flex flex-wrap gap-2 rounded-[1.35rem] border border-zinc-900 bg-black p-2;
-  }
-
-  .tab-trigger {
-    @apply rounded-2xl px-3 py-2.5 text-sm font-medium text-zinc-500 transition hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-700 data-[state=active]:bg-zinc-900 data-[state=active]:text-zinc-50;
-  }
-
   .panel-row {
     @apply flex w-full items-start justify-between gap-3 rounded-2xl border border-transparent bg-black/60 px-3 py-3 text-left transition hover:border-zinc-900 hover:bg-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-700;
   }
@@ -150,114 +134,10 @@
     @apply fixed bottom-5 right-5 z-50 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 shadow-2xl;
   }
 
-  .command-item {
-    @apply flex w-full items-center justify-between gap-3 rounded-2xl border border-transparent bg-black px-3 py-3 text-left transition hover:border-zinc-900 hover:bg-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-700;
-  }
-
-  .command-item-active {
-    @apply border-zinc-800 bg-zinc-900;
-  }
-
   .code-block {
     @apply overflow-x-auto rounded-2xl border border-zinc-900 bg-black p-4 font-mono text-xs leading-6 text-zinc-400;
   }
 
-  .graph-shell {
-    @apply h-[42rem] overflow-hidden rounded-[1.65rem] border border-zinc-900 bg-[#050505];
-  }
-
-  .graph-node {
-    @apply min-h-[112px] w-[238px] rounded-[1.35rem] border border-zinc-800 bg-zinc-950 px-4 py-4 shadow-none;
-  }
-
-  .graph-node-selected {
-    @apply border-zinc-600;
-  }
-
-  .graph-node-dot {
-    @apply mt-0.5 inline-flex size-2.5 rounded-full;
-  }
-
-  .graph-node-dot-project {
-    @apply bg-white;
-  }
-
-  .graph-node-dot-module {
-    @apply bg-zinc-400;
-  }
-
-  .graph-node-dot-entry {
-    @apply bg-blue-400;
-  }
-
-  .graph-node-dot-issue {
-    @apply bg-amber-300;
-  }
-
-  .graph-node-dot-reading {
-    @apply bg-emerald-400;
-  }
-
-  .graph-node-dot-ai {
-    @apply bg-cyan-300;
-  }
-
-  .graph-node-handle {
-    opacity: 0;
-  }
-
-  .evidence-node {
-    @apply flex h-[92px] w-[220px] flex-col overflow-hidden rounded-lg border border-slate-600 bg-[#f7f9fc] px-3 py-2 text-slate-900 shadow-lg shadow-black/20;
-  }
-
-  .evidence-node-selected {
-    @apply border-blue-500 ring-2 ring-blue-400/40;
-  }
-
-  .evidence-node-faded {
-    opacity: 0.25;
-  }
-
-  .evidence-node-type {
-    @apply text-[10px] font-semibold uppercase tracking-[0.11em] text-slate-500;
-  }
-
-  .evidence-node strong {
-    @apply mt-1 truncate text-sm font-semibold;
-  }
-
-  .evidence-node small {
-    @apply mt-1 truncate font-mono text-[10px] text-slate-500;
-  }
-}
-
-.codearch-flow {
-  background: #050505;
-}
-
-.codearch-flow .react-flow__attribution {
-  display: none;
-}
-
-.codearch-flow .react-flow__edge-path {
-  stroke: #303030;
-}
-
-.codearch-flow .react-flow__controls {
-  overflow: hidden;
-  border-radius: 1rem;
-  border: 1px solid #18181b;
-  box-shadow: none;
-}
-
-.codearch-flow .react-flow__controls-button {
-  border-bottom: 1px solid #18181b;
-  background: #09090b;
-  color: #d4d4d8;
-}
-
-.codearch-flow .react-flow__controls-button:hover {
-  background: #111113;
 }
 
 /* Workbench UI: compact, calm surfaces with one persistent navigation rail. */
@@ -386,6 +266,9 @@ button:disabled { cursor: not-allowed; }
 .graph-inspector-divider { border-color: #303b40; }
 .graph-node-handle { opacity: 0; }
 .evidence-node { position: relative; display: flex; width: 226px; height: 102px; flex-direction: column; overflow: hidden; border: 1px solid #3b4a4f; border-radius: 7px; background: #1a2428; padding: 12px 14px; color: #e9efee; box-shadow: 0 5px 14px #05090b5c; transition: border-color .15s ease, background-color .15s ease; }
+.evidence-node-compact { width: 184px; height: 80px; padding: 10px 11px; }
+.evidence-node-compact strong { margin-top: 7px; }
+.evidence-node-compact small { margin-top: 5px; }
 .evidence-node:hover { border-color: #72969e; background: #202d31; }
 .evidence-node-selected { border-color: #a1cbd1; background: #233237; box-shadow: 0 0 0 2px #81bbc44d, 0 7px 18px #05090b70; }
 .evidence-node-faded { opacity: .22; }

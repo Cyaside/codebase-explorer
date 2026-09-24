@@ -100,8 +100,6 @@ export function normalizeBundleData(value: unknown): BundleData {
   const fullAIExecution = asRecord(record.full_ai_execution);
   const fullAIVerification = asRecord(record.full_ai_verification);
   const graphs = asRecord(record.graphs);
-  const mermaid = asRecord(record.mermaid);
-  const links = asRecord(record.links);
 
   const projectSummary = asString(project.summary);
   const fallbackReadingPath = asArray(record.reading_path).map((item) => {
@@ -230,14 +228,6 @@ export function normalizeBundleData(value: unknown): BundleData {
           }),
         };
       }),
-    },
-    mermaid: {
-      architecture: asString(mermaid.architecture),
-      dependencies: asString(mermaid.dependencies),
-    },
-    links: {
-      architecture_diagram: asString(links.architecture_diagram),
-      dependency_diagram: asString(links.dependency_diagram),
     },
   };
 }

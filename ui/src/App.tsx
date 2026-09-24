@@ -1,7 +1,6 @@
 import { startTransition, useEffect, useRef, useState } from "react";
-import { Command, FolderOpenDot, Play, RefreshCw } from "lucide-react";
+import { FolderOpenDot, Play, RefreshCw } from "lucide-react";
 
-import { CommandPalette, type CommandPaletteAction } from "@/components/CommandPalette";
 import { Sidebar } from "@/components/Sidebar";
 import { TabPanels } from "@/components/TabPanels";
 import {
@@ -19,12 +18,10 @@ import {
   startAnalyzeRun,
   testProvider,
 } from "@/lib/api";
-import { useWorkbenchShortcuts } from "@/hooks/useWorkbenchShortcuts";
-import { createWorkspace, defaultProfiles, loadProfiles, loadUIState, loadWorkspaces, persistProfiles, persistUIState, persistWorkspaces } from "@/lib/storage";
+import { createWorkspace, loadProfile, loadUIState, loadWorkspaces, persistProfile, persistUIState, persistWorkspaces } from "@/lib/storage";
 import { openAnalyzeRunStream } from "@/lib/stream";
 import type {
   AnalyzeRun,
-  ConnectionProfile,
   InspectorState,
   ProviderDiagnosticsState,
   SavedWorkspace,
@@ -32,26 +29,13 @@ import type {
   WorkbenchBundle,
   WorkbenchStatusResponse,
 } from "@/lib/types";
-import { bundleLink, normalizeLocalPath } from "@/lib/utils";
+import { bundleLink, matchesWorkspace } from "@/lib/utils";
 import { validateProfile } from "@/lib/validation";
 
 const initialUIState = loadUIState();
-const initialProfiles = loadProfiles();
+const initialProfile = loadProfile();
 const initialWorkspaces = loadWorkspaces();
 const ACTIVE_RUN_STORAGE_KEY = "codearch.workbench.active-run.v1";
-const workbenchTabs: TabKey[] = [
-  "projects",
-  "project",
-  "connections",
-  "properties",
-  "dashboard",
-  "summary",
-  "architecture",
-  "flowchart",
-  "issues",
-  "recommendations",
-];
-
 const initialProviderDiagnostics: ProviderDiagnosticsState = {
   busy: false,
   mode: "",
@@ -64,31 +48,28 @@ export function App() {
   const [status, setStatus] = useState<WorkbenchStatusResponse | null>(null);
   const [bundles, setBundles] = useState<WorkbenchStatusResponse["recent_bundles"]>([]);
   const [bundleCache, setBundleCache] = useState<Record<string, WorkbenchBundle>>({});
-  const [profiles, setProfiles] = useState(initialProfiles);
+  const [profile, setProfile] = useState(initialProfile);
   const [workspaces, setWorkspaces] = useState(initialWorkspaces);
   const [activeWorkspaceID, setActiveWorkspaceID] = useState(initialUIState.activeWorkspace || initialWorkspaces[0]?.id || "");
   const [activeTab, setActiveTab] = useState<TabKey>(initialUIState.activeTab || "projects");
-  const [profileSecrets, setProfileSecrets] = useState<Record<string, string>>({});
-  const [savedCredentials, setSavedCredentials] = useState<Record<string, string>>({});
+  const [apiKey, setAPIKey] = useState("");
+  const [savedKeyBaseURL, setSavedKeyBaseURL] = useState("");
   const [activeRun, setActiveRun] = useState<AnalyzeRun | null>(null);
   const [busyDetail, setBusyDetail] = useState("");
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [inspector, setInspector] = useState<InspectorState | null>(null);
   const [providerDiagnostics, setProviderDiagnostics] = useState<ProviderDiagnosticsState>(initialProviderDiagnostics);
 
   const repoInputRef = useRef<HTMLInputElement | null>(null);
+  const bundleRequestsRef = useRef(new Map<string, Promise<WorkbenchBundle>>());
   const completedRunRef = useRef("");
   const runWorkspaceIDRef = useRef("");
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceID) || null;
-  const activeProfileID = activeWorkspace?.selectedProfile || profiles[0]?.id || "";
-  const profile = profiles.find((item) => item.id === activeProfileID) || profiles[0] || defaultProfiles()[0];
   const providerOptions = status?.supported_providers || [];
-  const apiKey = profile ? profileSecrets[profile.id] || "" : "";
-  const hasSavedKey = !!profile && savedCredentials[profile.id] === profile.provider.baseUrl.trim().replace(/\/+$/, "");
-  const validationErrors = profile ? validateProfile(profile, apiKey, providerOptions, hasSavedKey) : [];
+  const hasSavedKey = !!savedKeyBaseURL && savedKeyBaseURL === profile.provider.baseUrl.trim().replace(/\/+$/, "");
+  const validationErrors = validateProfile(profile, apiKey, providerOptions, hasSavedKey);
   const workspaceBundles = activeWorkspace ? bundles.filter((bundle) => matchesWorkspace(bundle.analyzed_path, activeWorkspace.repoPath)) : [];
   const selectedBundleName = activeWorkspace?.activeBundle || workspaceBundles[0]?.name || "";
   const currentBundle = selectedBundleName ? bundleCache[selectedBundleName] || null : null;
@@ -97,21 +78,11 @@ export function App() {
   useEffect(() => {
     void refreshStatus();
     void fetchSavedCredentials().then((connections) => {
-      setSavedCredentials(Object.fromEntries(connections.map((item) => [item.id, item.base_url])));
-      setProfiles((current) => {
-        const next = [...current];
-        for (const saved of connections) {
-          const restored: ConnectionProfile = {
-            id: saved.id,
-            label: saved.label,
-            provider: { name: "compatible", model: saved.model, baseUrl: saved.base_url },
-          };
-          const index = next.findIndex((item) => item.id === saved.id);
-          if (index >= 0) next[index] = restored;
-          else next.push(restored);
-        }
-        return next;
-      });
+      const saved = connections.find((item) => item.id === "openai");
+      if (saved) {
+        setSavedKeyBaseURL(saved.base_url);
+        setProfile({ id: "openai", label: "OpenAI-compatible", provider: { name: "compatible", model: saved.model, baseUrl: saved.base_url } });
+      }
     }).catch((error) => setErrorMessage(error instanceof Error ? error.message : "Could not load saved connections."));
     try {
       const persisted = JSON.parse(window.sessionStorage.getItem(ACTIVE_RUN_STORAGE_KEY) || "null") as { id?: string; workspace_id?: string } | null;
@@ -127,8 +98,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    persistProfiles(profiles);
-  }, [profiles]);
+    persistProfile(profile);
+  }, [profile]);
 
   useEffect(() => {
     persistWorkspaces(workspaces);
@@ -146,17 +117,6 @@ export function App() {
       setActiveWorkspaceID(workspaces[0].id);
     }
   }, [activeWorkspace, workspaces]);
-
-  useEffect(() => {
-    if (!activeWorkspace || profiles.some((item) => item.id === activeWorkspace.selectedProfile)) {
-      return;
-    }
-
-    updateWorkspace(activeWorkspace.id, {
-      selectedProfile: profiles[0]?.id || "",
-      updatedAt: new Date().toISOString(),
-    });
-  }, [activeWorkspace?.id, activeWorkspace?.selectedProfile, profiles]);
 
   useEffect(() => {
     if (!toastMessage) {
@@ -236,67 +196,6 @@ export function App() {
     setInspector(buildDefaultInspector(activeWorkspace, currentBundle, activeTab));
   }, [activeWorkspace?.id, currentBundle?.summary.name, activeTab]);
 
-  useWorkbenchShortcuts({
-    activeTab,
-    busy,
-    commandPaletteOpen,
-    onNextBundle: () => {
-      void selectRelativeBundle(1);
-    },
-    onPreviousBundle: () => {
-      void selectRelativeBundle(-1);
-    },
-    onAnalyze: () => {
-      void handleAnalyze();
-    },
-    onCancel: () => {
-      void handleCancelAnalyze();
-    },
-    onCloseCommandPalette: () => {
-      setCommandPaletteOpen(false);
-    },
-    onFocusAnalyze: () => {
-      repoInputRef.current?.focus();
-      repoInputRef.current?.select();
-    },
-    onOpenCommandPalette: () => {
-      setCommandPaletteOpen(true);
-    },
-    onRefresh: () => {
-      void refreshStatus();
-    },
-    onSelectTab: setActiveTab,
-    tabs: workbenchTabs,
-  });
-
-  const commandActions = buildCommandActions({
-    bundles: workspaceBundles.length ? workspaceBundles : bundles.slice(0, 8),
-    onAnalyze: () => {
-      void handleAnalyze();
-    },
-    onCancelAnalyze: () => {
-      void handleCancelAnalyze();
-    },
-    onCreateWorkspace: handleCreateWorkspace,
-    onFocusAnalyze: () => {
-      repoInputRef.current?.focus();
-      repoInputRef.current?.select();
-    },
-    onRefresh: () => {
-      void refreshStatus();
-    },
-    onSelectBundle: (bundleName) => {
-      void loadBundle(bundleName);
-    },
-    onSelectTab: setActiveTab,
-    onSelectWorkspace: (workspaceID) => {
-      void selectWorkspace(workspaceID);
-    },
-    tabs: workbenchTabs,
-    workspaces,
-    busy,
-  });
-
   async function refreshStatus(preferredBundleName?: string) {
     try {
       setErrorMessage("");
@@ -328,11 +227,23 @@ export function App() {
     try {
       setErrorMessage("");
       if (!bundleCache[bundleName]) {
-        const bundle = await fetchBundle(bundleName);
-        setBundleCache((current) => ({
-          ...current,
-          [bundleName]: bundle,
-        }));
+        let request = bundleRequestsRef.current.get(bundleName);
+        if (!request) {
+          request = fetchBundle(bundleName);
+          bundleRequestsRef.current.set(bundleName, request);
+        }
+        let bundle: WorkbenchBundle;
+        try {
+          bundle = await request;
+        } finally {
+          bundleRequestsRef.current.delete(bundleName);
+        }
+        setBundleCache((current) => {
+          const retained = Object.entries(current).filter(([name]) => name !== bundleName);
+          const selected = retained.find(([name]) => name === selectedBundleName);
+          const recent = retained.filter(([name]) => name !== selectedBundleName).slice(selected ? -1 : -2);
+          return Object.fromEntries([...recent, ...(selected ? [selected] : []), [bundleName, bundle]]);
+        });
       }
 
       if (workspaceID) {
@@ -344,17 +255,6 @@ export function App() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load bundle.");
     }
-  }
-
-  async function selectRelativeBundle(direction: -1 | 1) {
-    if (!workspaceBundles.length) {
-      return;
-    }
-
-    const currentIndex = workspaceBundles.findIndex((bundle) => bundle.name === selectedBundleName);
-    const startIndex = currentIndex >= 0 ? currentIndex : 0;
-    const nextIndex = (startIndex + direction + workspaceBundles.length) % workspaceBundles.length;
-    await loadBundle(workspaceBundles[nextIndex].name, activeWorkspace?.id);
   }
 
   async function selectWorkspace(workspaceID: string, sourceWorkspaces = workspaces, sourceBundles = bundles) {
@@ -383,7 +283,6 @@ export function App() {
 
   function handleCreateWorkspace() {
     const nextWorkspace = createWorkspace({
-      selectedProfile: profiles[0]?.id || "",
     });
 
     setWorkspaces((current) => [nextWorkspace, ...current]);
@@ -452,8 +351,8 @@ export function App() {
 
   async function currentConnectionPayload() {
     const saved = await saveCredential(profile, apiKey.trim());
-    setSavedCredentials((current) => ({ ...current, [saved.id]: saved.base_url }));
-    if (apiKey.trim()) setProfileSecrets((current) => ({ ...current, [profile.id]: "" }));
+    setSavedKeyBaseURL(saved.base_url);
+    if (apiKey.trim()) setAPIKey("");
     return { provider: buildProviderPayload(profile, ""), credential_id: profile.id };
   }
 
@@ -542,71 +441,10 @@ export function App() {
     }
   }
 
-  function handleDuplicateProfile() {
-    const cloneID = `profile-${Date.now()}`;
-    const clone: ConnectionProfile = {
-      id: cloneID,
-      label: `${profile.label} Copy`,
-      provider: { ...profile.provider },
-    };
-
-    setProfiles((current) => [...current, clone]);
-    if (activeWorkspace) {
-      updateWorkspace(activeWorkspace.id, {
-        selectedProfile: cloneID,
-        updatedAt: new Date().toISOString(),
-      });
-    }
-    setToastMessage(`Duplicated "${profile.label}".`);
-  }
-
-  async function handleDeleteProfile() {
-    if (profiles.length <= 1) {
-      setErrorMessage("Keep at least one connection profile available.");
-      return;
-    }
-    if (profile.locked) {
-      setErrorMessage("Preset profiles cannot be deleted.");
-      return;
-    }
-
-    if (savedCredentials[profile.id]) {
-      try {
-        await deleteSavedCredential(profile.id);
-        setSavedCredentials((current) => {
-          const next = { ...current };
-          delete next[profile.id];
-          return next;
-        });
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Could not delete saved connection.");
-        return;
-      }
-    }
-
-    const fallbackProfileID = profiles.find((item) => item.id !== profile.id)?.id || profiles[0]?.id || "";
-    setProfiles((current) => current.filter((item) => item.id !== profile.id));
-    setProfileSecrets((current) => {
-      const next = { ...current };
-      delete next[profile.id];
-      return next;
-    });
-    setWorkspaces((current) =>
-      current.map((workspace) =>
-        workspace.selectedProfile === profile.id ? { ...workspace, selectedProfile: fallbackProfileID, updatedAt: new Date().toISOString() } : workspace,
-      ),
-    );
-    setToastMessage(`Deleted "${profile.label}".`);
-  }
-
   async function handleClearSavedKey() {
     try {
       await deleteSavedCredential(profile.id);
-      setSavedCredentials((current) => {
-        const next = { ...current };
-        delete next[profile.id];
-        return next;
-      });
+      setSavedKeyBaseURL("");
       setToastMessage(`Cleared the saved key for "${profile.label}".`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not clear saved key.");
@@ -740,7 +578,6 @@ export function App() {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#workbench-main">Skip to content</a>
-      <CommandPalette actions={commandActions} onClose={() => setCommandPaletteOpen(false)} open={commandPaletteOpen} />
 
       <div className="app-layout">
         <Sidebar
@@ -769,7 +606,6 @@ export function App() {
                   <p className="workbench-subtitle">{activeWorkspace?.repoPath || "Select a project and connect a repository to begin."}</p>
                 </div>
                 <div className="workbench-actions">
-                  <button aria-label="Open command palette" className="secondary-control icon-control" onClick={() => setCommandPaletteOpen(true)} title="Command palette (Ctrl+K)" type="button"><Command className="size-4" /></button>
                   <button aria-label="Refresh workbench" className="secondary-control icon-control" onClick={() => void refreshStatus()} title="Refresh" type="button"><RefreshCw className="size-4" /></button>
                   {currentBundle ? <a className="secondary-control icon-control" href={readmeHref} rel="noreferrer" target="_blank" title="Open bundle README" aria-label="Open bundle README"><FolderOpenDot className="size-4" /></a> : null}
                   {activeTab !== "project" ? <button className="primary-control" onClick={() => setActiveTab("project")} type="button"><Play className="size-3.5" /> Analyze</button> : null}
@@ -797,23 +633,16 @@ export function App() {
               busy={busy}
               busyDetail={busyDetail}
               inspector={inspector}
-              onAPIKeyChange={(value) =>
-                setProfileSecrets((current) => ({
-                  ...current,
-                  [profile.id]: value,
-                }))
-              }
+              onAPIKeyChange={setAPIKey}
               onCancelAnalyze={handleCancelAnalyze}
               onClearSavedKey={() => { void handleClearSavedKey(); }}
               onCreateWorkspace={handleCreateWorkspace}
               onDeleteBundle={(bundleName) => {
                 void handleDeleteBundle(bundleName);
               }}
-              onDeleteProfile={handleDeleteProfile}
               onDeleteWorkspace={(workspaceID) => {
                 void handleDeleteWorkspace(workspaceID);
               }}
-              onDuplicateProfile={handleDuplicateProfile}
               onListProviderModels={() => {
                 void handleListProviderModels();
               }}
@@ -826,17 +655,11 @@ export function App() {
               onOpenConnections={() => setActiveTab("connections")}
               onProfileChange={(nextProfile) => {
                 setProviderDiagnostics(initialProviderDiagnostics);
-                setProfiles((current) => current.map((item) => (item.id === nextProfile.id ? nextProfile : item)));
+                setProfile(nextProfile);
               }}
               onSaveProfile={() => { void handleSaveProfile(); }}
               onSelectBundle={(bundleName, workspaceID) => {
                 void loadBundle(bundleName, workspaceID);
-              }}
-              onSelectProfile={(profileID) => {
-                setProviderDiagnostics(initialProviderDiagnostics);
-                if (activeWorkspace) {
-                  updateWorkspace(activeWorkspace.id, { selectedProfile: profileID, updatedAt: new Date().toISOString() });
-                }
               }}
               onSelectWorkspace={(workspaceID) => {
                 void selectWorkspace(workspaceID);
@@ -845,14 +668,11 @@ export function App() {
               onTestProvider={() => {
                 void handleTestProvider();
               }}
-              onTabChange={setActiveTab}
               onWorkspaceChange={(workspace) => {
                 updateWorkspace(workspace.id, workspace);
               }}
               profile={profile}
               providerDiagnostics={providerDiagnostics}
-              profiles={profiles}
-              providerOptions={providerOptions}
               repoInputRef={repoInputRef}
               run={activeRun}
               validationErrors={validationErrors}
@@ -865,107 +685,6 @@ export function App() {
       {toastMessage ? <div className="toast-shell">{toastMessage}</div> : null}
     </div>
   );
-}
-
-function buildCommandActions({
-  bundles,
-  onAnalyze,
-  onCancelAnalyze,
-  onCreateWorkspace,
-  onFocusAnalyze,
-  onRefresh,
-  onSelectBundle,
-  onSelectTab,
-  onSelectWorkspace,
-  tabs,
-  workspaces,
-  busy,
-}: {
-  bundles: WorkbenchStatusResponse["recent_bundles"];
-  onAnalyze: () => void;
-  onCancelAnalyze: () => void;
-  onCreateWorkspace: () => void;
-  onFocusAnalyze: () => void;
-  onRefresh: () => void;
-  onSelectBundle: (bundleName: string) => void;
-  onSelectTab: (tab: TabKey) => void;
-  onSelectWorkspace: (workspaceID: string) => void;
-  tabs: TabKey[];
-  workspaces: SavedWorkspace[];
-  busy: boolean;
-}): CommandPaletteAction[] {
-  const actions: CommandPaletteAction[] = [
-    {
-      id: "new-project",
-      group: "Workspace",
-      label: "Create project workspace",
-      description: "Create a new saved project shell and focus its repository path input.",
-      keywords: ["new", "workspace", "project"],
-      run: onCreateWorkspace,
-    },
-    {
-      id: "focus-project-path",
-      group: "Workspace",
-      label: "Focus repository path",
-      description: "Jump directly to the active workspace path input.",
-      keywords: ["repo", "path", "focus"],
-      shortcut: "A",
-      run: onFocusAnalyze,
-    },
-    {
-      id: busy ? "cancel-run" : "run-analyze",
-      group: "Analyze",
-      label: busy ? "Cancel active analyze run" : "Analyze active project",
-      description: busy ? "Stop the current run when it reaches a safe cancel point." : "Run analysis for the active workspace.",
-      keywords: ["analyze", "cancel", "run"],
-      shortcut: busy ? "Esc" : "Ctrl+Enter",
-      run: busy ? onCancelAnalyze : onAnalyze,
-    },
-    {
-      id: "refresh-workbench",
-      group: "Workspace",
-      label: "Refresh workbench data",
-      description: "Refresh status, provider metadata, and available bundles from the local backend.",
-      keywords: ["refresh", "reload", "status"],
-      shortcut: "R",
-      run: onRefresh,
-    },
-  ];
-
-  for (const tab of tabs) {
-    actions.push({
-      id: `tab-${tab}`,
-      group: "Views",
-      label: `Open ${tabTitle(tab)}`,
-      description: `Switch the active surface to ${tabTitle(tab)}.`,
-      keywords: [tab, "view", "tab"],
-      run: () => onSelectTab(tab),
-    });
-  }
-
-  for (const workspace of workspaces) {
-    actions.push({
-      id: `workspace-${workspace.id}`,
-      group: "Projects",
-      label: `Open ${workspace.label}`,
-      description: workspace.repoPath || "Saved workspace without a repository path yet.",
-      keywords: [workspace.label, workspace.repoPath].filter(Boolean),
-      run: () => onSelectWorkspace(workspace.id),
-    });
-  }
-
-  for (const bundle of bundles) {
-    actions.push({
-      id: `bundle-${bundle.name}`,
-      group: "Bundles",
-      label: `Open ${bundle.project_name || bundle.name}`,
-      description: `${bundle.total_files} files · AI ${bundle.ai_status || "disabled"}`,
-      keywords: [bundle.name, bundle.project_name, bundle.ai_status].filter(Boolean) as string[],
-      run: () => onSelectBundle(bundle.name),
-    });
-  }
-
-  return actions;
 }
 
 function buildDefaultInspector(workspace: SavedWorkspace | null, bundle: WorkbenchBundle | null, activeTab: TabKey): InspectorState | null {
@@ -996,17 +715,9 @@ function buildDefaultInspector(workspace: SavedWorkspace | null, bundle: Workben
     properties: [
       { label: "Support files", value: String(workspace.supportFiles.length) },
       { label: "Ignore patterns", value: String(workspace.ignorePatterns.length) },
-      { label: "Connection", value: workspace.selectedProfile || "unassigned" },
+      { label: "Connection", value: "OpenAI-compatible" },
     ],
   };
-}
-
-function matchesWorkspace(bundlePath: string, workspacePath: string) {
-  if (!workspacePath.trim()) {
-    return false;
-  }
-
-  return normalizeLocalPath(bundlePath) === normalizeLocalPath(workspacePath);
 }
 
 function sortWorkspacesByUpdatedAt(left: SavedWorkspace, right: SavedWorkspace) {

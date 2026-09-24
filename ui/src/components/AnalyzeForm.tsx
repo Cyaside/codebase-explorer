@@ -161,14 +161,8 @@ export function AnalyzeForm({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-zinc-900 pt-4">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-          <span className="hint-chip">Ctrl+Enter analyze</span>
-          <span className="hint-chip">Ctrl+K command</span>
-          <span className="hint-chip">[ ] views</span>
-          <span className="hint-chip">J / K projects</span>
-        </div>
-        <p className="text-sm text-zinc-500">{busy ? busyDetail || "Analysis is running." : "Choose a local repository path and a connection with an API key."}</p>
+      <div className="border-t border-zinc-900 pt-4">
+        <p className="text-sm text-zinc-500">{busy ? busyDetail || "Analysis is running." : "Choose a local repository path and configure an OpenAI-compatible connection with an API key."}</p>
       </div>
 
       {run ? (

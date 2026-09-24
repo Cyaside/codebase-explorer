@@ -1,5 +1,4 @@
 import type {
-  AnalyzeResponse,
   AnalyzeRun,
   BundleSummary,
   ConnectionProfile,
@@ -9,7 +8,6 @@ import type {
   WorkbenchStatusResponse,
 } from "@/lib/types";
 import {
-  normalizeAnalyzeResponse,
   normalizeAnalyzeRun,
   normalizeBundleSummary,
   normalizeWorkbenchBundle,
@@ -85,13 +83,6 @@ export function deleteBundle(bundleName: string) {
   return requestJSON<{ deleted: string }>(`/api/bundles/${encodeURIComponent(bundleName)}`, {
     method: "DELETE",
   });
-}
-
-export function analyzeRepository(payload: AnalyzePayload) {
-  return requestJSON<AnalyzeResponse>("/api/analyze", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }).then(normalizeAnalyzeResponse);
 }
 
 export function startAnalyzeRun(payload: AnalyzePayload) {

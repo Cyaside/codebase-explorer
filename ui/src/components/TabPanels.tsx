@@ -1,11 +1,8 @@
-import type { RefObject } from "react";
-import * as Tabs from "@radix-ui/react-tabs";
-import { FolderCog } from "lucide-react";
+import { lazy, Suspense, type RefObject } from "react";
 
 import { ArchitectureView, DashboardView, IssuesView, RecommendationsView, SummaryView } from "@/components/AnalysisViews";
 import { AnalyzeForm } from "@/components/AnalyzeForm";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
-import { EvidenceGraph } from "@/components/EvidenceGraph";
 import { ProjectsPanel } from "@/components/ProjectsPanel";
 import { PropertiesPanel } from "@/components/PropertiesPanel";
 import type {
@@ -15,10 +12,11 @@ import type {
   InspectorState,
   ProviderDiagnosticsState,
   SavedWorkspace,
-  SupportedProviderOption,
   TabKey,
   WorkbenchBundle,
 } from "@/lib/types";
+
+const EvidenceGraph = lazy(() => import("@/components/EvidenceGraph").then(({ EvidenceGraph }) => ({ default: EvidenceGraph })));
 
 interface TabPanelsProps {
   activeTab: TabKey;
@@ -36,25 +34,19 @@ interface TabPanelsProps {
   onClearSavedKey: () => void;
   onCreateWorkspace: () => void;
   onDeleteBundle: (bundleName: string) => void;
-  onDeleteProfile: () => void;
   onDeleteWorkspace: (workspaceID: string) => void;
-  onDuplicateProfile: () => void;
   onInspect: (value: InspectorState | null) => void;
   onListProviderModels: () => void;
   onOpenConnections: () => void;
   onProfileChange: (profile: ConnectionProfile) => void;
   onSaveProfile: () => void;
   onSelectBundle: (bundleName: string, workspaceID?: string) => void;
-  onSelectProfile: (profileID: string) => void;
   onSelectWorkspace: (workspaceID: string) => void;
   onSubmitAnalyze: () => void;
-  onTabChange: (value: TabKey) => void;
   onTestProvider: () => void;
   onWorkspaceChange: (workspace: SavedWorkspace) => void;
   profile: ConnectionProfile;
   providerDiagnostics: ProviderDiagnosticsState;
-  profiles: ConnectionProfile[];
-  providerOptions: SupportedProviderOption[];
   repoInputRef: RefObject<HTMLInputElement | null>;
   run: AnalyzeRun | null;
   validationErrors: string[];
@@ -78,25 +70,19 @@ export function TabPanels(props: TabPanelsProps) {
     onClearSavedKey,
     onCreateWorkspace,
     onDeleteBundle,
-    onDeleteProfile,
     onDeleteWorkspace,
-    onDuplicateProfile,
     onInspect,
     onListProviderModels,
     onOpenConnections,
     onProfileChange,
     onSaveProfile,
     onSelectBundle,
-    onSelectProfile,
     onSelectWorkspace,
     onSubmitAnalyze,
-    onTabChange,
     onTestProvider,
     onWorkspaceChange,
     profile,
     providerDiagnostics,
-    profiles,
-    providerOptions,
     repoInputRef,
     run,
     validationErrors,
@@ -104,8 +90,8 @@ export function TabPanels(props: TabPanelsProps) {
   } = props;
 
   return (
-    <Tabs.Root className="space-y-4" onValueChange={(value) => onTabChange(value as TabKey)} value={activeTab}>
-      <Tabs.Content value="projects">
+    <div className="space-y-4">
+      {activeTab === "projects" ? (
         <ProjectsPanel
           activeWorkspaceID={activeWorkspaceID}
           bundles={bundles}
@@ -117,9 +103,9 @@ export function TabPanels(props: TabPanelsProps) {
           selectedBundle={activeWorkspace?.activeBundle || ""}
           workspaces={workspaces}
         />
-      </Tabs.Content>
+      ) : null}
 
-      <Tabs.Content value="project">
+      {activeTab === "project" ? (
         <AnalyzeForm
           busy={busy}
           busyDetail={busyDetail}
@@ -134,35 +120,10 @@ export function TabPanels(props: TabPanelsProps) {
           run={run}
           workspace={activeWorkspace}
         />
-      </Tabs.Content>
+      ) : null}
 
-      <Tabs.Content value="connections">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <section className="panel-block">
-            <div className="flex items-center gap-3">
-              <FolderCog className="size-4 text-zinc-500" />
-              <p className="panel-kicker">Connection profiles</p>
-            </div>
-            <div className="mt-4 space-y-2">
-              {profiles.map((item) => (
-                <button
-                  className={`panel-row${item.id === profile.id ? " panel-row-selected" : ""}`}
-                  key={item.id}
-                  onClick={() => onSelectProfile(item.id)}
-                  type="button"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-zinc-100">{item.label}</p>
-                    <p className="mt-1 truncate text-xs text-zinc-500">
-                      {item.provider.name} - {item.provider.model}
-                    </p>
-                  </div>
-                  <span className="text-xs text-zinc-600">{item.id === activeWorkspace?.selectedProfile ? "In use" : ""}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-
+      {activeTab === "connections" ? (
+        <div className="mx-auto max-w-3xl">
           <ConnectionPanel
             apiKey={apiKey}
             hasSavedKey={hasSavedKey}
@@ -170,47 +131,44 @@ export function TabPanels(props: TabPanelsProps) {
             onAPIKeyChange={onAPIKeyChange}
             onChange={onProfileChange}
             onClearKey={onClearSavedKey}
-            onDelete={onDeleteProfile}
-            onDuplicate={onDuplicateProfile}
             onListModels={onListProviderModels}
             onSave={onSaveProfile}
             onTestProvider={onTestProvider}
             profile={profile}
-            providerOptions={providerOptions}
             validationErrors={validationErrors}
           />
         </div>
-      </Tabs.Content>
+      ) : null}
 
-      <Tabs.Content value="properties">
+      {activeTab === "properties" ? (
         <PropertiesPanel activeRun={run} bundle={bundle} inspector={inspector} workspace={activeWorkspace} />
-      </Tabs.Content>
+      ) : null}
 
-      <Tabs.Content value="dashboard">
+      {activeTab === "dashboard" ? (
         <DashboardView bundle={bundle} onInspect={onInspect} />
-      </Tabs.Content>
+      ) : null}
 
-      <Tabs.Content value="summary">
+      {activeTab === "summary" ? (
         <SummaryView bundle={bundle} onInspect={onInspect} />
-      </Tabs.Content>
+      ) : null}
 
-      <Tabs.Content value="architecture">
+      {activeTab === "architecture" ? (
         <ArchitectureView bundle={bundle} onInspect={onInspect} />
-      </Tabs.Content>
+      ) : null}
 
-      <Tabs.Content value="flowchart">
-        <div className="space-y-4">
+      {activeTab === "flowchart" ? (
+        <Suspense fallback={<div className="panel-block text-sm text-zinc-400">Loading graph…</div>}>
           <EvidenceGraph bundle={bundle} />
-        </div>
-      </Tabs.Content>
+        </Suspense>
+      ) : null}
 
-      <Tabs.Content value="issues">
+      {activeTab === "issues" ? (
         <IssuesView bundle={bundle} onInspect={onInspect} />
-      </Tabs.Content>
+      ) : null}
 
-      <Tabs.Content value="recommendations">
+      {activeTab === "recommendations" ? (
         <RecommendationsView bundle={bundle} onInspect={onInspect} />
-      </Tabs.Content>
-    </Tabs.Root>
+      ) : null}
+    </div>
   );
 }

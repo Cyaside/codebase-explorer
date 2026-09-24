@@ -245,7 +245,6 @@ export function RecommendationsView({ bundle, onInspect }: ViewProps) {
   const nextMoves = [
     { label: "Open bundle README", href: bundleLink(bundle.summary.name, "README.md") },
     { label: "Open static viewer", href: bundleLink(bundle.summary.name, "ui/index.html") },
-    { label: "Open architecture artifact", href: bundleLink(bundle.summary.name, bundle.data.links.architecture_diagram) },
   ];
 
   return (
