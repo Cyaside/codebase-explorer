@@ -16,6 +16,7 @@ func TestAnalyzeWritesChangesCorrelationBundle(t *testing.T) {
 		DefaultOutputRoot: t.TempDir(),
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
@@ -24,7 +25,6 @@ func TestAnalyzeWritesChangesCorrelationBundle(t *testing.T) {
 
 	result, err := service.Analyze(t.Context(), AnalyzeRequest{
 		RepoPath:             repoPath,
-		DeterministicOnly:    true,
 		OptionalSupportFiles: []string{issuesPath, changelogPath},
 	})
 	if err != nil {

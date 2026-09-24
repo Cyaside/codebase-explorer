@@ -27,6 +27,14 @@ func (s Service) Serve(ctx context.Context, request ServeRequest) error {
 	if addr == "" {
 		addr = defaultWorkbenchAddr
 	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return fmt.Errorf("invalid workbench address %q: %w", addr, err)
+	}
+	ip := net.ParseIP(host)
+	if host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+		return fmt.Errorf("workbench must listen on a loopback address because it can access saved API keys")
+	}
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {

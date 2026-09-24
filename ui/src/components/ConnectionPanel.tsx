@@ -1,81 +1,43 @@
-import { Activity, CopyPlus, KeyRound, ListChecks, Save, Trash2 } from "lucide-react";
+import { Activity, KeyRound, ListChecks, Save } from "lucide-react";
 
-import type { ConnectionProfile, ProviderDiagnosticsState, SupportedProviderOption } from "@/lib/types";
+import type { ConnectionProfile, ProviderDiagnosticsState } from "@/lib/types";
 
 interface ConnectionPanelProps {
   apiKey: string;
+  hasSavedKey: boolean;
   diagnostics: ProviderDiagnosticsState;
   onAPIKeyChange: (value: string) => void;
   onChange: (profile: ConnectionProfile) => void;
-  onDelete: () => void;
-  onDuplicate: () => void;
+  onClearKey: () => void;
   onListModels: () => void;
   onSave: () => void;
   onTestProvider: () => void;
   profile: ConnectionProfile;
-  providerOptions: SupportedProviderOption[];
   validationErrors: string[];
 }
 
 export function ConnectionPanel({
   apiKey,
+  hasSavedKey,
   diagnostics,
   onAPIKeyChange,
   onChange,
-  onDelete,
-  onDuplicate,
+  onClearKey,
   onListModels,
   onSave,
   onTestProvider,
   profile,
-  providerOptions,
   validationErrors,
 }: ConnectionPanelProps) {
-  const providerName = profile.provider.name;
-  const providerMeta = providerOptions.find((item) => item.name === providerName);
-
   return (
-    <section className="rail-section">
+    <section className="rail-section connection-panel">
       <div>
         <p className="panel-kicker">Connection</p>
-        <h3 className="mt-3 text-lg font-semibold text-zinc-100">{profile.label}</h3>
+        <h3 className="mt-3 text-lg font-semibold text-zinc-100">OpenAI-compatible</h3>
+        <p className="mt-2 text-sm text-zinc-500">Use any endpoint that supports the OpenAI Chat Completions API.</p>
       </div>
 
       <div className="space-y-3">
-        <label className="compact-field">
-          <span className="compact-label">Label</span>
-          <input
-            className="compact-input"
-            onChange={(event) => onChange({ ...profile, label: event.target.value })}
-            type="text"
-            value={profile.label}
-          />
-        </label>
-
-        <label className="compact-field">
-          <span className="compact-label">Provider mode</span>
-          <select
-            className="compact-input"
-            onChange={(event) =>
-              onChange({
-                ...profile,
-                provider: {
-                  name: event.target.value,
-                  model: profile.provider.model || "",
-                  baseUrl: event.target.value === "openai" ? "" : profile.provider.baseUrl || "",
-                },
-              })
-            }
-            value={providerName}
-          >
-            {providerOptions.map((option) => (
-              <option key={option.name} value={option.name}>
-                {option.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
         <label className="compact-field">
           <span className="compact-label">Model</span>
           <input
@@ -89,7 +51,7 @@ export function ConnectionPanel({
                 },
               })
             }
-            placeholder="mistral-small-latest"
+            placeholder="Your model ID"
             type="text"
             value={profile.provider.model}
           />
@@ -108,7 +70,7 @@ export function ConnectionPanel({
                 },
               })
             }
-            placeholder="https://api.mistral.ai/v1"
+            placeholder="https://your-provider.example/v1"
             type="text"
             value={profile.provider.baseUrl}
           />
@@ -121,22 +83,14 @@ export function ConnectionPanel({
             <input
               className="compact-input pl-10"
               onChange={(event) => onAPIKeyChange(event.target.value)}
-              placeholder="Session memory only"
+              placeholder={hasSavedKey ? "Saved in local backend; enter to replace" : "Enter API key"}
               type="password"
               value={apiKey}
             />
           </div>
         </label>
+        <p className="text-xs text-zinc-500">{hasSavedKey ? "Key saved on this computer. It is never sent back to the browser." : "Save to store the key in the local backend, outside this repository."}</p>
       </div>
-
-      {providerMeta ? (
-        <div className="rounded-2xl border border-zinc-900 bg-black/50 px-3 py-3 text-xs leading-6 text-zinc-500">
-          <p className="font-semibold uppercase tracking-[0.18em] text-zinc-500">Contract</p>
-          <p>API key: {providerMeta.requires_api_key ? "required" : "optional"}</p>
-          <p>Model: {providerMeta.requires_model ? "required" : "optional"}</p>
-          <p>Base URL: {providerMeta.requires_base_url ? "required" : "optional"}</p>
-        </div>
-      ) : null}
 
       {validationErrors.length ? (
         <div className="rounded-2xl border border-red-950 bg-red-950/35 px-3 py-3 text-sm leading-6 text-red-200">
@@ -204,18 +158,11 @@ export function ConnectionPanel({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button className="secondary-control" onClick={onSave} type="button">
+        <button className="primary-control" onClick={onSave} type="button">
           <Save className="size-4" />
           Save
         </button>
-        <button className="secondary-control" onClick={onDuplicate} type="button">
-          <CopyPlus className="size-4" />
-          Duplicate
-        </button>
-        <button className="secondary-control danger" disabled={profile.locked} onClick={onDelete} type="button">
-          <Trash2 className="size-4" />
-          Delete
-        </button>
+        {hasSavedKey ? <button className="secondary-control danger" onClick={onClearKey} type="button">Clear saved key</button> : null}
       </div>
     </section>
   );

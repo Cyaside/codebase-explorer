@@ -5,7 +5,7 @@ export function fullAIResult(bundle: WorkbenchBundle | null, name: string): Full
 }
 
 export function hasFullAIOutput(result: FullAIResult | null): result is FullAIResult {
-  if (!result || result.status !== "succeeded") {
+  if (!result || !result.verified || (result.status !== "verified" && result.status !== "succeeded")) {
     return false;
   }
 
@@ -30,4 +30,3 @@ export function fullAIStatusLabel(bundle: WorkbenchBundle | null): string {
 export function fullAINote(bundle: WorkbenchBundle | null): string {
   return bundle?.data.full_ai_execution.note || bundle?.data.full_ai.note || "";
 }
-

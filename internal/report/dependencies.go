@@ -13,10 +13,10 @@ func DependenciesREADME(analysis analyzer.Result) string {
 	builder.WriteString("## Related Views\n\n")
 	builder.WriteString("- [Open the local viewer](../ui/index.html)\n")
 	builder.WriteString("- [Review the root report](../README.md)\n")
-	builder.WriteString("- [Open the dependency Mermaid graph](dependency-graph.mmd)\n")
+	builder.WriteString("- [Inspect resolved local import graph](../data/graphs.json)\n")
 	builder.WriteString("- [Inspect the raw dependency data](dependencies.json)\n\n")
 	builder.WriteString("## Dependency Graph\n\n")
-	builder.WriteString("- [dependency-graph.mmd](dependency-graph.mmd)\n\n")
+	builder.WriteString("Resolved import edges and their source files are in [graphs.json](../data/graphs.json).\n\n")
 	if len(analysis.DependencyRisks) == 0 {
 		builder.WriteString("No concentrated dependency points were detected from import-like heuristics.\n")
 		return builder.String()

@@ -3,6 +3,7 @@ package fullai
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,5 +57,21 @@ func TestCollectorReadsExactAndModuleTargets(t *testing.T) {
 	}
 	if evidence.Items[1].ReadStatus != "read" || evidence.Items[1].Resolution != "module-representative" {
 		t.Fatalf("expected module representative read, got %#v", evidence.Items[1])
+	}
+}
+
+func TestCollectorBoundsLargeFileRead(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	contents := strings.Repeat("a", maxEvidenceReadBytes+10000)
+	if err := os.WriteFile(filepath.Join(root, "large.go"), []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	item := collectEvidenceItem(Input{
+		RootPath:   root,
+		ScanResult: repo.ScanResult{Files: []repo.FileInfo{{Path: "large.go"}}},
+	}, Target{Path: "large.go"})
+	if item.ReadStatus != "read" || !item.Truncated || item.ByteCount != len(contents) || len(item.Snippet) > maxEvidenceSnippetBytes {
+		t.Fatalf("large file was not bounded: %#v", item)
 	}
 }

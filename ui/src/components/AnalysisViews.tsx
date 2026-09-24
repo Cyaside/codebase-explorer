@@ -20,7 +20,7 @@ export function DashboardView({ bundle, onInspect }: ViewProps) {
   return (
     <div className="space-y-4">
       <SurfaceHeader
-        eyebrow="Dashboard"
+        eyebrow="Overview"
         note={`${bundle.summary.project_type || "Repository"} - ${bundle.summary.total_files} files - ${bundle.summary.total_lines} lines`}
         title={bundle.summary.project_name || bundle.summary.name}
       />
@@ -245,7 +245,6 @@ export function RecommendationsView({ bundle, onInspect }: ViewProps) {
   const nextMoves = [
     { label: "Open bundle README", href: bundleLink(bundle.summary.name, "README.md") },
     { label: "Open static viewer", href: bundleLink(bundle.summary.name, "ui/index.html") },
-    { label: "Open architecture artifact", href: bundleLink(bundle.summary.name, bundle.data.links.architecture_diagram) },
   ];
 
   return (
@@ -289,7 +288,7 @@ export function RecommendationsView({ bundle, onInspect }: ViewProps) {
 
 function SurfaceHeader({ eyebrow, title, note }: { eyebrow: string; title: string; note: string }) {
   return (
-    <section className="panel-block">
+    <section className="surface-header">
       <p className="panel-kicker">{eyebrow}</p>
       <h2 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50">{title}</h2>
       <p className="mt-3 text-sm leading-6 text-zinc-400">{note}</p>
@@ -342,4 +341,3 @@ function EmptyState({ body, title }: { body: string; title: string }) {
     </section>
   );
 }
-

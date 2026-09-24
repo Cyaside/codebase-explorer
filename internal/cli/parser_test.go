@@ -30,25 +30,38 @@ func TestParseAnalyzeRejectsMissingSupportValue(t *testing.T) {
 	}
 }
 
-func TestParseAnalyzeAcceptsFullAIFlags(t *testing.T) {
+func TestParseAnalyzeUsesSingleWorkflow(t *testing.T) {
 	t.Parallel()
 
-	command, err := parse([]string{
-		"analyze",
-		"./repo",
-		"--full-ai",
-		"--ai-read-budget", "32",
-		"--ai-token-budget", "48000",
-	})
+	command, err := parse([]string{"analyze", "./repo"})
 	if err != nil {
-		t.Fatalf("parse analyze command with full-ai flags: %v", err)
+		t.Fatalf("parse analyze command: %v", err)
 	}
 
 	if command.analyzeRequest.FullAI.Mode != "full-ai" {
-		t.Fatalf("expected full-ai mode, got %#v", command.analyzeRequest.FullAI)
+		t.Fatalf("expected AI workflow, got %#v", command.analyzeRequest.FullAI)
 	}
-	if command.analyzeRequest.FullAI.ReadBudget != 32 || command.analyzeRequest.FullAI.TokenBudget != 48000 {
-		t.Fatalf("expected parsed full-ai budgets, got %#v", command.analyzeRequest.FullAI)
+	for _, flag := range []string{"--deterministic-only", "--full-ai", "--ai-read-budget", "--ai-token-budget"} {
+		if _, err := parse([]string{"analyze", "./repo", flag}); err == nil {
+			t.Fatalf("expected legacy flag %s to be rejected", flag)
+		}
+	}
+}
+
+func TestParseSavedConnection(t *testing.T) {
+	t.Parallel()
+	analyze, err := parse([]string{"analyze", "./repo", "--connection", "sumopod"})
+	if err != nil || analyze.analyzeRequest.CredentialID != "sumopod" {
+		t.Fatalf("analyze connection: %#v, %v", analyze, err)
+	}
+	doctor, err := parse([]string{"doctor", "--connection", "sumopod"})
+	if err != nil || doctor.doctorRequest.CredentialID != "sumopod" {
+		t.Fatalf("doctor connection: %#v, %v", doctor, err)
+	}
+	for _, args := range [][]string{{"analyze", "./repo", "--connection"}, {"doctor", "--connection"}} {
+		if _, err := parse(args); err == nil {
+			t.Fatalf("expected missing connection error for %v", args)
+		}
 	}
 }
 

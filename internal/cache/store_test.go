@@ -40,7 +40,7 @@ func TestStoreReturnsCacheMissForMissingPayload(t *testing.T) {
 	t.Parallel()
 
 	store := NewStore(t.TempDir(), true)
-	_, err := store.LoadProvider("missing")
+	_, err := store.LoadAIExecution("missing")
 	if !errors.Is(err, ErrCacheMiss) {
 		t.Fatalf("expected cache miss, got %v", err)
 	}
@@ -53,7 +53,7 @@ func TestStoreClearRemovesEntries(t *testing.T) {
 	if err := store.SaveDeterministic(DeterministicPayload{Key: "one"}); err != nil {
 		t.Fatalf("seed deterministic cache: %v", err)
 	}
-	if err := store.SaveProvider(ProviderPayload{Key: "two"}); err != nil {
+	if err := store.SaveAIExecution(AIExecutionPayload{Key: "two"}); err != nil {
 		t.Fatalf("seed provider cache: %v", err)
 	}
 
@@ -68,7 +68,7 @@ func TestStoreClearRemovesEntries(t *testing.T) {
 	if _, err := store.LoadDeterministic("one"); !errors.Is(err, ErrCacheMiss) {
 		t.Fatalf("expected deterministic cache entry to be removed, got %v", err)
 	}
-	if _, err := store.LoadProvider("two"); !errors.Is(err, ErrCacheMiss) {
+	if _, err := store.LoadAIExecution("two"); !errors.Is(err, ErrCacheMiss) {
 		t.Fatalf("expected provider cache entry to be removed, got %v", err)
 	}
 }
@@ -86,7 +86,7 @@ func TestBuildDeterministicKeyChangesWhenSupportFilesChange(t *testing.T) {
 		t.Fatalf("write support file: %v", err)
 	}
 
-	firstKey, err := BuildDeterministicKey(root, nil, []string{supportPath}, "test", true)
+	firstKey, err := BuildDeterministicKey(root, nil, []string{supportPath}, "test")
 	if err != nil {
 		t.Fatalf("build first key: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestBuildDeterministicKeyChangesWhenSupportFilesChange(t *testing.T) {
 		t.Fatalf("rewrite support file: %v", err)
 	}
 
-	secondKey, err := BuildDeterministicKey(root, nil, []string{supportPath}, "test", true)
+	secondKey, err := BuildDeterministicKey(root, nil, []string{supportPath}, "test")
 	if err != nil {
 		t.Fatalf("build second key: %v", err)
 	}

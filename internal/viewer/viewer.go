@@ -10,6 +10,7 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/changes"
 	"github.com/Cyaside/codebase-explorer/internal/fullai"
+	"github.com/Cyaside/codebase-explorer/internal/graph"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 )
 
@@ -35,6 +36,7 @@ type BundleData struct {
 	FullAI               fullai.Summary             `json:"full_ai"`
 	FullAIExecution      fullai.Execution           `json:"full_ai_execution"`
 	FullAIVerification   fullai.Verification        `json:"full_ai_verification"`
+	Graphs               graph.Set                  `json:"graphs,omitempty"`
 	Mermaid              MermaidData                `json:"mermaid"`
 	Links                LinkData                   `json:"links"`
 }

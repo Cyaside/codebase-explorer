@@ -17,6 +17,21 @@ func TestRegistryValidateOpenAICompatibleConfig(t *testing.T) {
 	}
 }
 
+func TestRegistryUsesOnePublicProviderAndMigratesOpenAI(t *testing.T) {
+	t.Parallel()
+	registry := NewRegistry()
+	if names := registry.Names(); len(names) != 1 || names[0] != "compatible" {
+		t.Fatalf("expected one public provider, got %#v", names)
+	}
+	legacy := Config{Name: "openai", Model: "fixture-model", APIKey: "test-key"}.Canonical()
+	if legacy.Name != "compatible" || legacy.BaseURL != "https://api.openai.com/v1" {
+		t.Fatalf("expected old OpenAI connection to migrate, got %#v", legacy)
+	}
+	if err := registry.Validate(legacy); err != nil {
+		t.Fatalf("expected migrated connection to validate: %v", err)
+	}
+}
+
 func TestRegistryValidateRejectsMissingRequiredFields(t *testing.T) {
 	t.Parallel()
 

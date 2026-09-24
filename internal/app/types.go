@@ -7,8 +7,8 @@ import (
 
 type AnalyzeRequest struct {
 	RepoPath             string
+	CredentialID         string
 	OutputRoot           string
-	DeterministicOnly    bool
 	FullAI               fullai.Options
 	ExtraIgnorePatterns  []string
 	OptionalSupportFiles []string
@@ -17,19 +17,19 @@ type AnalyzeRequest struct {
 }
 
 type AnalyzeResult struct {
-	OutputPath      string
-	ProjectName     string
-	ProjectType     string
-	TotalFiles      int
-	TotalLines      int
-	EntryPoints     []string
-	PrimaryLanguage string
-	Warnings        []string
-	Cache           AnalyzeCacheSummary
-	Changes         AnalyzeChangesSummary
-	AI              AnalyzeAISummary
-	FullAI          fullai.Summary
-	Output          AnalyzeOutputSummary
+	OutputPath      string                `json:"output_path"`
+	ProjectName     string                `json:"project_name"`
+	ProjectType     string                `json:"project_type"`
+	TotalFiles      int                   `json:"total_files"`
+	TotalLines      int                   `json:"total_lines"`
+	EntryPoints     []string              `json:"entry_points"`
+	PrimaryLanguage string                `json:"primary_language"`
+	Warnings        []string              `json:"warnings"`
+	Cache           AnalyzeCacheSummary   `json:"cache"`
+	Changes         AnalyzeChangesSummary `json:"changes"`
+	AI              AnalyzeAISummary      `json:"ai"`
+	FullAI          fullai.Summary        `json:"full_ai"`
+	Output          AnalyzeOutputSummary  `json:"output"`
 }
 
 type AnalyzeProgressEvent struct {
@@ -111,7 +111,7 @@ type CacheClearResult struct {
 	RemovedEntries int
 }
 
-type DoctorRequest struct{}
+type DoctorRequest struct{ CredentialID string }
 
 type DoctorCheck struct {
 	Name   string

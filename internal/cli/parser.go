@@ -44,7 +44,7 @@ func Run(ctx context.Context, args []string, service Service, stdout, stderr io.
 		printAnalyzeResult(stdout, result)
 		return 0, nil
 	case "doctor":
-		result, runErr := service.Doctor(ctx, app.DoctorRequest{})
+		result, runErr := service.Doctor(ctx, command.doctorRequest)
 		if runErr != nil {
 			return 1, runErr
 		}
@@ -96,6 +96,7 @@ func Run(ctx context.Context, args []string, service Service, stdout, stderr io.
 type parsedCommand struct {
 	name           string
 	analyzeRequest app.AnalyzeRequest
+	doctorRequest  app.DoctorRequest
 	serveRequest   app.ServeRequest
 	openRequest    app.OpenRequest
 	exportRequest  app.ExportRequest
@@ -117,10 +118,7 @@ func parse(args []string) (parsedCommand, error) {
 		}
 		return parsedCommand{}, fmt.Errorf("unknown cache command")
 	case "doctor":
-		if len(args) > 1 {
-			return parsedCommand{}, fmt.Errorf("doctor does not accept additional arguments")
-		}
-		return parsedCommand{name: "doctor"}, nil
+		return parseDoctor(args[1:])
 	case "serve", "start", "ui":
 		return parseServe(args[1:])
 	case "open":
@@ -132,6 +130,21 @@ func parse(args []string) (parsedCommand, error) {
 	default:
 		return parsedCommand{}, fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+func parseDoctor(args []string) (parsedCommand, error) {
+	request := app.DoctorRequest{}
+	for index := 0; index < len(args); index++ {
+		if args[index] != "--connection" {
+			return parsedCommand{}, fmt.Errorf("unknown doctor flag %q", args[index])
+		}
+		index++
+		if index >= len(args) || strings.TrimSpace(args[index]) == "" {
+			return parsedCommand{}, fmt.Errorf("--connection requires a value")
+		}
+		request.CredentialID = args[index]
+	}
+	return parsedCommand{name: "doctor", doctorRequest: request}, nil
 }
 
 func parseServe(args []string) (parsedCommand, error) {
@@ -162,37 +175,17 @@ func parseServe(args []string) (parsedCommand, error) {
 }
 
 func parseAnalyze(args []string) (parsedCommand, error) {
-	request := app.AnalyzeRequest{}
+	request := app.AnalyzeRequest{FullAI: fullai.Options{Mode: fullai.ModeFull}}
 
 	for index := 0; index < len(args); index++ {
 		current := args[index]
 		switch {
-		case current == "--deterministic-only":
-			request.DeterministicOnly = true
-		case current == "--full-ai":
-			request.FullAI.Mode = fullai.ModeFull
-		case current == "--ai-read-budget":
+		case current == "--connection":
 			index++
-			if index >= len(args) {
-				return parsedCommand{}, fmt.Errorf("--ai-read-budget requires a value")
+			if index >= len(args) || strings.TrimSpace(args[index]) == "" {
+				return parsedCommand{}, fmt.Errorf("--connection requires a value")
 			}
-			var value int
-			if _, err := fmt.Sscanf(args[index], "%d", &value); err != nil || value <= 0 {
-				return parsedCommand{}, fmt.Errorf("--ai-read-budget requires a positive integer")
-			}
-			request.FullAI.Mode = fullai.ModeFull
-			request.FullAI.ReadBudget = value
-		case current == "--ai-token-budget":
-			index++
-			if index >= len(args) {
-				return parsedCommand{}, fmt.Errorf("--ai-token-budget requires a value")
-			}
-			var value int
-			if _, err := fmt.Sscanf(args[index], "%d", &value); err != nil || value <= 0 {
-				return parsedCommand{}, fmt.Errorf("--ai-token-budget requires a positive integer")
-			}
-			request.FullAI.Mode = fullai.ModeFull
-			request.FullAI.TokenBudget = value
+			request.CredentialID = args[index]
 		case current == "--output":
 			index++
 			if index >= len(args) {

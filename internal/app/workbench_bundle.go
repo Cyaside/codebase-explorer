@@ -52,15 +52,39 @@ func listWorkbenchBundles(outputRoot string, limit int) ([]workbenchBundleSummar
 	summaries := make([]workbenchBundleSummary, 0, len(locations))
 	warnings := make([]string, 0)
 	for _, location := range locations {
-		data, err := loadViewerBundleData(location.path)
+		summary, err := loadWorkbenchBundleSummary(location)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("Skipped bundle %q: %v", location.name, err))
 			continue
 		}
-		summaries = append(summaries, summarizeWorkbenchBundle(location, data))
+		summaries = append(summaries, summary)
 	}
 
 	return summaries, warnings, nil
+}
+
+func loadWorkbenchBundleSummary(location workbenchBundleLocation) (workbenchBundleSummary, error) {
+	contents, err := os.ReadFile(filepath.Join(location.path, "data", "summary.json"))
+	if err == nil {
+		var summary workbenchBundleSummary
+		if err := json.Unmarshal(contents, &summary); err != nil {
+			return workbenchBundleSummary{}, fmt.Errorf("decode bundle summary: %w", err)
+		}
+		summary.Name = location.name
+		summary.Path = location.path
+		if summary.GeneratedAt.IsZero() {
+			summary.GeneratedAt = location.modTime
+		}
+		return summary, nil
+	}
+	if !os.IsNotExist(err) {
+		return workbenchBundleSummary{}, err
+	}
+	data, err := loadViewerBundleData(location.path)
+	if err != nil {
+		return workbenchBundleSummary{}, err
+	}
+	return summarizeWorkbenchBundle(location, data), nil
 }
 
 func loadWorkbenchBundle(outputRoot, bundleName string) (workbenchBundle, error) {

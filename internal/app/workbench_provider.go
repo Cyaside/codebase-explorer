@@ -14,8 +14,11 @@ import (
 
 const providerDiagnosticsPrompt = "Reply with exactly: Codebase Explorer provider test ok"
 
+var modelListHTTPClient = &http.Client{Timeout: 30 * time.Second}
+
 type workbenchProviderDiagnosticPayload struct {
-	Provider provider.Config `json:"provider"`
+	Provider     provider.Config `json:"provider"`
+	CredentialID string          `json:"credential_id,omitempty"`
 }
 
 type workbenchProviderModelsResponse struct {
@@ -41,6 +44,11 @@ func (s Service) handleWorkbenchProviderModels(w http.ResponseWriter, r *http.Re
 	}
 
 	payload, err := decodeWorkbenchProviderDiagnosticPayload(r)
+	if err != nil {
+		writeWorkbenchError(w, http.StatusBadRequest, err)
+		return
+	}
+	payload.Provider, err = s.resolveWorkbenchDiagnosticConnection(r, payload.Provider, payload.CredentialID)
 	if err != nil {
 		writeWorkbenchError(w, http.StatusBadRequest, err)
 		return
@@ -77,6 +85,11 @@ func (s Service) handleWorkbenchProviderTest(w http.ResponseWriter, r *http.Requ
 		writeWorkbenchError(w, http.StatusBadRequest, err)
 		return
 	}
+	payload.Provider, err = s.resolveWorkbenchDiagnosticConnection(r, payload.Provider, payload.CredentialID)
+	if err != nil {
+		writeWorkbenchError(w, http.StatusBadRequest, err)
+		return
+	}
 	if err := s.providers.Validate(payload.Provider); err != nil {
 		writeWorkbenchError(w, http.StatusBadRequest, err)
 		return
@@ -95,7 +108,7 @@ func (s Service) handleWorkbenchProviderTest(w http.ResponseWriter, r *http.Requ
 		UserPrompt:   providerDiagnosticsPrompt,
 	})
 	if err != nil {
-		writeWorkbenchError(w, http.StatusBadGateway, err)
+		writeWorkbenchError(w, http.StatusBadGateway, fmt.Errorf("%s", stripAPIKey(err.Error(), payload.Provider.APIKey)))
 		return
 	}
 
@@ -103,7 +116,7 @@ func (s Service) handleWorkbenchProviderTest(w http.ResponseWriter, r *http.Requ
 		Provider:  result.Provider,
 		Model:     result.Model,
 		Status:    result.Status,
-		Output:    result.Content,
+		Output:    stripAPIKey(result.Content, payload.Provider.APIKey),
 		LatencyMS: time.Since(startedAt).Milliseconds(),
 	})
 }
@@ -123,7 +136,7 @@ func decodeWorkbenchProviderDiagnosticPayload(r *http.Request) (workbenchProvide
 
 func validateProviderForModelList(registry provider.Registry, config provider.Config) error {
 	if !config.Enabled() {
-		return fmt.Errorf("provider mode is required")
+		return fmt.Errorf("compatible connection is required")
 	}
 	descriptor, found := registry.Describe(config.Name)
 	if !found {
@@ -147,7 +160,7 @@ func fetchProviderModels(ctx context.Context, config provider.Config) ([]string,
 	request.Header.Set("Accept", "application/json")
 	setWorkbenchOpenRouterHeaders(request, config)
 
-	response, err := http.DefaultClient.Do(request)
+	response, err := modelListHTTPClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("send model list request: %w", err)
 	}
@@ -158,7 +171,7 @@ func fetchProviderModels(ctx context.Context, config provider.Config) ([]string,
 		return nil, fmt.Errorf("read model list response: %w", err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("model list request failed with status %d: %s", response.StatusCode, strings.TrimSpace(string(responseBody)))
+		return nil, fmt.Errorf("model list request failed with status %d", response.StatusCode)
 	}
 
 	var payload struct {

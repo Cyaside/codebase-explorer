@@ -7,6 +7,7 @@ import (
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/changes"
+	"github.com/Cyaside/codebase-explorer/internal/graph"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 )
 
@@ -21,7 +22,7 @@ func TestFilesIncludeViewerAssetsAndData(t *testing.T) {
 			Type:         "Go CLI application",
 			AnalyzedPath: "/tmp/repo",
 			Summary:      "Deterministic summary",
-			ProviderMode: "deterministic-only",
+			ProviderMode: "compatible",
 		},
 		Metrics: analyzer.Metrics{
 			TotalFiles: 42,
@@ -38,10 +39,11 @@ func TestFilesIncludeViewerAssetsAndData(t *testing.T) {
 			Status:         provider.ResultStatusSkipped,
 			ProjectSummary: "AI summary",
 		},
-		Mermaid: MermaidData{
-			Architecture: "flowchart TD",
-			Dependencies: "flowchart LR",
-		},
+		Graphs: graph.Set{SchemaVersion: graph.SchemaVersion, Views: []graph.View{{
+			ID:    "architecture",
+			Nodes: []graph.Node{{ID: "entry", Label: "Entry point"}, {ID: "module", Label: "Core module"}},
+			Edges: []graph.Edge{{ID: "edge", Source: "entry", Target: "module", Relation: "calls"}},
+		}}},
 		Links: LinkData{
 			Root: "README.md",
 		},
@@ -63,5 +65,11 @@ func TestFilesIncludeViewerAssetsAndData(t *testing.T) {
 	}
 	if !strings.Contains(string(files["viewer-data.js"]), "Large repository detected.") {
 		t.Fatalf("expected viewer data payload to include warnings")
+	}
+	if !strings.Contains(string(files["viewer-data.js"]), `"graphs"`) || !strings.Contains(string(files["app.js"]), "Open structured graph data") {
+		t.Fatal("expected offline viewer to expose structured graphs")
+	}
+	if strings.Contains(string(files["index.html"]), "Mermaid Source") || strings.Contains(string(files["app.js"]), "Open raw Mermaid file") {
+		t.Fatal("new viewer should not advertise Mermaid source")
 	}
 }

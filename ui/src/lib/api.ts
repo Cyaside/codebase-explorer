@@ -1,5 +1,4 @@
 import type {
-  AnalyzeResponse,
   AnalyzeRun,
   BundleSummary,
   ConnectionProfile,
@@ -9,7 +8,6 @@ import type {
   WorkbenchStatusResponse,
 } from "@/lib/types";
 import {
-  normalizeAnalyzeResponse,
   normalizeAnalyzeRun,
   normalizeBundleSummary,
   normalizeWorkbenchBundle,
@@ -18,10 +16,6 @@ import {
 
 export interface AnalyzePayload {
   repo_path: string;
-  deterministic_only: boolean;
-  ai_mode: "standard" | "full-ai";
-  ai_read_budget: number;
-  ai_token_budget: number;
   support_files: string[];
   extra_ignore_patterns: string[];
   provider: {
@@ -30,6 +24,7 @@ export interface AnalyzePayload {
     api_key: string;
     base_url: string;
   } | null;
+  credential_id?: string;
 }
 
 export interface ProviderDiagnosticPayload {
@@ -39,6 +34,14 @@ export interface ProviderDiagnosticPayload {
     api_key: string;
     base_url: string;
   };
+  credential_id?: string;
+}
+
+export interface SavedCredentialInfo {
+  id: string;
+  label: string;
+  model: string;
+  base_url: string;
 }
 
 async function requestJSON<T>(url: string, options?: RequestInit): Promise<T> {
@@ -57,6 +60,21 @@ export function fetchStatus() {
   return requestJSON<WorkbenchStatusResponse>("/api/status").then(normalizeWorkbenchStatusResponse);
 }
 
+export function fetchSavedCredentials() {
+  return requestJSON<{ connections: SavedCredentialInfo[] }>("/api/credentials").then((response) => response.connections);
+}
+
+export function saveCredential(profile: ConnectionProfile, apiKey: string) {
+  return requestJSON<SavedCredentialInfo>("/api/credentials", {
+    method: "POST",
+    body: JSON.stringify({ id: profile.id, label: profile.label, model: profile.provider.model, base_url: profile.provider.baseUrl, api_key: apiKey }),
+  });
+}
+
+export function deleteSavedCredential(id: string) {
+  return requestJSON<{ deleted: string }>(`/api/credentials/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 export function fetchBundle(bundleName: string) {
   return requestJSON<WorkbenchBundle>(`/api/bundles/${encodeURIComponent(bundleName)}`).then(normalizeWorkbenchBundle);
 }
@@ -65,13 +83,6 @@ export function deleteBundle(bundleName: string) {
   return requestJSON<{ deleted: string }>(`/api/bundles/${encodeURIComponent(bundleName)}`, {
     method: "DELETE",
   });
-}
-
-export function analyzeRepository(payload: AnalyzePayload) {
-  return requestJSON<AnalyzeResponse>("/api/analyze", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }).then(normalizeAnalyzeResponse);
 }
 
 export function startAnalyzeRun(payload: AnalyzePayload) {
@@ -113,10 +124,10 @@ export function testProvider(payload: ProviderDiagnosticPayload) {
 
 export function buildProviderPayload(profile: ConnectionProfile, apiKey: string) {
   return {
-    name: profile.provider.name,
+    name: "compatible",
     model: profile.provider.model,
     api_key: apiKey.trim(),
-    base_url: profile.provider.baseUrl,
+    base_url: profile.provider.baseUrl.trim(),
   };
 }
 

@@ -10,19 +10,19 @@ import (
 	"github.com/Cyaside/codebase-explorer/internal/fullai"
 )
 
-func TestAnalyzeEmitsProgressForDeterministicOnly(t *testing.T) {
+func TestAnalyzeEmitsProgressForSingleWorkflow(t *testing.T) {
 	t.Parallel()
 
 	service := New(config.Settings{
 		DefaultOutputRoot: t.TempDir(),
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	var events []AnalyzeProgressEvent
 	_, err := service.Analyze(t.Context(), AnalyzeRequest{
-		RepoPath:          filepath.Join("..", "..", "testdata", "sample-repo"),
-		DeterministicOnly: true,
+		RepoPath: filepath.Join("..", "..", "testdata", "sample-repo"),
 		Progress: func(event AnalyzeProgressEvent) {
 			events = append(events, event)
 		},
@@ -37,8 +37,8 @@ func TestAnalyzeEmitsProgressForDeterministicOnly(t *testing.T) {
 	if !hasProgressEvent(events, "ai-context", "ready") {
 		t.Fatalf("expected AI context progress event, got %#v", events)
 	}
-	if !hasProgressEvent(events, "ai-synthesis", "skipped") {
-		t.Fatalf("expected skipped synthesis event, got %#v", events)
+	if !hasProgressEvent(events, "full-ai-execution", "executed") {
+		t.Fatalf("expected completed AI execution event, got %#v", events)
 	}
 }
 
@@ -46,16 +46,7 @@ func TestAnalyzeEmitsProgressForSuccessfulSynthesis(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"choices": [
-				{
-					"message": {
-						"content": "{\"project_summary\":\"AI summary\"}"
-					}
-				}
-			]
-		}`))
+		writeFixtureBatch(w, r)
 	}))
 	defer server.Close()
 
@@ -88,11 +79,11 @@ func TestAnalyzeEmitsProgressForSuccessfulSynthesis(t *testing.T) {
 	if len(events) < 3 {
 		t.Fatalf("expected progress events for AI context and synthesis, got %#v", events)
 	}
-	if !hasProgressEvent(events, "ai-synthesis", "running") {
-		t.Fatalf("expected running synthesis event, got %#v", events)
+	if !hasProgressEvent(events, "full-ai-execution", "running") {
+		t.Fatalf("expected running AI execution event, got %#v", events)
 	}
-	if !hasProgressEvent(events, "ai-synthesis", "succeeded") {
-		t.Fatalf("expected successful synthesis event, got %#v", events)
+	if !hasProgressEvent(events, "full-ai-execution", "executed") {
+		t.Fatalf("expected completed AI execution event, got %#v", events)
 	}
 }
 
@@ -103,6 +94,7 @@ func TestAnalyzeEmitsProgressForFullAIPlanning(t *testing.T) {
 		DefaultOutputRoot: t.TempDir(),
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	var events []AnalyzeProgressEvent
@@ -135,8 +127,8 @@ func TestAnalyzeEmitsProgressForFullAIPlanning(t *testing.T) {
 	if !hasProgressEvent(events, "full-ai-functions", "prepared") {
 		t.Fatalf("expected prepared full-ai function event, got %#v", events)
 	}
-	if !hasProgressEvent(events, "full-ai-execution", "disabled") {
-		t.Fatalf("expected disabled full-ai execution event without provider, got %#v", events)
+	if !hasProgressEvent(events, "full-ai-execution", "executed") {
+		t.Fatalf("expected completed AI execution event, got %#v", events)
 	}
 }
 

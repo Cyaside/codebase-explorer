@@ -7,7 +7,7 @@ interface AnalyzeRunStreamHandlers {
 }
 
 function isTerminalRunStatus(status: string) {
-  return status === "succeeded" || status === "failed" || status === "canceled";
+  return status === "succeeded" || status === "partial" || status === "failed" || status === "canceled";
 }
 
 export function openAnalyzeRunStream(runID: string, handlers: AnalyzeRunStreamHandlers) {

@@ -9,6 +9,7 @@ import (
 )
 
 const maxWorkbenchProgressEvents = 64
+const maxActiveWorkbenchRuns = 2
 
 type workbenchAnalyzeRun struct {
 	ID        string                    `json:"id"`
@@ -45,12 +46,24 @@ func newWorkbenchRuntime(service Service, outputRoot string) *workbenchRuntime {
 	}
 }
 
-func (runtime *workbenchRuntime) startAnalyze(payload workbenchAnalyzePayload) workbenchAnalyzeRun {
+func (runtime *workbenchRuntime) startAnalyze(payload workbenchAnalyzePayload) (workbenchAnalyzeRun, error) {
 	runtime.mu.Lock()
+	active := 0
+	for _, state := range runtime.runs {
+		if !isWorkbenchRunTerminal(state.run.Status) {
+			active++
+		}
+	}
+	if active >= maxActiveWorkbenchRuns {
+		runtime.mu.Unlock()
+		return workbenchAnalyzeRun{}, fmt.Errorf("%d analysis runs are already active; wait or cancel one before starting another", maxActiveWorkbenchRuns)
+	}
 	runtime.seq++
 	runID := fmt.Sprintf("run-%d-%03d", time.Now().UTC().Unix(), runtime.seq)
 	now := time.Now().UTC()
+	ctx, cancel := context.WithCancel(context.Background())
 	state := &workbenchRunState{
+		cancel: cancel,
 		run: workbenchAnalyzeRun{
 			ID:        runID,
 			Status:    "queued",
@@ -66,31 +79,31 @@ func (runtime *workbenchRuntime) startAnalyze(payload workbenchAnalyzePayload) w
 	runtime.mu.Unlock()
 	closeWorkbenchRunSubscribers(closedSubscribers)
 
-	go runtime.executeAnalyze(runID, payload)
+	go runtime.executeAnalyze(ctx, runID, payload)
 
-	return snapshot
+	return snapshot, nil
 }
 
-func (runtime *workbenchRuntime) executeAnalyze(runID string, payload workbenchAnalyzePayload) {
-	ctx, cancel := context.WithCancel(context.Background())
-	runtime.setRunCancel(runID, cancel)
+func (runtime *workbenchRuntime) executeAnalyze(ctx context.Context, runID string, payload workbenchAnalyzePayload) {
+	if ctx.Err() != nil {
+		runtime.finishCanceled(runID, "analysis canceled by user")
+		return
+	}
 	runtime.appendProgress(runID, AnalyzeProgressEvent{
 		Stage:  "analyze",
 		Status: "running",
 		Detail: "analysis started in background",
 	})
+	if ctx.Err() != nil {
+		runtime.finishCanceled(runID, "analysis canceled by user")
+		return
+	}
 
-	result, err := runtime.service.Analyze(ctx, AnalyzeRequest{
-		RepoPath:             payload.RepoPath,
-		DeterministicOnly:    payload.DeterministicOnly,
-		FullAI:               payload.fullAIOptions(),
-		ExtraIgnorePatterns:  payload.ExtraIgnorePatterns,
-		OptionalSupportFiles: payload.SupportFiles,
-		ProviderOverride:     payload.Provider,
-		Progress: func(event AnalyzeProgressEvent) {
-			runtime.appendProgress(runID, event)
-		},
-	})
+	request := payload.analyzeRequest()
+	request.Progress = func(event AnalyzeProgressEvent) {
+		runtime.appendProgress(runID, event)
+	}
+	result, err := runtime.service.Analyze(ctx, request)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			runtime.finishCanceled(runID, "analysis canceled by user")
@@ -106,7 +119,33 @@ func (runtime *workbenchRuntime) executeAnalyze(runID string, payload workbenchA
 		return
 	}
 
+	if result.FullAI.Status == "partial" {
+		runtime.finishPartial(runID, response)
+		return
+	}
 	runtime.finishSucceeded(runID, response)
+}
+
+func (runtime *workbenchRuntime) finishPartial(runID string, response workbenchAnalyzeResponse) {
+	runtime.mu.Lock()
+	state, ok := runtime.runs[runID]
+	if !ok {
+		runtime.mu.Unlock()
+		return
+	}
+	state.cancel = nil
+	state.run.Status = "partial"
+	state.run.UpdatedAt = time.Now().UTC()
+	state.run.Progress = appendProgressEvent(state.run.Progress, AnalyzeProgressEvent{
+		Stage: "analyze", Status: "partial", Detail: "some AI sections failed; inspect the bundle for details",
+	})
+	state.run.Response = &response
+	state.run.Error = ""
+	snapshot := cloneWorkbenchAnalyzeRun(state.run)
+	subscribers := takeWorkbenchRunSubscribers(state)
+	runtime.mu.Unlock()
+	broadcastWorkbenchRun(snapshot, subscribers)
+	closeWorkbenchRunSubscribers(subscribers)
 }
 
 func (runtime *workbenchRuntime) snapshot(runID string) (workbenchAnalyzeRun, bool) {
@@ -149,22 +188,6 @@ func (runtime *workbenchRuntime) cancel(runID string) (workbenchAnalyzeRun, bool
 	snapshot := cloneWorkbenchAnalyzeRun(state.run)
 	runtime.mu.Unlock()
 	return snapshot, true
-}
-
-func (runtime *workbenchRuntime) setRunCancel(runID string, cancel context.CancelFunc) {
-	runtime.mu.Lock()
-	defer runtime.mu.Unlock()
-
-	state, ok := runtime.runs[runID]
-	if !ok {
-		return
-	}
-
-	state.cancel = cancel
-	if state.run.Status == "queued" {
-		state.run.Status = "running"
-		state.run.UpdatedAt = time.Now().UTC()
-	}
 }
 
 func (runtime *workbenchRuntime) appendProgress(runID string, event AnalyzeProgressEvent) {
@@ -313,15 +336,23 @@ func (runtime *workbenchRuntime) trimRunsLocked() []chan workbenchAnalyzeRun {
 		return nil
 	}
 
-	excess := len(runtime.runList) - keepLatestRuns
 	var subscribersToClose []chan workbenchAnalyzeRun
-	for _, runID := range runtime.runList[:excess] {
-		if state, ok := runtime.runs[runID]; ok {
+	excess := len(runtime.runList) - keepLatestRuns
+	kept := make([]string, 0, len(runtime.runList))
+	for _, runID := range runtime.runList {
+		state, ok := runtime.runs[runID]
+		if !ok {
+			continue
+		}
+		if excess > 0 && isWorkbenchRunTerminal(state.run.Status) {
 			subscribersToClose = append(subscribersToClose, takeWorkbenchRunSubscribers(state)...)
 			delete(runtime.runs, runID)
+			excess--
+			continue
 		}
+		kept = append(kept, runID)
 	}
-	runtime.runList = append([]string(nil), runtime.runList[excess:]...)
+	runtime.runList = kept
 	return subscribersToClose
 }
 
@@ -389,7 +420,7 @@ func closeWorkbenchRunSubscribers(subscribers []chan workbenchAnalyzeRun) {
 
 func isWorkbenchRunTerminal(status string) bool {
 	switch status {
-	case "succeeded", "failed", "canceled":
+	case "succeeded", "partial", "failed", "canceled":
 		return true
 	default:
 		return false

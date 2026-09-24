@@ -70,6 +70,9 @@ func (m Matcher) ShouldIgnore(relativePath string, isDir bool) bool {
 
 	normalized := filepath.ToSlash(relativePath)
 	base := path.Base(normalized)
+	if !isDir && SensitivePath(base) {
+		return true
+	}
 
 	if isDir {
 		if _, skipped := defaultSkippedDirectories[base]; skipped {
@@ -83,6 +86,22 @@ func (m Matcher) ShouldIgnore(relativePath string, isDir bool) bool {
 		}
 	}
 
+	return false
+}
+
+// SensitivePath excludes common credential files before they enter scan
+// metadata, evidence selection, or a generated bundle.
+func SensitivePath(value string) bool {
+	base := strings.ToLower(filepath.Base(strings.TrimSpace(value)))
+	if base == ".env" || strings.HasPrefix(base, ".env.") || base == ".npmrc" || base == ".pypirc" ||
+		base == "id_rsa" || base == "id_ed25519" || base == "credentials.json" || base == "secrets.json" {
+		return true
+	}
+	for _, suffix := range []string{".pem", ".p12", ".pfx", ".key"} {
+		if strings.HasSuffix(base, suffix) {
+			return true
+		}
+	}
 	return false
 }
 

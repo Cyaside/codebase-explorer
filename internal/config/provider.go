@@ -20,6 +20,9 @@ func loadProviderSettings() (ProviderSettings, bool) {
 		APIKey:  strings.TrimSpace(getEnv("CODEARCH_API_KEY")),
 		BaseURL: strings.TrimSpace(getEnv("CODEARCH_BASE_URL")),
 	}
+	if settings.Name == "" && (settings.Model != "" || settings.APIKey != "" || settings.BaseURL != "") {
+		settings.Name = "compatible"
+	}
 
 	return settings, settings.Enabled() || settings.Model != "" || settings.APIKey != "" || settings.BaseURL != ""
 }

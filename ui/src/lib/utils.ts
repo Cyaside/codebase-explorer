@@ -1,15 +1,5 @@
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-export function splitLines(value: string) {
-  return value
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+export function cn(...inputs: Array<string | false | null | undefined>) {
+  return inputs.filter(Boolean).join(" ");
 }
 
 export function bundleLink(bundleName: string, relativePath: string) {
@@ -18,6 +8,10 @@ export function bundleLink(bundleName: string, relativePath: string) {
 
 export function normalizeLocalPath(value: string) {
   return value.trim().replace(/\//g, "\\").toLowerCase();
+}
+
+export function matchesWorkspace(bundlePath: string, workspacePath: string) {
+  return !!workspacePath.trim() && normalizeLocalPath(bundlePath) === normalizeLocalPath(workspacePath);
 }
 
 export function formatTimestamp(value: string) {

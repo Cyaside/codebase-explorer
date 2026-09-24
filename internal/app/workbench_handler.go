@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,19 +42,25 @@ type workbenchProviderConfig struct {
 
 type workbenchAnalyzePayload struct {
 	RepoPath            string           `json:"repo_path"`
-	DeterministicOnly   bool             `json:"deterministic_only"`
-	AIMode              string           `json:"ai_mode"`
-	AIReadBudget        int              `json:"ai_read_budget"`
-	AITokenBudget       int              `json:"ai_token_budget"`
 	ExtraIgnorePatterns []string         `json:"extra_ignore_patterns"`
 	SupportFiles        []string         `json:"support_files"`
 	Provider            *provider.Config `json:"provider"`
+	CredentialID        string           `json:"credential_id,omitempty"`
+}
+
+func (payload workbenchAnalyzePayload) analyzeRequest() AnalyzeRequest {
+	return AnalyzeRequest{
+		RepoPath:             payload.RepoPath,
+		FullAI:               fullai.Options{Mode: fullai.ModeFull},
+		ExtraIgnorePatterns:  payload.ExtraIgnorePatterns,
+		OptionalSupportFiles: payload.SupportFiles,
+		ProviderOverride:     payload.Provider,
+	}
 }
 
 type workbenchAnalyzeResponse struct {
 	Result appAnalyzeResult       `json:"result"`
 	Bundle workbenchBundleSummary `json:"bundle"`
-	Data   any                    `json:"data"`
 }
 
 type appAnalyzeResult = AnalyzeResult
@@ -77,6 +84,8 @@ func (s Service) workbenchHandler(outputRoot string) (http.Handler, error) {
 	mux.HandleFunc("/api/doctor", s.handleWorkbenchDoctor)
 	mux.HandleFunc("/api/provider/models", s.handleWorkbenchProviderModels)
 	mux.HandleFunc("/api/provider/test", s.handleWorkbenchProviderTest)
+	mux.HandleFunc("/api/credentials", s.handleWorkbenchCredentials)
+	mux.HandleFunc("/api/credentials/", s.handleWorkbenchCredential)
 	mux.HandleFunc("/api/analyze", func(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkbenchAnalyze(w, r)
 	})
@@ -133,6 +142,7 @@ func (s Service) handleWorkbenchStatus(w http.ResponseWriter, r *http.Request, o
 			RequiresBaseURL: descriptor.RequiresBaseURL,
 		})
 	}
+	defaultProvider := s.providerConfig(AnalyzeRequest{})
 
 	response := workbenchStatusResponse{
 		AppVersion:   s.settings.AppVersion,
@@ -140,9 +150,9 @@ func (s Service) handleWorkbenchStatus(w http.ResponseWriter, r *http.Request, o
 		CacheRoot:    s.cache.Root(),
 		CacheEnabled: s.cache.Enabled(),
 		DefaultProvider: workbenchProviderConfig{
-			Name:    s.settings.Provider.Name,
-			Model:   s.settings.Provider.Model,
-			BaseURL: s.settings.Provider.BaseURL,
+			Name:    defaultProvider.Name,
+			Model:   defaultProvider.Model,
+			BaseURL: defaultProvider.BaseURL,
 		},
 		SupportedProviders: options,
 		RecentBundles:      bundles,
@@ -158,7 +168,12 @@ func (s Service) handleWorkbenchDoctor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := s.Doctor(r.Context(), DoctorRequest{})
+	credentialID := r.URL.Query().Get("credential_id")
+	if credentialID != "" && !localCredentialRequest(r) {
+		writeWorkbenchError(w, http.StatusForbidden, fmt.Errorf("saved connections are available only from this computer and same-origin pages"))
+		return
+	}
+	result, err := s.Doctor(r.Context(), DoctorRequest{CredentialID: credentialID})
 	if err != nil {
 		writeWorkbenchError(w, http.StatusInternalServerError, err)
 		return
@@ -183,15 +198,12 @@ func (s Service) handleWorkbenchAnalyze(w http.ResponseWriter, r *http.Request) 
 		writeWorkbenchError(w, http.StatusBadRequest, fmt.Errorf("remote repository URLs are not supported yet; analyze a local checkout path"))
 		return
 	}
+	if err := s.resolveWorkbenchAnalyzeConnection(r, &payload); err != nil {
+		writeWorkbenchError(w, http.StatusBadRequest, err)
+		return
+	}
 
-	result, err := s.Analyze(r.Context(), AnalyzeRequest{
-		RepoPath:             payload.RepoPath,
-		DeterministicOnly:    payload.DeterministicOnly,
-		FullAI:               payload.fullAIOptions(),
-		ExtraIgnorePatterns:  payload.ExtraIgnorePatterns,
-		OptionalSupportFiles: payload.SupportFiles,
-		ProviderOverride:     payload.Provider,
-	})
+	result, err := s.Analyze(r.Context(), payload.analyzeRequest())
 	if err != nil {
 		writeWorkbenchError(w, http.StatusBadRequest, err)
 		return
@@ -221,8 +233,20 @@ func (s Service) handleWorkbenchAnalyzeRuns(w http.ResponseWriter, r *http.Reque
 		writeWorkbenchError(w, http.StatusBadRequest, fmt.Errorf("remote repository URLs are not supported yet; analyze a local checkout path"))
 		return
 	}
+	if err := s.resolveWorkbenchAnalyzeConnection(r, &payload); err != nil {
+		writeWorkbenchError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := s.providers.Validate(s.providerConfig(payload.analyzeRequest())); err != nil {
+		writeWorkbenchError(w, http.StatusBadRequest, fmt.Errorf("connection: %w", err))
+		return
+	}
 
-	run := runtime.startAnalyze(payload)
+	run, err := runtime.startAnalyze(payload)
+	if err != nil {
+		writeWorkbenchError(w, http.StatusConflict, err)
+		return
+	}
 	writeWorkbenchJSON(w, http.StatusAccepted, map[string]workbenchAnalyzeRun{
 		"run": run,
 	})
@@ -344,44 +368,37 @@ func decodeWorkbenchAnalyzePayload(r *http.Request) (workbenchAnalyzePayload, er
 	}
 
 	var payload workbenchAnalyzePayload
-	if err := json.Unmarshal(body, &payload); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&payload); err != nil {
 		return workbenchAnalyzePayload{}, fmt.Errorf("decode request: %w", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err != nil {
+			return workbenchAnalyzePayload{}, fmt.Errorf("decode request: %w", err)
+		}
+		return workbenchAnalyzePayload{}, fmt.Errorf("decode request: expected one JSON object")
 	}
 
 	return payload, nil
 }
 
-func (payload workbenchAnalyzePayload) fullAIOptions() fullai.Options {
-	options := fullai.Options{
-		Mode:        fullai.NormalizeMode(payload.AIMode),
-		ReadBudget:  payload.AIReadBudget,
-		TokenBudget: payload.AITokenBudget,
-	}
-	if !options.Mode.Enabled() && (payload.AIReadBudget > 0 || payload.AITokenBudget > 0) {
-		options.Mode = fullai.ModeFull
-	}
-	return options.Normalize()
-}
-
 func (s Service) buildWorkbenchAnalyzeResponse(result AnalyzeResult) (workbenchAnalyzeResponse, error) {
-	data, err := loadViewerBundleData(result.OutputPath)
-	if err != nil {
-		return workbenchAnalyzeResponse{}, err
-	}
-
 	info, err := os.Stat(result.OutputPath)
 	if err != nil {
 		return workbenchAnalyzeResponse{}, err
 	}
 
+	summary, err := loadWorkbenchBundleSummary(workbenchBundleLocation{
+		name: filepath.Base(result.OutputPath), path: result.OutputPath, modTime: info.ModTime().UTC(),
+	})
+	if err != nil {
+		return workbenchAnalyzeResponse{}, err
+	}
 	return workbenchAnalyzeResponse{
 		Result: result,
-		Bundle: summarizeWorkbenchBundle(workbenchBundleLocation{
-			name:    filepath.Base(result.OutputPath),
-			path:    result.OutputPath,
-			modTime: info.ModTime().UTC(),
-		}, data),
-		Data: data,
+		Bundle: summary,
 	}, nil
 }
 

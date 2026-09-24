@@ -93,6 +93,7 @@ func VerifyFunctionOutputDetailed(job FunctionJob, output FunctionOutput) (Funct
 		return output, builder.report
 	}
 
+	output = filterGraphEndpointPaths(output, allowed, builder)
 	output, evidenceOK := verifyEvidencePaths(output, allowed, builder)
 	verifyFunctionShape(job.Name, output, builder)
 	if evidenceOK {
@@ -101,6 +102,45 @@ func VerifyFunctionOutputDetailed(job FunctionJob, output FunctionOutput) (Funct
 
 	builder.finish()
 	return output, builder.report
+}
+
+func filterGraphEndpointPaths(output FunctionOutput, allowed map[string]struct{}, builder *functionVerificationBuilder) FunctionOutput {
+	accepted := make([]GraphEdge, 0, len(output.GraphEdges))
+	for _, edge := range output.GraphEdges {
+		valid := true
+		for _, endpoint := range []string{edge.From, edge.To} {
+			value := strings.ReplaceAll(strings.TrimSpace(endpoint), "\\", "/")
+			lower := strings.ToLower(value)
+			fileSuffix := false
+			for _, suffix := range []string{".go", ".ts", ".tsx", ".js", ".jsx", ".py", ".rs", ".java", ".json"} {
+				if strings.HasSuffix(lower, suffix) {
+					fileSuffix = true
+					break
+				}
+			}
+			if !strings.Contains(value, "/") && !fileSuffix {
+				continue // A named runtime step; only its cited edge evidence can be checked.
+			}
+			backed := false
+			for path := range allowed {
+				normalized := strings.ReplaceAll(path, "\\", "/")
+				if normalized == value || strings.HasPrefix(normalized, strings.TrimSuffix(value, "/")+"/") {
+					backed = true
+					break
+				}
+			}
+			if !backed {
+				builder.warn("graph.endpoint", "removed graph edge with endpoint absent from readable evidence: "+value)
+				valid = false
+				break
+			}
+		}
+		if valid {
+			accepted = append(accepted, edge)
+		}
+	}
+	output.GraphEdges = accepted
+	return output
 }
 
 func VerifyFunctionOutput(job FunctionJob, output FunctionOutput) (FunctionOutput, bool) {
@@ -225,13 +265,17 @@ func requireSummary(output FunctionOutput, builder *functionVerificationBuilder)
 }
 
 func requireEvidenceFinding(output FunctionOutput, builder *functionVerificationBuilder) {
+	if len(output.KeyFindings) == 0 {
+		builder.fail("findings.evidence", "at least one evidence-backed finding is required")
+		return
+	}
 	for _, finding := range output.KeyFindings {
-		if strings.TrimSpace(finding.Claim) != "" && len(finding.EvidencePaths) > 0 {
-			builder.pass("findings.evidence", "at least one finding has accepted evidence")
+		if strings.TrimSpace(finding.Claim) == "" || len(finding.EvidencePaths) == 0 {
+			builder.fail("findings.evidence", "every finding must cite accepted evidence")
 			return
 		}
 	}
-	builder.fail("findings.evidence", "at least one evidence-backed finding is required")
+	builder.pass("findings.evidence", "every finding cites accepted evidence")
 }
 
 func requireGraphEdges(output FunctionOutput, builder *functionVerificationBuilder) {
@@ -283,11 +327,17 @@ func requireRecommendations(output FunctionOutput, builder *functionVerification
 }
 
 func requireGrounding(output FunctionOutput, builder *functionVerificationBuilder) {
-	if len(output.KeyFindings) > 0 || len(output.Uncertainties) > 0 {
-		builder.pass("recommendations.grounded", "recommendations include findings or uncertainties for grounding")
+	if len(output.KeyFindings) > 0 {
+		for _, finding := range output.KeyFindings {
+			if len(finding.EvidencePaths) == 0 {
+				builder.fail("recommendations.grounded", "recommendation findings must cite accepted evidence")
+				return
+			}
+		}
+		builder.pass("recommendations.grounded", "recommendations include evidence-backed findings")
 		return
 	}
-	builder.warn("recommendations.grounded", "recommendations have no explicit findings or uncertainty notes")
+	builder.fail("recommendations.grounded", "recommendations require evidence-backed findings")
 }
 
 func requireDashboardSurface(output FunctionOutput, builder *functionVerificationBuilder) {

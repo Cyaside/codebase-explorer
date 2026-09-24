@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Codebase Explorer</title>
+  <rect x="1" y="1" width="62" height="62" rx="14" fill="#182321" stroke="#557267" stroke-width="2"/>
+  <path d="M24 18 12 32l12 14M40 18l12 14-12 14" fill="none" stroke="#EAF0EA" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m31 20 5 12-5 12" fill="none" stroke="#78A692" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="31" cy="20" r="3.7" fill="#E0A66A"/>
+  <circle cx="36" cy="32" r="5" fill="#E0A66A"/>
+  <circle cx="31" cy="44" r="3.7" fill="#E0A66A"/>
+</svg>

@@ -14,7 +14,7 @@ interface FullAITextPanelProps {
 export function FullAITextPanel({ bundle, eyebrow, fallbackBody, result, title }: FullAITextPanelProps) {
   const ready = hasFullAIOutput(result);
   const body = ready ? result.output.summary || fallbackBody : fallbackBody;
-  const note = ready ? `${result.name} verified: ${result.verified ? "yes" : "needs review"}` : fullAINote(bundle);
+  const note = ready ? `${result.name}: structure and evidence paths checked; claims still require judgment.` : fullAINote(bundle);
 
   return (
     <section className="panel-block">
@@ -48,22 +48,29 @@ export function FullAIStatusPanel({ bundle }: { bundle: WorkbenchBundle }) {
     { label: "Status", value: fullAIStatusLabel(bundle) },
     { label: "Evidence read", value: `${summary.collected_items}/${summary.planned_targets}` },
     { label: "Functions", value: `${execution.executed_count}/${summary.prepared_functions}` },
-    { label: "Verified", value: `${verification.verified_count || execution.verified_count}` },
+    { label: "Checks passed", value: `${verification.verified_count || execution.verified_count}` },
     { label: "Failed checks", value: `${verification.failed_check_count}` },
     { label: "Warnings", value: `${verification.warning_count}` },
   ];
+  if (summary.call_count) {
+    stats.push({ label: "Provider calls", value: `${summary.call_count}${summary.repair_calls ? ` (${summary.repair_calls} repair)` : ""}` });
+    stats.push({ label: "AI duration", value: `${(summary.duration_ms / 1000).toFixed(1)}s` });
+    if (summary.prompt_tokens || summary.output_tokens) {
+      stats.push({ label: "Tokens in / out", value: `${summary.prompt_tokens} / ${summary.output_tokens}` });
+    }
+  }
 
   return (
     <section className="panel-block">
       <div className="flex items-center gap-3">
         <ShieldCheck className="size-4 text-zinc-500" />
-        <p className="panel-kicker">Full-AI runtime</p>
+        <p className="panel-kicker">AI analysis</p>
       </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="analysis-health-grid">
         {stats.map((item) => (
-          <div className="rounded-2xl border border-zinc-900 bg-black px-3 py-3" key={item.label}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">{item.label}</p>
-            <p className="mt-2 text-sm font-semibold text-zinc-100">{item.value}</p>
+          <div className="analysis-health-item" key={item.label}>
+            <p>{item.label}</p>
+            <strong>{item.value}</strong>
           </div>
         ))}
       </div>
@@ -87,6 +94,7 @@ export function FullAIStatusPanel({ bundle }: { bundle: WorkbenchBundle }) {
         </div>
       ) : null}
       {execution.note || summary.note ? <p className="mt-4 text-xs leading-5 text-zinc-500">{execution.note || summary.note}</p> : null}
+      {summary.pack_hash ? <p className="mt-2 text-xs text-zinc-600">Agent pack {summary.pack_version || "unknown"} · {summary.pack_hash.slice(0, 12)}</p> : null}
       {verification.note ? <p className="mt-2 text-xs leading-5 text-zinc-600">{verification.note}</p> : null}
     </section>
   );
@@ -180,5 +188,9 @@ export function FullAIRecommendationsPanel({
 }
 
 function StatusPill({ status }: { status: string }) {
-  return <span className="run-pill">{status || "unknown"}</span>;
+  const label = status === "verified" ? "Evidence checked"
+    : status === "verified-with-warnings" ? "Evidence checked with warnings"
+    : status === "executed" || status === "succeeded" ? "Complete"
+    : status || "unknown";
+  return <span className="run-pill">{label}</span>;
 }

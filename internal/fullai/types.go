@@ -58,9 +58,20 @@ type Plan struct {
 
 type Summary struct {
 	SchemaVersion     string `json:"schema_version"`
+	PackVersion       string `json:"pack_version,omitempty"`
+	PackHash          string `json:"pack_hash,omitempty"`
+	Provider          string `json:"provider,omitempty"`
+	Model             string `json:"model,omitempty"`
+	CallCount         int    `json:"call_count,omitempty"`
+	RepairCalls       int    `json:"repair_calls,omitempty"`
+	PromptBytes       int    `json:"prompt_bytes,omitempty"`
+	PromptTokens      int    `json:"prompt_tokens,omitempty"`
+	OutputTokens      int    `json:"output_tokens,omitempty"`
+	DurationMS        int64  `json:"duration_ms,omitempty"`
 	Enabled           bool   `json:"enabled"`
 	Mode              string `json:"mode"`
 	Status            string `json:"status"`
+	CacheStatus       string `json:"cache_status,omitempty"`
 	ReadBudget        int    `json:"read_budget"`
 	TokenBudget       int    `json:"token_budget"`
 	PlannedTargets    int    `json:"planned_targets"`
@@ -121,6 +132,7 @@ type FunctionJob struct {
 
 type Execution struct {
 	SchemaVersion string           `json:"schema_version"`
+	PackHash      string           `json:"pack_hash,omitempty"`
 	GeneratedAt   time.Time        `json:"generated_at"`
 	Mode          string           `json:"mode"`
 	Provider      string           `json:"provider,omitempty"`
@@ -130,11 +142,18 @@ type Execution struct {
 	ExecutedCount int              `json:"executed_count"`
 	VerifiedCount int              `json:"verified_count"`
 	FailedCount   int              `json:"failed_count"`
+	CallCount     int              `json:"call_count,omitempty"`
+	RepairCalls   int              `json:"repair_calls,omitempty"`
+	PromptBytes   int              `json:"prompt_bytes,omitempty"`
+	PromptTokens  int              `json:"prompt_tokens,omitempty"`
+	OutputTokens  int              `json:"output_tokens,omitempty"`
+	DurationMS    int64            `json:"duration_ms,omitempty"`
 	Note          string           `json:"note,omitempty"`
 }
 
 type FunctionResult struct {
 	Name            string               `json:"name"`
+	InstructionHash string               `json:"instruction_hash,omitempty"`
 	Status          string               `json:"status"`
 	InstructionPath string               `json:"instruction_path"`
 	EvidencePaths   []string             `json:"evidence_paths"`
@@ -175,6 +194,7 @@ type IssueSignal struct {
 
 type FunctionPrompt struct {
 	FunctionName string `json:"function_name"`
+	PackHash     string `json:"pack_hash,omitempty"`
 	SystemPrompt string `json:"system_prompt"`
 	UserPrompt   string `json:"user_prompt"`
 }

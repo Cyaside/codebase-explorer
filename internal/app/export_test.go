@@ -19,12 +19,12 @@ func TestExportCreatesZipArchiveForLatestBundle(t *testing.T) {
 		CacheEnabled:      true,
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	repoPath := filepath.Join("..", "..", "testdata", "sample-repo")
 	analyzeResult, err := service.Analyze(t.Context(), AnalyzeRequest{
-		RepoPath:          repoPath,
-		DeterministicOnly: true,
+		RepoPath: repoPath,
 	})
 	if err != nil {
 		t.Fatalf("seed bundle through analyze: %v", err)

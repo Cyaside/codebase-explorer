@@ -14,6 +14,10 @@ Do not invent files, modules, flows, incidents, or paths.
 If evidence is thin, say so in uncertainties.`
 
 func BuildFunctionPrompt(job FunctionJob, evidence Evidence) (FunctionPrompt, error) {
+	instructions, err := loadInstructions(job)
+	if err != nil {
+		return FunctionPrompt{}, err
+	}
 	payload := map[string]any{
 		"function":       job.Name,
 		"objective":      job.Objective,
@@ -41,7 +45,8 @@ func BuildFunctionPrompt(job FunctionJob, evidence Evidence) (FunctionPrompt, er
 
 	return FunctionPrompt{
 		FunctionName: job.Name,
-		SystemPrompt: functionSystemPrompt,
+		PackHash:     instructions.Hash,
+		SystemPrompt: functionSystemPrompt + instructions.Text,
 		UserPrompt:   builder.String(),
 	}, nil
 }

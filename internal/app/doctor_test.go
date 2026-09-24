@@ -61,6 +61,19 @@ func TestDoctorPassesWhenProviderConfigIsValid(t *testing.T) {
 	}
 }
 
+func TestDoctorFailsWithoutConnection(t *testing.T) {
+	t.Parallel()
+	service := New(config.Settings{DefaultOutputRoot: t.TempDir(), AppVersion: "test", ConfigSource: "test"})
+	result, err := service.Doctor(t.Context(), DoctorRequest{})
+	if err != nil {
+		t.Fatalf("doctor: %v", err)
+	}
+	check := findDoctorCheck(result, "provider")
+	if check == nil || check.Status != "fail" {
+		t.Fatalf("expected missing connection to fail doctor, got %#v", check)
+	}
+}
+
 func findDoctorCheck(result DoctorResult, name string) *DoctorCheck {
 	for index := range result.Checks {
 		if result.Checks[index].Name == name {

@@ -16,7 +16,7 @@ func NewService(version string) Service {
 	return Service{version: version}
 }
 
-func (s Service) Analyze(scanResult repo.ScanResult, deterministicOnly bool) Result {
+func (s Service) Analyze(scanResult repo.ScanResult) Result {
 	generatedAt := time.Now().UTC()
 	orientationScan := buildOrientationScan(scanResult)
 	metrics := buildMetrics(scanResult)
@@ -31,11 +31,6 @@ func (s Service) Analyze(scanResult repo.ScanResult, deterministicOnly bool) Res
 	projectType := guessProjectType(orientationScan, languages, entryPoints)
 	summary := buildSummary(scanResult.ProjectName, projectType, metrics, languages, entryPoints, hotspots)
 
-	provider := "deterministic-only"
-	if !deterministicOnly {
-		provider = "deterministic-baseline"
-	}
-
 	return Result{
 		SchemaVersion:        schemaVersion,
 		Version:              s.version,
@@ -44,7 +39,7 @@ func (s Service) Analyze(scanResult repo.ScanResult, deterministicOnly bool) Res
 		AnalyzedPath:         scanResult.RootPath,
 		ProjectType:          projectType,
 		Summary:              summary,
-		Provider:             provider,
+		Provider:             "repository-scan",
 		Languages:            languages,
 		ImportantDirectories: importantDirectories,
 		EntryPoints:          entryPoints,

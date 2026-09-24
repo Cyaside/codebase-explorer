@@ -6,12 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Cyaside/codebase-explorer/internal/analyzer"
 	"github.com/Cyaside/codebase-explorer/internal/bundle"
 	"github.com/Cyaside/codebase-explorer/internal/cache"
 	"github.com/Cyaside/codebase-explorer/internal/config"
 	"github.com/Cyaside/codebase-explorer/internal/fullai"
+	"github.com/Cyaside/codebase-explorer/internal/graph"
 	"github.com/Cyaside/codebase-explorer/internal/provider"
 	"github.com/Cyaside/codebase-explorer/internal/repo"
 )
@@ -26,6 +28,7 @@ type Service struct {
 	fullAIFunctions fullai.FunctionPreparer
 	providers       provider.Registry
 	writer          bundle.Writer
+	credentials     *credentialStore
 }
 
 func New(settings config.Settings) Service {
@@ -52,10 +55,32 @@ func New(settings config.Settings) Service {
 		fullAIFunctions: fullai.NewFunctionPreparer(),
 		providers:       provider.NewRegistry(),
 		writer:          bundle.NewWriter(settings.AppVersion, settings.OutputKeepLatest),
+		credentials:     newCredentialStore(""),
 	}
 }
 
 func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Minute)
+	defer cancel()
+	// New runs always use the single AI workflow.
+	request.FullAI = fullai.Options{Mode: fullai.ModeFull}
+	if request.CredentialID != "" {
+		if request.ProviderOverride != nil {
+			return AnalyzeResult{}, fmt.Errorf("connection: choose a saved connection or a direct provider override")
+		}
+		connection, err := s.credentials.connection(request.CredentialID)
+		if err != nil {
+			return AnalyzeResult{}, fmt.Errorf("connection: %w", err)
+		}
+		request.ProviderOverride = &connection
+	}
+	if err := s.providers.Validate(s.providerConfig(request)); err != nil {
+		return AnalyzeResult{}, fmt.Errorf("connection: %w", err)
+	}
+	packHash, err := fullai.PackHash()
+	if err != nil {
+		return AnalyzeResult{}, fmt.Errorf("agent instructions: %w", err)
+	}
 	emitAnalyzeProgress(request, "analyze", "running", "starting local repository analysis")
 
 	repoPath, err := resolveRepoPath(request.RepoPath)
@@ -69,6 +94,13 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	}
 
 	supportFiles := resolveSupportFiles(repoPath, request.OptionalSupportFiles)
+	safeSupportFiles := supportFiles[:0]
+	for _, path := range supportFiles {
+		if !fullai.SensitiveEvidencePath(path) {
+			safeSupportFiles = append(safeSupportFiles, path)
+		}
+	}
+	supportFiles = safeSupportFiles
 	state, err := s.loadDeterministicState(ctx, request, repoPath, supportFiles)
 	if err != nil {
 		return AnalyzeResult{}, fmt.Errorf("scan repository: %w", err)
@@ -81,11 +113,20 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	fullAIPlan, fullAISummary := s.buildFullAIPlan(request, scanResult, analysis, changeResult, supportFiles)
 	fullAIEvidence, fullAISummary := s.collectFullAIEvidence(request, scanResult, analysis, changeResult, supportFiles, fullAIPlan, fullAISummary)
 	fullAIFunctions, fullAISummary := s.prepareFullAIFunctions(request, scanResult, analysis, changeResult, supportFiles, fullAIPlan, fullAIEvidence, fullAISummary)
-	fullAIExecution, fullAISummary, err := s.executeFullAIFunctions(ctx, request, analysis, fullAIFunctions, fullAIEvidence, fullAISummary)
+	// Leave time to validate and publish a partial bundle if a slow provider
+	// exhausts the AI portion of the run.
+	aiCtx, cancelAI := context.WithTimeout(ctx, 6*time.Minute)
+	fullAIExecution, fullAISummary, err := s.executeAdaptiveAI(aiCtx, request, analysis, fullAIFunctions, fullAIEvidence, fullAISummary)
+	cancelAI()
 	if err != nil {
 		return AnalyzeResult{}, err
 	}
+	fullAIExecution.PackHash = packHash
+	if fullAIExecution.ExecutedCount == 0 {
+		return AnalyzeResult{}, fmt.Errorf("AI analysis failed: %s", strings.TrimSpace(fullAIExecution.Note))
+	}
 	fullAIVerification := fullai.NewVerification(analysis.GeneratedAt, string(request.FullAI.Normalize().Mode), fullAIExecution.Results)
+	graphs := graph.Build(repoPath, analysis, fullAIExecution)
 	aiContext := buildCondensedContext(analysis)
 	emitAnalyzeProgress(request, "ai-context", "ready", summarizeAIContext(aiContext))
 	aiResult, providerCacheStatus, err := s.buildFinalAIResult(ctx, request, analysis, aiContext, fullAIExecution)
@@ -100,12 +141,11 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	emitAnalyzeProgress(request, "bundle-write", "running", "writing bundle output")
 	combinedProviderStatus := combineProviderStatus(providerCacheStatus, fullAICacheStatus(fullAISummary))
 	writeResult, err := s.writer.Write(bundle.WriteRequest{
-		OutputRoot:        outputRoot,
-		DeterministicOnly: request.DeterministicOnly,
-		ScanResult:        scanResult,
-		Analysis:          analysis,
-		Changes:           changeResult,
-		Warnings:          warnings,
+		OutputRoot: outputRoot,
+		ScanResult: scanResult,
+		Analysis:   analysis,
+		Changes:    changeResult,
+		Warnings:   warnings,
 		Cache: bundle.CacheMeta{
 			Enabled:             s.cache.Enabled(),
 			Root:                s.cache.Root(),
@@ -120,13 +160,18 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 		FullAIExecution:    fullAIExecution,
 		FullAIVerification: fullAIVerification,
 		FullAISummary:      fullAISummary,
+		Graphs:             graphs,
 	})
 	if err != nil {
 		return AnalyzeResult{}, fmt.Errorf("write bundle: %w", err)
 	}
 	emitAnalyzeProgress(request, "bundle-write", "succeeded", fmt.Sprintf("bundle written to %s", writeResult.BundlePath))
 	emitAnalyzeProgress(request, "output-cleanup", cleanupStatus(writeResult.PrunedBundles), cleanupDetail(writeResult.PrunedBundles, writeResult.RetentionLimit))
-	emitAnalyzeProgress(request, "analyze", "succeeded", fmt.Sprintf("analysis completed for %s", analysis.ProjectName))
+	completionStatus := "succeeded"
+	if fullAIExecution.Status == "partial" {
+		completionStatus = "partial"
+	}
+	emitAnalyzeProgress(request, "analyze", completionStatus, fmt.Sprintf("analysis completed for %s", analysis.ProjectName))
 
 	primaryLanguage := ""
 	if len(analysis.Languages) > 0 {
@@ -164,7 +209,7 @@ func (s Service) Analyze(ctx context.Context, request AnalyzeRequest) (AnalyzeRe
 	}, nil
 }
 
-func (s Service) Doctor(_ context.Context, _ DoctorRequest) (DoctorResult, error) {
+func (s Service) Doctor(_ context.Context, request DoctorRequest) (DoctorResult, error) {
 	outputRoot, err := s.resolveOutputRoot("")
 	if err != nil {
 		return DoctorResult{}, err
@@ -210,7 +255,7 @@ func (s Service) Doctor(_ context.Context, _ DoctorRequest) (DoctorResult, error
 		})
 	}
 
-	checks = append(checks, s.providerDoctorCheck())
+	checks = append(checks, s.providerDoctorCheck(request))
 
 	return DoctorResult{
 		ConfigSource: s.settings.ConfigSource,
@@ -219,16 +264,15 @@ func (s Service) Doctor(_ context.Context, _ DoctorRequest) (DoctorResult, error
 	}, nil
 }
 
-func (s Service) providerDoctorCheck() DoctorCheck {
+func (s Service) providerDoctorCheck(request DoctorRequest) DoctorCheck {
 	providerConfig := s.providerConfig(AnalyzeRequest{})
-	if !providerConfig.Enabled() {
-		return DoctorCheck{
-			Name:   "provider",
-			Status: "pass",
-			Detail: "no provider configured; deterministic analysis remains available",
+	if request.CredentialID != "" {
+		var err error
+		providerConfig, err = s.credentials.connection(request.CredentialID)
+		if err != nil {
+			return DoctorCheck{Name: "provider", Status: "fail", Detail: err.Error()}
 		}
 	}
-
 	if err := s.providers.Validate(providerConfig); err != nil {
 		return DoctorCheck{
 			Name:   "provider",

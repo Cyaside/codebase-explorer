@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 )
@@ -17,6 +18,23 @@ func (c Config) Enabled() bool {
 	return strings.TrimSpace(c.Name) != ""
 }
 
+// Canonical preserves old connection names while exposing one provider contract.
+func (c Config) Canonical() Config {
+	c.Name = normalizeName(c.Name)
+	c.Model = strings.TrimSpace(c.Model)
+	c.APIKey = strings.TrimSpace(c.APIKey)
+	c.BaseURL = strings.TrimRight(strings.TrimSpace(c.BaseURL), "/")
+	if c.Name == "openai" {
+		c.Name = "compatible"
+		if c.BaseURL == "" {
+			c.BaseURL = "https://api.openai.com/v1"
+		}
+	} else if c.Name == "openai-compatible" {
+		c.Name = "compatible"
+	}
+	return c
+}
+
 type Descriptor struct {
 	Name            string
 	RequiresAPIKey  bool
@@ -30,13 +48,8 @@ type Registry struct {
 
 func NewRegistry() Registry {
 	descriptors := map[string]Descriptor{
-		"openai": {
-			Name:           "openai",
-			RequiresAPIKey: true,
-			RequiresModel:  true,
-		},
-		"openai-compatible": {
-			Name:            "openai-compatible",
+		"compatible": {
+			Name:            "compatible",
 			RequiresAPIKey:  true,
 			RequiresModel:   true,
 			RequiresBaseURL: true,
@@ -56,8 +69,9 @@ func (r Registry) Names() []string {
 }
 
 func (r Registry) Validate(config Config) error {
+	config = config.Canonical()
 	if !config.Enabled() {
-		return nil
+		return fmt.Errorf("compatible connection is required: configure a base URL, model, and API key")
 	}
 
 	name := normalizeName(config.Name)
@@ -74,22 +88,27 @@ func (r Registry) Validate(config Config) error {
 	if descriptor.RequiresBaseURL && strings.TrimSpace(config.BaseURL) == "" {
 		return fmt.Errorf("provider %q requires a base URL", descriptor.Name)
 	}
+	parsed, err := url.Parse(config.BaseURL)
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return fmt.Errorf("provider %q requires an HTTP(S) base URL without credentials or query", descriptor.Name)
+	}
 
 	return nil
 }
 
 func (r Registry) Describe(name string) (Descriptor, bool) {
-	descriptor, found := r.descriptors[normalizeName(name)]
+	descriptor, found := r.descriptors[(Config{Name: name}).Canonical().Name]
 	return descriptor, found
 }
 
 func (r Registry) ClientFor(config Config) (Client, error) {
+	config = config.Canonical()
 	if err := r.Validate(config); err != nil {
 		return nil, err
 	}
 
 	switch normalizeName(config.Name) {
-	case "openai", "openai-compatible":
+	case "compatible":
 		client := NewOpenAICompatibleClient(nil)
 		return client, nil
 	default:

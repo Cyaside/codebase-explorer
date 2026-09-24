@@ -61,12 +61,18 @@ func selectFunctionEvidence(name string, items []EvidenceItem) []string {
 	}
 
 	for _, item := range items {
+		if item.ReadStatus != "read" {
+			continue
+		}
 		if matchesFunctionEvidence(name, item) {
 			add(item)
 		}
 	}
 	if len(paths) == 0 {
 		for _, item := range items {
+			if item.ReadStatus != "read" {
+				continue
+			}
 			add(item)
 			if len(paths) >= 3 {
 				break

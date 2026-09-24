@@ -4,10 +4,10 @@ This folder contains the AI instruction pack that ships with Codebase Explorer.
 
 ## Purpose
 
-`.agents/` tells an AI exploration worker how to:
+`.agents/` is embedded in the application and sent to AI workers with selected repository evidence. It tells workers how to:
 
-- inspect a repository
-- gather evidence
+- inspect supplied repository evidence
+- cite the files supporting each claim
 - produce structured outputs for each major analysis surface
 - avoid hallucinating architecture or issue claims
 

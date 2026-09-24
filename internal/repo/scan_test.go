@@ -1,6 +1,28 @@
 package repo
 
-import "testing"
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestScanExcludesCredentialFilesFromMetadata(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for name, content := range map[string]string{"README.md": "project", ".env": "API_KEY=secret", "credentials.json": `{"key":"secret"}`} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := NewScanner().Scan(context.Background(), ScanOptions{RootPath: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Files) != 1 || result.Files[0].Path != "README.md" {
+		t.Fatalf("credential paths entered scan metadata: %#v", result.Files)
+	}
+}
 
 func TestMarkerCountOnlyMatchesStandaloneMarkers(t *testing.T) {
 	t.Parallel()

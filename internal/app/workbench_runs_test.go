@@ -19,6 +19,7 @@ func TestWorkbenchAnalyzeRunCompletes(t *testing.T) {
 		DefaultOutputRoot: t.TempDir(),
 		AppVersion:        "test",
 		ConfigSource:      "test",
+		Provider:          mockConnection(t),
 	})
 
 	handler, err := service.workbenchHandler(service.settings.DefaultOutputRoot)
@@ -27,8 +28,7 @@ func TestWorkbenchAnalyzeRunCompletes(t *testing.T) {
 	}
 
 	body, err := json.Marshal(map[string]any{
-		"repo_path":          filepath.Join("..", "..", "testdata", "sample-repo"),
-		"deterministic_only": true,
+		"repo_path": filepath.Join("..", "..", "testdata", "sample-repo"),
 	})
 	if err != nil {
 		t.Fatalf("marshal run body: %v", err)
@@ -117,7 +117,6 @@ func TestWorkbenchAnalyzeRunCanBeCanceled(t *testing.T) {
 		t.Fatalf("decode start response: %v", err)
 	}
 
-	time.Sleep(150 * time.Millisecond)
 	cancelRequest := httptest.NewRequest(http.MethodPost, "/api/analyze-runs/"+started.Run.ID+"/cancel", nil)
 	cancelRecorder := httptest.NewRecorder()
 	handler.ServeHTTP(cancelRecorder, cancelRequest)
@@ -156,7 +155,7 @@ func pollWorkbenchRun(t *testing.T, handler http.Handler, runID string, wait tim
 		lastRun = response.Run
 
 		switch response.Run.Status {
-		case "succeeded", "failed", "canceled":
+		case "succeeded", "partial", "failed", "canceled":
 			return response.Run
 		}
 

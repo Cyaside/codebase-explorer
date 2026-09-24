@@ -24,8 +24,8 @@ export function StatsGrid({ bundle }: StatsGridProps) {
         {
           icon: <Bot className="size-4" />,
           label: "AI status",
-          note: bundle.data.ai.provider || "AI inactive",
-          value: bundle.data.ai.status || "disabled",
+          note: bundle.data.ai.provider || "Provider unavailable",
+          value: bundle.data.ai.status || "unknown",
         },
         {
           icon: <ShieldAlert className="size-4" />,
@@ -43,14 +43,14 @@ export function StatsGrid({ bundle }: StatsGridProps) {
         },
         {
           icon: <GitBranch className="size-4" />,
-          label: "Flowchart",
-          note: "Graph appears after analysis",
+          label: "Graphs",
+          note: "Available after analysis",
           value: "--",
         },
         {
           icon: <Bot className="size-4" />,
           label: "AI status",
-          note: "Optional synthesis layer",
+          note: "Connection required",
           value: "--",
         },
         {
@@ -62,15 +62,15 @@ export function StatsGrid({ bundle }: StatsGridProps) {
       ];
 
   return (
-    <section className="grid gap-3 xl:grid-cols-4">
+    <section className="stats-strip">
       {cards.map((card) => (
-        <article className="panel-block h-full min-h-[10.5rem]" key={card.label}>
+        <article className="stat-item" key={card.label}>
           <div className="flex items-center justify-between gap-3">
             <span className="panel-kicker">{card.label}</span>
-            <span className="text-zinc-500">{card.icon}</span>
+            <span className="stat-icon">{card.icon}</span>
           </div>
-          <strong className="mt-8 block text-4xl font-semibold tracking-tight text-zinc-50">{card.value}</strong>
-          <p className="mt-3 text-sm text-zinc-300">{card.note}</p>
+          <strong className="stat-value">{card.value}</strong>
+          <p className="stat-note">{card.note}</p>
         </article>
       ))}
     </section>

@@ -7,15 +7,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
 const defaultOpenAIBaseURL = "https://api.openai.com/v1"
 
 const maxPromptCompletionAttempts = 3
+const promptHTTPTimeout = 180 * time.Second
 
 type HTTPDoer interface {
 	Do(*http.Request) (*http.Response, error)
@@ -23,13 +27,19 @@ type HTTPDoer interface {
 
 type OpenAICompatibleClient struct {
 	httpClient HTTPDoer
+	limiter    *promptLimiter
+}
+
+type promptLimiter struct {
+	serial atomic.Bool
+	mu     sync.Mutex
 }
 
 func NewOpenAICompatibleClient(httpClient HTTPDoer) OpenAICompatibleClient {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		httpClient = &http.Client{Timeout: promptHTTPTimeout}
 	}
-	return OpenAICompatibleClient{httpClient: httpClient}
+	return OpenAICompatibleClient{httpClient: httpClient, limiter: &promptLimiter{}}
 }
 
 func (c OpenAICompatibleClient) Synthesize(ctx context.Context, request Request) (Result, error) {
@@ -64,11 +74,27 @@ func (c OpenAICompatibleClient) Synthesize(ctx context.Context, request Request)
 func (c OpenAICompatibleClient) Complete(ctx context.Context, request PromptRequest) (PromptResult, error) {
 	var lastErr error
 	for attempt := range maxPromptCompletionAttempts {
-		result, retryAfter, err := c.completeOnce(ctx, request)
+		var result PromptResult
+		var retryAfter *time.Duration
+		var err error
+		if c.limiter != nil && c.limiter.serial.Load() {
+			c.limiter.mu.Lock()
+			result, retryAfter, err = c.completeOnce(ctx, request)
+			c.limiter.mu.Unlock()
+		} else {
+			result, retryAfter, err = c.completeOnce(ctx, request)
+		}
 		if err == nil {
 			return result, nil
 		}
+		var statusErr promptStatusError
+		if c.limiter != nil && errors.As(err, &statusErr) && statusErr.statusCode == http.StatusTooManyRequests {
+			c.limiter.serial.Store(true)
+		}
 		lastErr = err
+		if ctx.Err() != nil {
+			return PromptResult{}, ctx.Err()
+		}
 		if attempt == maxPromptCompletionAttempts-1 || !retryablePromptError(err) {
 			return PromptResult{}, err
 		}
@@ -121,12 +147,14 @@ func (c OpenAICompatibleClient) completeOnce(ctx context.Context, request Prompt
 	}
 
 	return PromptResult{
-		GeneratedAt: time.Now().UTC(),
-		Provider:    normalizeName(request.Config.Name),
-		Model:       strings.TrimSpace(request.Config.Model),
-		Status:      ResultStatusAvailable,
-		Used:        true,
-		Content:     strings.TrimSpace(content),
+		GeneratedAt:  time.Now().UTC(),
+		Provider:     request.Config.Canonical().Name,
+		Model:        strings.TrimSpace(request.Config.Model),
+		Status:       ResultStatusAvailable,
+		Used:         true,
+		Content:      strings.TrimSpace(content),
+		PromptTokens: response.Usage.PromptTokens,
+		OutputTokens: response.Usage.CompletionTokens,
 	}, nil, nil
 }
 
@@ -142,6 +170,10 @@ type openAICompatibleChatMessage struct {
 
 type openAICompatibleChatResponse struct {
 	Choices []openAICompatibleChoice `json:"choices"`
+	Usage   struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+	} `json:"usage"`
 }
 
 type openAICompatibleChoice struct {
@@ -191,25 +223,24 @@ func chatCompletionsURL(config Config) string {
 
 type promptStatusError struct {
 	statusCode int
-	body       []byte
 }
 
 func (e promptStatusError) Error() string {
-	message := strings.TrimSpace(string(e.body))
-	if message == "" {
-		return fmt.Sprintf("synthesis request failed with status %d", e.statusCode)
-	}
-	return fmt.Sprintf("synthesis request failed with status %d: %s", e.statusCode, message)
+	return fmt.Sprintf("provider request failed with HTTP status %d", e.statusCode)
 }
 
-func httpStatusError(statusCode int, body []byte) error {
-	return promptStatusError{statusCode: statusCode, body: body}
+func httpStatusError(statusCode int, _ []byte) error {
+	return promptStatusError{statusCode: statusCode}
 }
 
 func retryablePromptError(err error) bool {
 	var statusErr promptStatusError
 	if errors.As(err, &statusErr) {
 		return statusErr.statusCode == http.StatusTooManyRequests || statusErr.statusCode >= http.StatusInternalServerError
+	}
+	var networkError net.Error
+	if errors.As(err, &networkError) {
+		return networkError.Timeout() || networkError.Temporary()
 	}
 
 	message := strings.ToLower(strings.TrimSpace(err.Error()))
@@ -249,11 +280,11 @@ func retryAfterDuration(value string) *time.Duration {
 		return nil
 	}
 	if seconds, err := strconv.Atoi(trimmed); err == nil {
-		duration := time.Duration(seconds) * time.Second
+		duration := min(time.Duration(seconds)*time.Second, 30*time.Second)
 		return &duration
 	}
 	if retryAt, err := http.ParseTime(trimmed); err == nil {
-		duration := time.Until(retryAt)
+		duration := min(time.Until(retryAt), 30*time.Second)
 		if duration < 0 {
 			duration = 0
 		}
