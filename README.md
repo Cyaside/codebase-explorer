@@ -1,136 +1,131 @@
-# Codebase Explorer
+<div align="center">
+  <img src="ui/public/brand-mark.svg" alt="Codebase Explorer logo" width="64" height="64" />
+  <h1>Codebase Explorer</h1>
+  <p><strong>Find your way through an unfamiliar repository.</strong></p>
+  <p>A local workbench that turns a source checkout into an evidence-linked overview, reading path, and interactive graphs.</p>
+  <p>
+    <a href="go.mod"><img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" /></a>
+    <a href="ui/package.json"><img alt="React 19" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" /></a>
+    <a href="LICENSE"><img alt="Apache 2.0 license" src="https://img.shields.io/badge/License-Apache%202.0-64748B" /></a>
+  </p>
+  <p>
+    <a href="#why-codebase-explorer">Why</a> ·
+    <a href="#quick-start">Quick start</a> ·
+    <a href="#how-it-works">How it works</a> ·
+    <a href="#workbench-and-bundles">Workbench and bundles</a> ·
+    <a href="#development">Development</a>
+  </p>
+</div>
 
-Codebase Explorer adalah CLI dan local web workbench untuk membantu memahami codebase asing dengan cepat lewat structured analysis bundle.
+<p align="center">
+  <a href="media/codebase-explorer-demo.webm">
+    <img src="media/demo-preview.png" alt="Codebase Explorer dark workbench showing an evidence-linked architecture graph" width="900" />
+  </a>
+</p>
+<p align="center"><a href="media/codebase-explorer-demo.webm">Watch the 24-second workbench demo (WebM)</a></p>
 
-Tool ini memakai deterministic analysis sebagai baseline dan bisa dinaikkan ke full-AI repository exploration saat provider AI dikonfigurasi:
-- scan repo lokal dengan ignore handling
-- deteksi bahasa utama, entry point, dan module penting
-- ranking hotspot dan dependency risk ringan
-- reading path awal untuk onboarding
-- optional support-file correlation untuk issue export atau changelog lokal
-- optional full-AI mode berbasis instruction pack `.agents/`
-- output bundle reusable dalam format Markdown, JSON, Mermaid, dan viewer/workbench lokal
+## Why Codebase Explorer?
 
-## Quickstart
+Getting oriented in a new codebase means finding its entry points, understanding how modules relate, and checking whether an explanation actually points to source. Codebase Explorer combines a local repository scan with an OpenAI-compatible model, then keeps the source paths behind its findings visible in the workbench.
+
+It runs against a **local checkout**. You choose the endpoint and model; an API key is required before analysis begins.
+
+## What you get
+
+| View | What it helps you do |
+| --- | --- |
+| Overview and summary | See the repository shape, main language, entry points, and supported findings. |
+| Architecture and reading path | Understand major components and where to start reading. |
+| Graphs | Explore architecture, execution flow, and dependencies/impact through interactive, dark-theme diagrams. |
+| Issues and recommendations | Review risks and next steps alongside their source references. |
+| Inspector | Open the evidence and relationships behind a selected item. |
+
+The workbench uses React Flow and ELKjs to lay out structured nodes and edges. The current graph UI does not render Mermaid.
+
+## Quick start
+
+**Requirements:** Go 1.26 or newer, a local repository checkout, and an OpenAI-compatible endpoint with a model and API key. Node.js is only needed when changing the frontend.
 
 ```bash
-go run ./cmd/codearch doctor
-go run ./cmd/codearch analyze <repo-path> --deterministic-only
-go run ./cmd/codearch analyze <repo-path> --full-ai
-go run ./cmd/codearch start --no-browser
-go run ./cmd/codearch analyze <repo-path> --support ./issues.json --changelog ./CHANGELOG.md
-go run ./cmd/codearch open --no-browser
-go run ./cmd/codearch export --output ./out/latest-bundle.zip
-go run ./cmd/codearch cache clear
+git clone https://github.com/Cyaside/codebase-explorer.git
+cd codebase-explorer
+go run ./cmd/codearch start
 ```
 
-Panduan langkah cepat yang lebih lengkap ada di [docs/quickstart.md](docs/quickstart.md).
+Open the local URL printed by the command if the browser does not open automatically. Then:
 
-## Commands
+1. In **Connections**, enter the endpoint base URL, model, and API key. Use **Test model**, then **Save**. The key is stored by the local backend outside this repository, so you do not need to re-enter it for each run.
+2. In **Project setup**, select a local repository path. Add support files such as an issue export or changelog if they are relevant.
+3. Select **Analyze**. Follow progress in the workbench, then open the summary, architecture, graphs, and evidence inspector.
 
-- `codearch doctor`
-  Validasi config, output root, cache root, dan provider setup.
-- `codearch analyze <repo-path>`
-  Menjalankan scan, deterministic analysis, support-file correlation opsional, AI synthesis opsional, dan full-AI exploration bila `--full-ai` aktif.
-- `codearch start [--addr <host:port>] [--no-browser]`
-  Menjalankan local web workbench untuk membuka satu project aktif, menyimpan workspace lokal, memilih koneksi provider, menjalankan full-AI analysis, dan membaca bundle dengan UI dark control-plane. Ini adalah command yang direkomendasikan untuk pemakaian harian.
-- `codearch serve [--addr <host:port>] [--no-browser]`
-  Alias lama untuk `codearch start`.
-- `codearch open [bundle-path] [--no-browser]`
-  Membuka viewer bundle terbaru atau bundle yang dipilih.
-- `codearch export [bundle-path] [--output <zip-path>]`
-  Mengekspor bundle yang sudah ada ke file `.zip` tanpa analisis ulang.
-- `codearch cache clear`
-  Menghapus cache filesystem dengan aman tanpa menyentuh bundle di `out/`.
+For a CLI run, use a saved connection:
 
-## Environment
+```bash
+go run ./cmd/codearch doctor --connection openai
+go run ./cmd/codearch analyze <repo-path> --connection openai
+```
 
-Variabel environment yang didukung:
-
-- `CODEARCH_OUTPUT_ROOT`
-  Override root output bundle. Default: `out/`
-- `CODEARCH_OUTPUT_KEEP`
-  Jumlah bundle terbaru yang dipertahankan. Default: `10`
-- `CODEARCH_CACHE`
-  Aktif/nonaktifkan cache filesystem. Nilai: `true/false`
-- `CODEARCH_CACHE_ROOT`
-  Override lokasi cache filesystem
-- `CODEARCH_PROVIDER`
-  Provider AI opsional, misalnya `openai` atau `openai-compatible`
-- `CODEARCH_MODEL`
-  Model provider AI
-- `CODEARCH_API_KEY`
-  API key provider AI
-- `CODEARCH_BASE_URL`
-  Base URL untuk provider `openai-compatible`
-
-Environment tetap cocok untuk satu default provider. Kalau butuh beberapa API key sekaligus, gunakan `codearch start` lalu simpan connection profile lokal di browser untuk OpenAI, OpenRouter, Mistral, atau endpoint compatible lain. Profile itu hanya dipakai per run dan tidak ikut ditulis ke bundle output.
-
-Contoh Mistral lewat provider openai-compatible:
+Or provide the same connection through environment variables, for example in PowerShell:
 
 ```powershell
-$env:CODEARCH_PROVIDER="openai-compatible"
-$env:CODEARCH_BASE_URL="https://api.mistral.ai/v1"
-$env:CODEARCH_MODEL="mistral-small-latest"
-$env:CODEARCH_API_KEY="..."
-go run ./cmd/codearch analyze <repo-path> --full-ai
+$env:CODEARCH_BASE_URL = "https://your-endpoint.example/v1"
+$env:CODEARCH_MODEL = "your-model"
+$env:CODEARCH_API_KEY = "your-key"
+go run ./cmd/codearch doctor
+go run ./cmd/codearch analyze C:\path\to\repository
 ```
 
-## Output Bundle
+The base URL, model, and key are all required. Keep the key in your local environment or the workbench connection form; never add it to a repository file.
 
-Hasil analisis ditulis ke folder `out/` dan berisi:
-- `README.md` sebagai pintu masuk hasil
-- `overview/`, `architecture/`, `hotspots/`, `dependencies/`, dan `reading-path/`
-- `changes/` untuk korelasi changelog atau issue export saat support files diberikan
-- `architecture/module-graph.mmd` dan `dependencies/dependency-graph.mmd`
-- `ui/index.html` untuk viewer lokal
-- `data/analysis.json`, `data/metrics.json`, `data/files.json`, `data/modules.json`, dan `data/contract.json`
-- `data/full-ai-plan.json`, `data/full-ai-evidence.json`, `data/full-ai-functions.json`, `data/full-ai-execution.json`, dan `data/full-ai-meta.json`
-- `changes/issue-correlation.json` untuk hasil machine-readable change awareness
+## How it works
 
-`out/` juga sekarang dipruning otomatis agar hanya menyimpan bundle terbaru dalam jumlah terbatas.
+1. **Check the connection.** The model configuration and API key are validated before the repository is scanned.
+2. **Scan and select evidence.** Local analysis finds entry points, modules, dependencies, hotspots, and relevant support files. It limits and redacts the material sent to the endpoint.
+3. **Run the instruction pack.** Workers load the actual `.agents/` instructions. Compact context uses one structured model request; larger context can use two independent requests in parallel. The dashboard is assembled locally.
+4. **Validate and assemble.** Returned sections are checked against the evidence paths that were read. Only a failed section may get one focused repair request. The run reports `succeeded`, `partial`, or `failed` rather than silently treating provider failure as success.
+5. **Write a bundle.** Accepted results and scan data are written atomically with the instruction pack version/hash and run metrics.
 
-Support files tetap opsional. Kalau file issue/changelog tidak diberikan atau tidak valid, hasil utama deterministic tetap jadi dan bundle tetap ditulis.
+Path and structure checks do **not** prove that every interpretation is semantically correct. Review important claims against the linked source.
 
-## Workbench
+## Workbench and bundles
 
-Workbench adalah local webapp ringan yang tetap jalan dari binary Go yang sama, tanpa Electron atau backend berat tambahan. Workbench ini cocok untuk:
-- membuka satu project aktif lewat saved workspace lokal
-- menyimpan beberapa connection profile secara lokal di browser
-- menjalankan full-AI analysis dari koneksi provider terpilih
-- mengetes provider, model, API key, dan model list langsung dari tab Connections
-- langsung membaca dashboard, summary, architecture, flowchart, issue tracking, dan recommendations
-- menampilkan flowchart project langsung di tab interaktif, bukan hanya source diagram mentah
-- melihat status full-AI, jumlah evidence yang dibaca, function outputs, dan verified counts
+The workbench serves on the local machine. Each completed analysis produces a portable bundle under `out/` by default. The bundle includes Markdown reports, structured JSON in `data/`, and a standalone viewer in `ui/`. The evidence manifest records paths and metadata without retaining the submitted source excerpts.
 
-Untuk sekarang jalur local-first tetap diprioritaskan, jadi input repository GitHub URL belum di-clone otomatis. Gunakan local checkout path saat menjalankan analisis dari workbench.
+| Command | Purpose |
+| --- | --- |
+| `go run ./cmd/codearch start` | Start the local workbench. Use `--addr <host:port>` or `--no-browser` when needed. |
+| `go run ./cmd/codearch analyze <repo-path>` | Analyze a checkout with a saved or environment connection. Accepts `--connection`, `--support`, `--issues`, `--changelog`, `--output`, and `--ignore`. |
+| `go run ./cmd/codearch doctor` | Check the connection and local setup before a run. |
+| `go run ./cmd/codearch open [bundle-path]` | Open the latest or a selected bundle. |
+| `go run ./cmd/codearch export [bundle-path] --output <zip-path>` | Package an existing bundle without analyzing again. |
+| `go run ./cmd/codearch cache clear` | Clear the analysis cache. |
 
-## Build
+Older bundles remain readable in the current viewer. Generated bundles and cache directories are ignored by Git. The default output retention is ten bundles; `CODEARCH_OUTPUT_ROOT` and `CODEARCH_OUTPUT_KEEP` change the output location and retention.
 
-Single binary tetap jadi jalur distribusi utama. Contoh build:
+## Data and trust
+
+- The workbench stores the API key in its local backend and does not return the saved key to the browser or write it into a bundle.
+- Common secret files are excluded, and selected excerpts are checked for sensitive content before they are sent.
+- Large files and total request size are bounded internally. Bundle metadata records the evidence manifest and request size.
+- Model output is accepted only when its references pass the available evidence and structure checks. Partial results remain visibly partial.
+- The endpoint you configure receives selected repository evidence. Use an endpoint you trust for the repository you analyze.
+
+## Development
+
+The Go binary embeds the built workbench assets, so a normal `go run` does not need an npm install. To change the frontend, use Node.js and npm:
 
 ```bash
-go build -o ./dist/codearch ./cmd/codearch
-GOOS=windows GOARCH=amd64 go build -o ./dist/codearch-windows-amd64.exe ./cmd/codearch
-GOOS=darwin GOARCH=arm64 go build -o ./dist/codearch-darwin-arm64 ./cmd/codearch
-GOOS=linux GOARCH=amd64 go build -o ./dist/codearch-linux-amd64 ./cmd/codearch
+cd ui
+npm ci
+npm run check
+npm run build
 ```
 
-Release checklist ringkas ada di [docs/release-checklist.md](docs/release-checklist.md).
+Then run the backend checks from the repository root:
 
-## Troubleshooting
+```bash
+go test ./...
+go vet ./...
+```
 
-Kalau run tidak sesuai harapan, lihat [docs/troubleshooting.md](docs/troubleshooting.md).
-
-Masalah yang paling umum:
-- provider belum dikonfigurasi, jadi AI otomatis `disabled` atau `fallback`
-- support file tidak valid, jadi change-awareness ditulis sebagai partial result
-- repo cukup besar, sehingga CLI memberi warning performa dan bundle bisa lebih berat
-
-## Status
-
-Deterministic analyzer, AI synthesis opsional, full-AI exploration, visual workbench, change-awareness, cache filesystem, `export`, dan `cache clear` sudah aktif. Produk sekarang sudah bisa dipakai end-to-end sebagai local-first repository orientation tool dengan optional deep AI pass.
-
-## License
-
-Codebase Explorer is licensed under the [Apache License 2.0](LICENSE).
+The project is licensed under [Apache 2.0](LICENSE).
